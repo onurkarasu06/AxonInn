@@ -1,0 +1,693 @@
+﻿@model AxonInn.Models.Hotel
+@using Microsoft.AspNetCore.Http
+@using System.Text.Encodings.Web
+@using Newtonsoft.Json
+
+@{
+    Layout = "~/Views/Shared/_Layout.cshtml";
+    
+    // HATA ÇÖZÜMÜ: Eski GetObject yerine standart JSON Deserialize işlemini kullanıyoruz
+    var personelJson = Context.Session.GetString("GirisYapanPersonel");
+    AxonInn.Models.Personel girisYapanPersonel = null;
+    
+    if (!string.IsNullOrEmpty(personelJson))
+    {
+        girisYapanPersonel = JsonConvert.DeserializeObject<AxonInn.Models.Personel>(personelJson);
+    }
+    
+    int yetki = girisYapanPersonel?.Yetki ?? 0;
+    
+    // Modelden gelen verileri hiyerarşiden çıkarıp düz listelere dönüştürüyoruz
+    var departmanlar = Model?.Departmen?.ToList() ?? new List<AxonInn.Models.Departman>();
+    var personelList = departmanlar.SelectMany(d => d.Personels).ToList();
+    var gorevList = personelList.SelectMany(p => p.Gorevs).OrderByDescending(g => g.KayitTarihi).ToList();
+}
+
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css" />
+
+<style>
+    /* Orijinal CSS tasarımın birebir korunmuştur */
+    .table-responsive::-webkit-scrollbar { width: 5px; }
+    .table-responsive::-webkit-scrollbar-track { background: #f8fafc; }
+    .table-responsive::-webkit-scrollbar-thumb { background: #bae6fd; border-radius: 10px; }
+    .table-responsive { border-radius: 12px; -webkit-overflow-scrolling: touch; }
+    .avatar-container { position: relative; width: 35px; height: 35px; display: inline-block; }
+    .avatar-img { width: 35px; height: 35px; object-fit: cover; object-position: top; transition: all 0.3s ease; background-color: #f8f9fa; }
+    .avatar-container:hover .avatar-img { transform: scale(2.5); z-index: 100; position: relative; box-shadow: 0 10px 20px rgba(0,0,0,0.2) !important; }
+    .kanit-img { width: 50px; height: 50px; object-fit: cover; border-radius: 8px; transition: all 0.3s ease; cursor: zoom-in; }
+    .kanit-container { transition: transform 0.3s ease; z-index: 1; }
+    .kanit-container:hover { transform: scale(2.2); z-index: 999; position: relative; }
+    .personel-foto-tikla { cursor: pointer; transition: all 0.3s ease; }
+    .personel-foto-tikla:hover { filter: brightness(0.8); }
+    .btn-edit-small { width: 32px; height: 32px; padding: 0; display: inline-flex; align-items: center; justify-content: center; border-radius: 50%; border: 1px solid; }
+    .gorev-link { font-family: 'Inter', sans-serif; font-size: 0.8rem; cursor: pointer; color: #2c3e50; font-weight: 600; text-decoration: none; }
+    .gorev-link:hover { color: #5c7cfa !important; }
+    button:disabled { cursor: not-allowed !important; opacity: 0.5; }
+    .btn-loading { opacity: 0.8 !important; pointer-events: none !important; cursor: not-allowed !important; }
+    #merkeziPersonelFotoModal .modal-content { background: transparent; border: none; }
+    .personel-modal-wrapper { position: relative; display: inline-flex; flex-direction: column; align-items: center; margin: auto; width: 280px; }
+    .personel-büyük-foto { width: 280px; height: 280px; border: 8px solid white; border-radius: 30px; box-shadow: 0 20px 40px rgba(0,0,0,0.3); object-fit: cover; object-position: top; background-color: #f8f9fa; display: block; }
+    .modal-isim-etiket { margin-top: -20px; z-index: 5; background: linear-gradient(135deg, #5c7cfa 0%, #3b5bdb 100%); color: white; padding: 8px 25px; border-radius: 15px; font-weight: 700; font-size: 0.85rem; border: 2px solid white; box-shadow: 0 8px 15px rgba(92, 124, 250, 0.4); text-transform: uppercase; }
+    .delete-modal-avatar { width: 100% !important; height: 100% !important; border-radius: 50%; object-fit: cover !important; object-position: top !important; background-color: #f8f9fa; }
+    .kanit-modal-cerceve { border: 6px solid #ffffff; border-radius: 20px; background-color: #ffffff; position: relative; display: inline-block; max-width: 95vw; }
+    .modal-kapat-cerceve-kanit, .modal-kapat-cerceve-yeni { position: absolute; top: -12px; right: -12px; z-index: 1100; background-color: #ef4444; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; border-radius: 50%; border: 3px solid #ffffff; box-shadow: 0 4px 12px rgba(0,0,0,0.3); cursor: pointer; transition: all 0.2s ease; }
+    .modal-kapat-cerceve-kanit:hover, .modal-kapat-cerceve-yeni:hover { transform: scale(1.1); background-color: #dc2626; }
+    #carouselIcerik img { max-height: 75vh; max-width: 100%; border-radius: 12px; object-fit: contain; }
+    .skeleton-box { display: inline-block; height: 1em; position: relative; overflow: hidden; background-color: #e2e5ec; border-radius: 8px; }
+    .skeleton-box::after { position: absolute; top: 0; right: 0; bottom: 0; left: 0; transform: translateX(-100%); background-image: linear-gradient(90deg, rgba(255, 255, 255, 0) 0, rgba(255, 255, 255, 0.4) 20%, rgba(255, 255, 255, 0.6) 60%, rgba(255, 255, 255, 0)); animation: shimmer 1.5s infinite; content: ''; }
+    @@keyframes shimmer { 100% { transform: translateX(100%); } }
+    @@media (max-width: 768px) { .container-fluid { padding-left: 10px; padding-right: 10px; } h6.text-uppercase { font-size: 0.65rem !important; letter-spacing: 2px !important; } h5.fw-bold { font-size: 1.1rem; margin-bottom: 10px !important; } .table thead th { font-size: 0.6rem !important; padding: 10px 5px !important; } .table tbody td { padding: 10px 5px !important; font-size: 0.75rem !important; } .avatar-container, .avatar-img { width: 30px; height: 30px; } .gorev-link { font-size: 0.75rem !important; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; white-space: normal; } .btn-edit-small { width: 35px; height: 35px; } .modal-dialog { margin: auto !important; display: flex !important; align-items: center !important; justify-content: center !important; min-height: calc(100% - 1rem); } .modal-content { max-width: 90vw !important; margin: 0 auto !important; } .personel-modal-wrapper { width: 100% !important; max-width: 280px; display: flex; flex-direction: column; align-items: center; } .personel-büyük-foto { max-width: 100%; height: auto; aspect-ratio: 1/1; border-radius: 25px; } .kanit-modal-cerceve { border-width: 4px; } .modal-kapat-cerceve-kanit, .modal-kapat-cerceve-yeni { top: -10px; right: -10px; width: 30px; height: 30px; } }
+</style>
+
+<div id="skeletonLoader" class="container-fluid mt-3">
+    <div class="skeleton-box w-100 mb-4" style="height: 40px; border-radius: 12px;"></div>
+    <div class="row mb-3 align-items-center"><div class="col-6"><div class="skeleton-box w-50" style="height: 30px;"></div></div><div class="col-6 text-end"><div class="skeleton-box w-25 rounded-pill" style="height: 35px;"></div></div></div>
+    <div class="row mb-4 g-3"><div class="col-md-4"><div class="skeleton-box w-100" style="height: 42px; border-radius: 8px;"></div></div><div class="col-md-4"><div class="skeleton-box w-100" style="height: 42px; border-radius: 8px;"></div></div><div class="col-md-4"><div class="skeleton-box w-100" style="height: 42px; border-radius: 8px;"></div></div></div>
+    <div class="card border-0 shadow-lg rounded-4 overflow-hidden">
+        <div class="card-body p-0">
+            <div class="p-3 bg-light border-bottom d-flex justify-content-between"><div class="skeleton-box w-100" style="height: 20px;"></div></div>
+            <div class="p-3">
+                @for (int i = 0; i < 5; i++)
+                {
+                    <div class="d-flex align-items-center justify-content-between mb-3 border-bottom pb-2">
+                        <div class="skeleton-box rounded-circle me-2" style="width: 35px; height: 35px;"></div><div class="skeleton-box" style="width: 20%; height: 20px;"></div><div class="skeleton-box" style="width: 30%; height: 20px;"></div><div class="skeleton-box" style="width: 10%; height: 20px;"></div><div class="skeleton-box" style="width: 15%; height: 20px;"></div><div class="skeleton-box" style="width: 10%; height: 30px; border-radius: 5px;"></div>
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="mainContent" class="container-fluid d-none animate__animated animate__fadeIn">
+    <div class="row mb-4 mt-2">
+        <div class="col-12">
+            <div class="d-flex align-items-center justify-content-center shadow-sm w-100 py-2" style="background-color: #f0f4ff; border-radius: 12px; border: 1px solid rgba(0, 0, 0, 0.04);">
+                <h6 class="mb-0 text-uppercase fw-900" style="letter-spacing: 5px; color: #5c7cfa; font-size: 0.75rem;">
+                    <i class="fas fa-hotel me-2"></i>
+                    @(Model?.Adi ?? "AxonInn Otel")
+                </h6>
+            </div>
+        </div>
+    </div>
+
+    <div class="row mb-3 align-items-center">
+        <div class="col-8 col-md-6">
+            <h5 class="fw-bold text-dark mb-0"><i class="fas fa-tasks me-2 text-primary"></i>Görev Yönetimi</h5>
+        </div>
+        <div class="col-4 col-md-6 text-end">
+            @if (yetki == 1 || yetki == 2)
+            {
+                <button type="button" class="btn btn-primary btn-sm rounded-pill px-4 shadow-sm" data-bs-toggle="modal" data-bs-target="#yeniGorevModal">
+                    <i class="fas fa-plus me-2"></i>
+                    <span class="d-none d-md-inline">Yeni Görev Ekle</span>
+                    <span class="d-inline d-md-none">Ekle</span>
+                </button>
+            }
+            else
+            {
+                <button type="button" class="btn btn-primary btn-sm rounded-pill px-4 shadow-sm opacity-50" disabled>
+                    <i class="fas fa-plus me-2"></i>
+                    <span class="d-none d-md-inline">Yeni Görev Ekle</span>
+                    <span class="d-inline d-md-none">Ekle</span>
+                </button>
+            }
+        </div>
+    </div>
+
+    <div class="row mb-4 g-3">
+        <div class="col-md-4">
+            <div class="input-group shadow-sm rounded-3 overflow-hidden border bg-white">
+                <span class="input-group-text bg-transparent border-0 ps-3"><i class="fas fa-search text-primary opacity-50"></i></span>
+                <input type="text" id="tabloAra" class="form-control border-0 shadow-none py-2" placeholder="Personel veya görev ara...">
+            </div>
+        </div>
+
+        <div class="col-md-4">
+            <div class="dropdown custom-filter-dropdown w-100">
+                <button class="btn custom-filter-btn shadow-sm rounded-3 w-100 py-2 px-3 d-flex align-items-center justify-content-between" type="button" id="durumFilterBtn" data-bs-toggle="dropdown" aria-expanded="false">
+                    <span><i class="fas fa-filter text-primary me-2 opacity-75"></i><span id="selectedDurumText">Tüm Durumlar</span></span>
+                    <i class="fas fa-chevron-down small text-muted"></i>
+                </button>
+                <ul class="dropdown-menu custom-dropdown-menu border-0 shadow-lg p-2 animate-slide-in w-100" aria-labelledby="durumFilterBtn" style="border-radius: 12px;">
+                    <li><a class="dropdown-item active durum-filter-item" href="#" data-value="">Tüm Durumlar</a></li>
+                    <li><a class="dropdown-item durum-filter-item" href="#" data-value="beklemede">🔴 Beklemede</a></li>
+                    <li><a class="dropdown-item durum-filter-item" href="#" data-value="işlemde">🟡 İşlemde</a></li>
+                    <li><a class="dropdown-item durum-filter-item" href="#" data-value="tamamlandı">🟢 Tamamlandı</a></li>
+                </ul>
+            </div>
+        </div>
+
+        <div class="col-md-4">
+            <div class="dropdown custom-filter-dropdown w-100">
+                <button class="btn custom-filter-btn shadow-sm rounded-3 w-100 py-2 px-3 d-flex align-items-center justify-content-between" type="button" id="deptFilterBtn" data-bs-toggle="dropdown" aria-expanded="false">
+                    <span class="text-truncate pe-2"><i class="fas fa-building text-primary me-2 opacity-75"></i><span id="selectedDeptText">Tüm Departmanlar</span></span>
+                    <i class="fas fa-chevron-down small text-muted"></i>
+                </button>
+                <ul class="dropdown-menu custom-dropdown-menu border-0 shadow-lg p-2 animate-slide-in w-100" aria-labelledby="deptFilterBtn" style="border-radius: 12px; max-height: 250px; overflow-y: auto;">
+                    <li><a class="dropdown-item active dept-filter-item" href="#" data-value="">Tüm Departmanlar</a></li>
+                    @foreach (var dep in departmanlar)
+                    {
+                        <li><a class="dropdown-item dept-filter-item" href="#" data-value="@dep.Adi">@dep.Adi</a></li>
+                    }
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <div class="card border-0 shadow-lg rounded-4 overflow-hidden">
+        <div class="card-body p-0">
+            <div class="table-responsive" style="max-height: 550px; overflow-y: auto;">
+                <table class="table table-hover align-middle mb-0">
+                    <thead class="bg-light border-bottom sticky-top" style="z-index: 10;">
+                        <tr class="text-uppercase fw-800" style="font-size: 0.7rem;">
+                            <th class="ps-4 py-3">PERSONEL</th>
+                            <th class="py-3">GÖREV DETAYI</th>
+                            <th class="py-3 text-center">İŞ DURUMU</th>
+                            <th class="py-3 text-center">KAYIT BİLGİSİ</th>
+                            <th class="py-3 text-center">FOTOĞRAF</th>
+                            <th class="py-3 text-center">İŞLEM</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var item in gorevList)
+                        {
+                            <tr style="font-size: 0.85rem;" data-tarih="@item.KayitTarihi.Ticks">
+                                <td class="ps-4">
+                                    <div class="d-flex align-items-center">
+                                        <div class="me-3 avatar-container">
+                                            <img id="tabloFoto_@item.Id" src="/Gorev/PersonelFotoGetir?id=@item.PersonelRef"
+                                                 width="35" height="35" class="rounded-circle shadow-sm avatar-img personel-foto-tikla" loading="lazy"
+                                                 onerror="this.style.display='none'; document.getElementById('avatarFallback_@item.Id').style.display='flex';"
+                                                 onclick="personelFotoGoster(this.src, '@item.PersonelRefNavigation?.Adi @item.PersonelRefNavigation?.Soyadi')" title="Büyütmek için tıkla" />
+                                            <div id="avatarFallback_@item.Id" class="bg-primary bg-opacity-10 text-primary rounded-circle align-items-center justify-content-center fw-bold avatar-img" style="font-size: 0.8rem; display: none;">
+                                                @(item.PersonelRefNavigation?.Adi?[0])@(item.PersonelRefNavigation?.Soyadi?[0])
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <div class="fw-bold text-dark">@item.PersonelRefNavigation?.Adi @item.PersonelRefNavigation?.Soyadi</div>
+                                            <small class="text-muted">@item.PersonelRefNavigation?.DepartmanRefNavigation?.Adi</small>
+                                        </div>
+                                    </div>
+                                </td>
+
+                                <td style="max-width: 220px;">
+                                    <div class="gorev-link fw-semibold text-dark text-truncate w-100"
+                                         data-bs-toggle="modal" data-bs-target="#detayModal"
+                                         onclick="openDetayModal('@Html.Raw(JavaScriptEncoder.Default.Encode(item.Gorev1 ?? ""))', '@Html.Raw(JavaScriptEncoder.Default.Encode(item.PersonelNotu ?? ""))')"
+                                         title="Detayları gör">
+                                        <i class="fas fa-external-link-alt me-1 small opacity-50"></i>
+                                        @item.Gorev1
+                                    </div>
+                                    @if (!string.IsNullOrEmpty(item.PersonelNotu))
+                                    {
+                                        <div class="mt-1 opacity-50" style="font-size: 0.6rem;">
+                                            <span class="text-muted fw-normal" style="font-style: italic;">(Personel notu mevcut)</span>
+                                        </div>
+                                    }
+                                </td>
+
+                                <td class="text-center">
+                                    @switch (item.Durum)
+                                    {
+                                        case 1: <span class="text-danger fw-bold"><i class="fas fa-circle me-1 small opacity-50"></i> Beklemede</span> break;
+                                        case 2: <span class="text-warning fw-bold"><i class="fas fa-spinner fa-spin me-1"></i> İşlemde</span> break;
+                                        case 3: <span class="text-success fw-bold"><i class="fas fa-check-circle me-1"></i> Tamamlandı</span> break;
+                                    }
+                                </td>
+
+                                <td class="ps-3">
+                                    @{ string statusColor = item.Durum switch { 1 => "text-danger", 2 => "text-warning", 3 => "text-success", _ => "text-secondary" }; }
+                                    <div class="d-flex flex-column gap-1" style="font-size: 0.65rem;">
+                                        <div class="d-flex align-items-center @statusColor" style="--bs-text-opacity: .8;">
+                                            <i class="far fa-plus-square me-2" style="width: 12px;"></i>
+                                            <span>Kayıt: @item.KayitTarihi.ToString("dd.MM.yy HH:mm")</span>
+                                        </div>
+                                        <div class="d-flex align-items-center @statusColor" style="--bs-text-opacity: .9;">
+                                            <i class="far fa-play-circle me-2" style="width: 12px;"></i>
+                                            <span>Başlama: @(item.CozumBaslamaTarihi?.ToString("dd.MM.yy HH:mm") ?? "--:--")</span>
+                                        </div>
+                                        <div class="d-flex align-items-center @statusColor">
+                                            <i class="far fa-check-square me-2" style="width: 12px;"></i>
+                                            <span class="@(item.CozumBitisTarihi.HasValue ? "fw-bold" : "")">
+                                                Bitiş: @(item.CozumBitisTarihi?.ToString("dd.MM.yy HH:mm") ?? "--:--")
+                                            </span>
+                                        </div>
+                                    </div>
+                                </td>
+
+                                <td class="text-center">
+                                    @if (item.GorevFotografs != null && item.GorevFotografs.Any())
+                                    {
+                                        var fotoDizisi = Json.Serialize(item.GorevFotografs.Select(f => f.Id));
+                                        <div class="kanit-container d-inline-block position-relative" onclick='kanitFotografGoster(@fotoDizisi)' style="cursor: pointer;">
+                                            <img src="/Gorev/KanitFotoGetir?id=@item.GorevFotografs.First().Id" width="50" height="50" loading="lazy" class="rounded shadow-sm border border-2 border-white kanit-img" />
+                                            @if (item.GorevFotografs.Count > 1)
+                                            {
+                                                <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-primary" style="font-size: 0.6rem;">+@(item.GorevFotografs.Count - 1)</span>
+                                            }
+                                        </div>
+                                    }
+                                </td>
+
+                                <td class="text-center">
+                                    <div class="btn-group gap-1">
+                                        @if (yetki <= 2)
+                                        {
+                                            <button class="btn btn-outline-primary btn-edit-small" data-bs-toggle="modal" data-bs-target="#guncelleModal"
+                                                    onclick="prepareEdit('@item.Id', '@item.PersonelRef', '@Html.Raw(JavaScriptEncoder.Default.Encode(item.Gorev1 ?? ""))', '@Html.Raw(JavaScriptEncoder.Default.Encode(item.PersonelNotu ?? ""))', '@item.Durum')">
+                                                <i class="fas fa-pencil-alt"></i>
+                                            </button>
+                                        }
+                                        else if (yetki == 3)
+                                        {
+                                            <button class="btn btn-outline-primary btn-edit-small opacity-50" disabled title="Düzenleme yetkisi yok"><i class="fas fa-pencil-alt"></i></button>
+                                        }
+
+                                        @if (yetki == 1)
+                                        {
+                                            <button class="btn btn-outline-danger btn-edit-small" data-bs-toggle="modal" data-bs-target="#gorevSilOnayModal"
+                                                    onclick="prepareDelete('@item.Id', '@item.PersonelRefNavigation?.Adi @item.PersonelRefNavigation?.Soyadi')">
+                                                <i class="fas fa-trash-alt"></i>
+                                            </button>
+                                        }
+                                        else if (yetki == 2 || yetki == 3)
+                                        {
+                                            <button class="btn btn-outline-danger btn-edit-small opacity-50" disabled title="Silme yetkiniz yok"><i class="fas fa-trash-alt"></i></button>
+                                        }
+                                    </div>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+@* --- MODALLAR --- *@
+
+<div class="modal fade" id="merkeziPersonelFotoModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered" style="max-width: fit-content;">
+        <div class="modal-content bg-transparent border-0">
+            <div class="modal-body p-2 text-center">
+                <div class="personel-modal-wrapper">
+                    <div class="modal-kapat-cerceve-yeni" data-bs-dismiss="modal"><i class="fas fa-times text-white" style="font-size: 0.8rem;"></i></div>
+                    <img id="modalPersonelResim" src="" class="personel-büyük-foto">
+                    <div class="modal-isim-etiket"><span id="modalPersonelIsim"></span></div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="merkeziKanitModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content bg-transparent border-0">
+            <div class="modal-body p-3 text-center">
+                <div id="merkeziCarousel" class="carousel slide shadow-lg kanit-modal-cerceve" data-bs-ride="carousel">
+                    <div class="modal-kapat-cerceve-kanit" data-bs-dismiss="modal"><i class="fas fa-times text-white"></i></div>
+                    <div class="carousel-inner" id="carouselIcerik"></div>
+                    <button class="carousel-control-prev" type="button" data-bs-target="#merkeziCarousel" data-bs-slide="prev"><span class="carousel-control-prev-icon"></span></button>
+                    <button class="carousel-control-next" type="button" data-bs-target="#merkeziCarousel" data-bs-slide="next"><span class="carousel-control-next-icon"></span></button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="detayModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg rounded-4 overflow-hidden">
+            <div class="modal-header bg-light border-0 py-3 px-4 d-flex align-items-center justify-content-between">
+                <div class="d-flex align-items-center">
+                    <div class="bg-primary bg-opacity-10 text-primary rounded-circle d-flex align-items-center justify-content-center me-3 shadow-sm" style="width: 40px; height: 40px;"><i class="fas fa-info-circle fs-5"></i></div>
+                    <h6 class="fw-bolder mb-0 text-dark" style="letter-spacing: 0.5px;">Görev Detayları</h6>
+                </div>
+                <button type="button" class="btn-close shadow-none" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-4 pt-3">
+                <div class="mb-4">
+                    <label class="small fw-bold text-primary mb-2 text-uppercase d-flex align-items-center" style="letter-spacing: 1px;"><i class="fas fa-align-left me-2 opacity-75"></i> Açıklama</label>
+                    <div id="detayGorevAciklama" class="p-3 bg-white rounded-3 shadow-sm border border-primary border-opacity-25 lh-lg" style="font-size: 0.9rem; color: #495057;"></div>
+                </div>
+                <div id="notBolumu">
+                    <label class="small fw-bold text-warning mb-2 text-uppercase d-flex align-items-center" style="letter-spacing: 1px; filter: brightness(0.85);"><i class="fas fa-sticky-note me-2 opacity-75"></i> Personel Notu</label>
+                    <div id="detayGorevNotu" class="p-3 bg-warning bg-opacity-10 rounded-3 shadow-sm border border-warning border-opacity-50 fst-italic lh-lg" style="font-size: 0.9rem; color: #664d03;"></div>
+                </div>
+            </div>
+            <div class="modal-footer border-0 bg-light-subtle py-2 px-4 justify-content-end">
+                <button type="button" class="btn btn-sm btn-secondary rounded-pill px-4 fw-bold shadow-sm" data-bs-dismiss="modal">Kapat</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="guncelleModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg rounded-4">
+            <div class="modal-header bg-warning bg-opacity-75 border-0 py-2">
+                <h6 class="modal-title fw-bold text-dark mb-0"><i class="fas fa-edit me-2"></i>Görevi Güncelle</h6>
+                <button type="button" class="btn-close shadow-none" data-bs-dismiss="modal"></button>
+            </div>
+            <form asp-controller="Gorev" asp-action="Guncelle" method="post" enctype="multipart/form-data">
+                <div class="modal-body p-4 pb-1">
+                    <input type="hidden" name="Id" id="editGorevID" />
+
+                    <div class="mb-3">
+                        <label class="small fw-bold text-muted mb-1 text-uppercase">Departman Filtrele</label>
+                        <select class="form-select form-select-sm shadow-none" onchange="guncellePersonelFiltrele(this)">
+                            <option value="all">Tüm Departmanlar</option>
+                            @foreach (var d in departmanlar)
+                            {
+                                <option value="@d.Adi.Replace(" ", "_")">@d.Adi</option>
+                            }
+                        </select>
+                    </div>
+
+                    <div class="row g-2 mb-3">
+                        <div class="col-md-6">
+                            <label class="small fw-bold text-muted mb-1 text-uppercase">Personel</label>
+                            <select name="PersonelRef" id="editPersonelID" class="form-select form-select-sm shadow-none edit-pers-select">
+                                @foreach (var p in personelList)
+                                {
+                                    <option value="@p.Id" class="edit-pers-item @p.DepartmanRefNavigation?.Adi?.Replace(" ", "_")">@p.Adi @p.Soyadi</option>
+                                }
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="small fw-bold text-muted mb-1 text-uppercase">Durum</label>
+                            <select name="Durum" id="editGorevDurumu" class="form-select form-select-sm shadow-none">
+                                <option value="1">Beklemede</option>
+                                <option value="2">İşlemde</option>
+                                <option value="3">Tamamlandı</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="small fw-bold text-muted mb-1 text-uppercase">Görev Açıklaması</label>
+                        <textarea name="Gorev1" id="editGorevAciklama" class="form-control form-control-sm shadow-none" rows="2" required></textarea>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="small fw-bold text-muted mb-1 text-uppercase">Personel Notu</label>
+                        <textarea name="PersonelNotu" id="editGorevNotu" class="form-control form-control-sm shadow-none" rows="2" style="background-color: #fffbeb; border: 1px solid #ffeeba;"></textarea>
+                    </div>
+
+                    <div class="p-2 rounded-3 mb-2" style="background-color: #f8f9fa; border: 1px dashed #dee2e6;">
+                        <label class="small fw-bold text-dark d-flex align-items-center mb-1 text-uppercase">
+                            <i class="fas fa-camera me-2 text-warning"></i> Yeni Fotoğraflar
+                        </label>
+                        <input type="file" name="YeniFotograflar" class="form-control form-control-sm bg-white border-0" multiple accept="image/*">
+                    </div>
+                </div>
+                <div class="modal-footer border-0 bg-light-subtle py-2 px-4">
+                    <button type="button" class="btn btn-sm btn-link text-secondary fw-bold me-auto text-decoration-none" data-bs-dismiss="modal">Vazgeç</button>
+                    <button type="submit" class="btn btn-sm btn-warning px-4 rounded-pill fw-bold shadow-sm d-flex align-items-center justify-content-center">
+                        <span class="btn-text">Kaydet</span>
+                        <div class="spinner-border spinner-border-sm ms-2 d-none btn-spinner text-dark" role="status" aria-hidden="true"></div>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="gorevSilOnayModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered" style="max-width: 350px;">
+        <div class="modal-content border-0 shadow-lg rounded-4 overflow-hidden">
+            <div class="modal-header border-0 bg-danger bg-opacity-10 justify-content-center py-4 position-relative">
+                <div class="rounded-circle bg-white shadow-sm d-flex align-items-center justify-content-center position-relative overflow-hidden" style="width: 100px; height: 100px; border: 4px solid #f8d7da;">
+                    <i id="gorevSilModalDefaultIcon" class="fas fa-trash-alt text-danger fs-2"></i>
+                    <img id="gorevSilModalFoto" src="" class="delete-modal-avatar" style="display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; object-position: top;">
+                </div>
+            </div>
+            <div class="modal-body text-center px-4 pb-4">
+                <h6 class="fw-bold text-dark mb-2">Görevi Sil?</h6>
+                <p class="text-muted small mb-0"><span id="gorevSilModalIsim" class="text-danger fw-bold"></span> adlı personelin görev kaydı kalıcı olarak silinecektir.</p>
+                <div class="mt-4">
+                    <div class="row g-2">
+                        <div class="col-6">
+                            <button type="button" class="btn btn-light btn-sm w-100 rounded-pill fw-bold text-secondary border shadow-none" data-bs-dismiss="modal">VAZGEÇ</button>
+                        </div>
+                        <div class="col-6">
+                           <form id="silFormu" asp-controller="Gorev" asp-action="Sil" method="post" style="margin:0;">
+                                <button type="submit" class="btn btn-danger btn-sm w-100 rounded-pill fw-bold shadow-sm py-2 d-flex align-items-center justify-content-center">
+                                    <span class="btn-text">EVET, SİL</span>
+                                    <div class="spinner-border spinner-border-sm ms-2 d-none btn-spinner" role="status" aria-hidden="true"></div>
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="yeniGorevModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg rounded-4">
+            <div class="modal-header bg-primary text-white border-0 py-2">
+                <h6 class="modal-title fw-bold"><i class="fas fa-plus-circle me-2"></i>Yeni Görev Tanımla</h6>
+                <button type="button" class="btn-close btn-close-white shadow-none" data-bs-dismiss="modal"></button>
+            </div>
+            <form asp-controller="Gorev" asp-action="Ekle" method="post" enctype="multipart/form-data">
+                <div class="modal-body p-4 pb-1">
+                    <div class="mb-3">
+                        <label class="small fw-bold text-muted mb-1 text-uppercase">Departman Seçin</label>
+                        <select class="form-select form-select-sm shadow-none" onchange="yeniGorevPersonelFiltrele(this)">
+                            <option value="all">Tüm Departmanlar</option>
+                            @foreach (var d in departmanlar)
+                            {
+                                <option value="@d.Adi.Replace(" ", "_")">@d.Adi</option>
+                            }
+                        </select>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="small fw-bold text-muted mb-1 text-uppercase">Personel Seçin</label>
+                        <select name="PersonelRef" class="form-select form-select-sm shadow-none modal-pers-select" required>
+                            <option value="" selected disabled>Personel Seçiniz...</option>
+                            @foreach (var p in personelList)
+                            {
+                                <option value="@p.Id" class="pers-item @p.DepartmanRefNavigation?.Adi?.Replace(" ", "_")">
+                                    @p.Adi @p.Soyadi (@p.DepartmanRefNavigation?.Adi)
+                                </option>
+                            }
+                        </select>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="small fw-bold text-muted mb-1 text-uppercase">Görev Açıklaması</label>
+                        <textarea name="Gorev1" class="form-control form-control-sm shadow-none" rows="2" required placeholder="Yapılacak işi detaylandırın..."></textarea>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="small fw-bold text-primary mb-1 text-uppercase">Personel Notu (Opsiyonel)</label>
+                        <textarea name="PersonelNotu" class="form-control form-control-sm shadow-none border-primary border-opacity-25" rows="2" style="background-color: #f8f9ff;"></textarea>
+                    </div>
+
+                    <div class="p-2 rounded-3 mb-2" style="background-color: #f8f9fa; border: 1px dashed #dee2e6;">
+                        <label class="small fw-bold text-muted mb-1 text-uppercase"><i class="fas fa-camera me-1"></i> Fotoğraf Ekle</label>
+                        <input type="file" name="Fotograf" class="form-control form-control-sm bg-white border-0 shadow-sm" multiple accept="image/*">
+                    </div>
+                </div>
+                <div class="modal-footer border-0 bg-light-subtle py-3 px-4">
+                    <div class="d-flex w-100 align-items-center">
+                        <button type="button" class="btn btn-sm btn-link text-secondary text-decoration-none fw-bold p-0 shadow-none me-auto" data-bs-dismiss="modal" style="font-size: 0.8rem;">Vazgeç</button>
+                        <button type="submit" class="btn btn-sm btn-primary px-3 rounded-pill shadow-sm fw-bold py-2 d-flex align-items-center justify-content-center" style="font-size: 0.8rem; width: auto; min-width: 120px;">
+                            <span class="btn-text">Görevi Oluştur</span>
+                            <div class="spinner-border spinner-border-sm ms-2 d-none btn-spinner" role="status" aria-hidden="true"></div>
+                        </button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
+<script>
+    // JS Kodların birebir aynı bırakıldı
+    document.addEventListener("DOMContentLoaded", function () {
+        setTimeout(function() {
+            const loader = document.getElementById('skeletonLoader');
+            if(loader) loader.classList.add('d-none');
+            const mainContent = document.getElementById('mainContent');
+            if(mainContent) mainContent.classList.remove('d-none');
+        }, 50);
+
+        document.querySelectorAll('form').forEach(form => {
+            form.addEventListener('submit', function () {
+                const submitBtn = this.querySelector('button[type="submit"]');
+                if (submitBtn) {
+                    const textSpan = submitBtn.querySelector('.btn-text');
+                    const spinner = submitBtn.querySelector('.btn-spinner');
+                    submitBtn.classList.add('btn-loading');
+                    if(textSpan && spinner) {
+                        textSpan.innerText = 'İşleniyor...';
+                        spinner.classList.remove('d-none');
+                    }
+                }
+            });
+        });
+    });
+
+    let currentDurum = "";
+    let currentDept = "";
+
+    function tabloyuFiltrele() {
+        var arama = $("#tabloAra").val().toLocaleLowerCase('tr-TR');
+        var $tbody = $("table tbody");
+
+        $tbody.find("tr").each(function () {
+            var metin = $(this).text().toLocaleLowerCase('tr-TR');
+            var searchDurum = currentDurum.toLocaleLowerCase('tr-TR');
+            var searchDept = currentDept.toLocaleLowerCase('tr-TR');
+
+            var metinVar = arama === "" || metin.includes(arama);
+            var durumVar = searchDurum === "" || metin.includes(searchDurum);
+            var depVar = searchDept === "" || metin.includes(searchDept);
+
+            if (metinVar && durumVar && depVar) {
+                $(this).show();
+            } else {
+                $(this).hide();
+            }
+        });
+    }
+
+    $(document).ready(function () {
+        $("#tabloAra").on("keyup", tabloyuFiltrele);
+
+        document.querySelectorAll('.durum-filter-item').forEach(item => {
+            item.addEventListener('click', function(e) {
+                e.preventDefault();
+                document.querySelectorAll('.durum-filter-item').forEach(i => i.classList.remove('active'));
+                this.classList.add('active');
+                document.getElementById('selectedDurumText').innerText = this.innerText;
+                currentDurum = this.getAttribute('data-value');
+                tabloyuFiltrele();
+            });
+        });
+
+        document.querySelectorAll('.dept-filter-item').forEach(item => {
+            item.addEventListener('click', function(e) {
+                e.preventDefault();
+                document.querySelectorAll('.dept-filter-item').forEach(i => i.classList.remove('active'));
+                this.classList.add('active');
+                document.getElementById('selectedDeptText').innerText = this.innerText;
+                currentDept = this.getAttribute('data-value'); 
+                tabloyuFiltrele();
+            });
+        });
+    });
+
+    function prepareEdit(id, pId, aciklama, not, durum) {
+        document.getElementById('editGorevID').value = id;
+        document.getElementById('editPersonelID').value = pId;
+        document.getElementById('editGorevAciklama').value = aciklama;
+        document.getElementById('editGorevNotu').value = (not === 'null' || not === null) ? '' : not;
+        document.getElementById('editGorevDurumu').value = durum;
+    }
+
+    function openDetayModal(aciklama, not) {
+        document.getElementById('detayGorevAciklama').innerText = aciklama;
+        const notBolumu = document.getElementById('notBolumu');
+        if (not && not !== 'null' && not.trim() !== '') {
+            document.getElementById('detayGorevNotu').innerText = not;
+            notBolumu.style.display = 'block';
+        } else {
+            notBolumu.style.display = 'none';
+        }
+    }
+
+    function prepareDelete(gorevId, adSoyad) {
+        document.getElementById('silFormu').setAttribute('action', '/Gorev/Sil?id=' + gorevId);
+        document.getElementById('gorevSilModalIsim').innerText = adSoyad;
+        const tabloFoto = document.getElementById('tabloFoto_' + gorevId);
+        const modalIcon = document.getElementById('gorevSilModalDefaultIcon');
+        const modalImg = document.getElementById('gorevSilModalFoto');
+        if (tabloFoto && modalImg && modalIcon) {
+            modalImg.src = tabloFoto.src;
+            modalImg.style.display = 'block';
+            modalIcon.style.display = 'none';
+        } else if (modalImg && modalIcon) {
+            modalImg.src = '';
+            modalImg.style.display = 'none';
+            modalIcon.style.display = 'block';
+        }
+    }
+
+    function personelFotoGoster(resimData, tamAd) {
+        const resim = document.getElementById('modalPersonelResim');
+        const isim = document.getElementById('modalPersonelIsim');
+        if(resim && isim) {
+            resim.src = resimData;
+            isim.innerText = tamAd;
+            new bootstrap.Modal(document.getElementById('merkeziPersonelFotoModal')).show();
+        }
+    }
+
+    function kanitFotografGoster(fotoIdListesi) {
+        const icerikContainer = document.getElementById('carouselIcerik');
+        if(!icerikContainer) return;
+        icerikContainer.innerHTML = '';
+        fotoIdListesi.forEach((fotoId, index) => {
+            const activeClass = index === 0 ? 'active' : '';
+            icerikContainer.insertAdjacentHTML('beforeend',
+                `<div class="carousel-item ${activeClass}">
+                    <img src="/Gorev/KanitFotoGetir?id=${fotoId}" class="d-block w-100" loading="lazy">
+                </div>`
+            );
+        });
+        new bootstrap.Modal(document.getElementById('merkeziKanitModal')).show();
+    }
+
+    function yeniGorevPersonelFiltrele(selectElement) {
+        var secilenDept = selectElement.value;
+        var $personelSelect = $('.modal-pers-select');
+        $personelSelect.val("");
+        if (secilenDept === "all") {
+            $personelSelect.find('.pers-item').show().prop('disabled', false);
+        } else {
+            $personelSelect.find('.pers-item').hide().prop('disabled', true);
+            $personelSelect.find('.' + secilenDept).show().prop('disabled', false);
+        }
+    }
+
+    function guncellePersonelFiltrele(selectElement) {
+        var secilenDept = selectElement.value;
+        var $personelSelect = $('.edit-pers-select');
+        if (secilenDept === "all") {
+            $personelSelect.find('.edit-pers-item').show().prop('disabled', false);
+        } else {
+            $personelSelect.find('.edit-pers-item').hide().prop('disabled', true);
+            var $uygunlar = $personelSelect.find('.' + secilenDept);
+            $uygunlar.show().prop('disabled', false);
+            if ($personelSelect.find('option:selected').css('display') === 'none') {
+                $personelSelect.val($uygunlar.first().val());
+            }
+        }
+    }
+</script>
+
+@if (TempData["Mesaj"] != null)
+{
+    <script>
+        $(document).ready(function () {
+            Swal.fire({
+                icon: '@(TempData["MesajTipi"] ?? "warning")',
+                title: 'Bilgilendirme',
+                text: '@Html.Raw(TempData["Mesaj"])',
+                confirmButtonText: 'Tamam',
+                confirmButtonColor: '#0d6efd',
+                customClass: { confirmButton: 'rounded-pill px-4' }
+            });
+        });
+    </script>
+}

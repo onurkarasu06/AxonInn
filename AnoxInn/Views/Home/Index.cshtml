@@ -1,0 +1,355 @@
+﻿@model AxonInn.Models.Hotel
+@using Newtonsoft.Json
+
+@{
+    Layout = "~/Views/Shared/_Layout.cshtml";
+
+    // Hotel modelinden hiyerarşik olarak personelleri ve görevleri çıkartıyoruz
+    var departmanlar = Model?.Departmen?.ToList() ?? new List<AxonInn.Models.Departman>();
+    var personelList = departmanlar.SelectMany(d => d.Personels).ToList();
+    var gorevList = personelList.SelectMany(p => p.Gorevs).ToList();
+
+    var hotelAdi = Model?.Adi ?? "Bilinmeyen Otel";
+
+    // Adetleri canlı olarak hesaplıyoruz (Hatanın çözümü)
+    int aktifPersonelAdet = personelList.Count(p => p.AktifMi == 1);
+    int beklemedeAdet = gorevList.Count(g => g.Durum == 1);
+    int islemdeAdet = gorevList.Count(g => g.Durum == 2);
+    int bittiAdet = gorevList.Count(g => g.Durum == 3);
+}
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css" />
+
+<style>
+    .fw-600 { font-weight: 600; }
+    .fw-900 { font-weight: 900; }
+    .rounded-20 { border-radius: 20px; }
+    .shadow-soft { box-shadow: 0 10px 30px rgba(0, 0, 0, 0.04) !important; }
+    .card-hover { transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
+    .card-hover:hover { transform: translateY(-5px); box-shadow: 0 15px 35px rgba(0, 0, 0, 0.08) !important; }
+    .chart-container canvas { border-radius: 0 0 15px 15px; }
+    @@media (max-width: 768px) { .card-hover:hover { transform: none; } .h3 { font-size: 1.5rem !important; } }
+    .skeleton-box { display: inline-block; height: 1em; position: relative; overflow: hidden; background-color: #e2e5ec; border-radius: 8px; }
+    .skeleton-box::after { position: absolute; top: 0; right: 0; bottom: 0; left: 0; transform: translateX(-100%); background-image: linear-gradient( 90deg, rgba(255, 255, 255, 0) 0, rgba(255, 255, 255, 0.4) 20%, rgba(255, 255, 255, 0.6) 60%, rgba(255, 255, 255, 0) ); animation: shimmer 1.5s infinite; content: ''; }
+    @@keyframes shimmer { 100% { transform: translateX(100%); } }
+    .animate-slide-in { animation: slideInDropdown 0.25s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards; transform-origin: top center; }
+    @@keyframes slideInDropdown { 0% { opacity: 0; transform: translateY(-10px) scaleY(0.9); } 100% { opacity: 1; transform: translateY(0) scaleY(1); } }
+    .custom-dropdown-menu .dropdown-item { padding: 8px 16px; transition: all 0.2s ease; font-weight: 500; color: #495057; }
+    .custom-dropdown-menu .dropdown-item:hover { background-color: #f0f4ff; color: #0d6efd; border-radius: 6px; transform: translateX(4px); }
+    .custom-dropdown-menu .dropdown-item.active { background-color: #0d6efd; color: #fff; border-radius: 6px; }
+</style>
+
+<div id="skeletonLoader" class="container-fluid pt-3 px-lg-4 pb-4" style="background-color: #f8f9fc;">
+    <div class="row mb-4">
+        <div class="col-8 col-md-4">
+            <div class="skeleton-box w-100 mb-2" style="height: 35px; border-radius: 10px;"></div>
+            <div class="skeleton-box w-50" style="height: 15px;"></div>
+        </div>
+    </div>
+    <div class="row g-3 mb-4">
+        @for (int i = 0; i < 4; i++)
+        {
+            <div class="col-6 col-xl-3">
+                <div class="card border-0 shadow-sm rounded-4 p-2 p-md-3 bg-white h-100">
+                    <div class="d-flex align-items-center">
+                        <div class="skeleton-box rounded-circle me-3" style="width: 45px; height: 45px;"></div>
+                        <div class="flex-grow-1">
+                            <div class="skeleton-box w-75 mb-2" style="height: 12px;"></div>
+                            <div class="skeleton-box w-50" style="height: 25px;"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
+    <div class="row mb-4 mt-2">
+        <div class="col-12"><div class="skeleton-box w-100" style="height: 40px; border-radius: 12px;"></div></div>
+    </div>
+    <div class="row g-4 mb-4">
+        <div class="col-lg-5">
+            <div class="card border-0 shadow-sm rounded-4 p-3 h-100 bg-white">
+                <div class="skeleton-box w-50 mb-4" style="height: 20px;"></div>
+                <div class="skeleton-box w-100" style="height: 170px; border-radius: 15px;"></div>
+            </div>
+        </div>
+        <div class="col-lg-7">
+            <div class="card border-0 shadow-sm rounded-4 p-3 h-100 bg-white">
+                <div class="d-flex flex-column flex-md-row justify-content-between mb-4 gap-2">
+                    <div class="skeleton-box" style="height: 20px; width: 40%;"></div>
+                    <div class="skeleton-box" style="height: 30px; width: 30%; border-radius: 15px;"></div>
+                </div>
+                <div class="skeleton-box w-100" style="height: 160px; border-radius: 15px;"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="mainContent" class="container-fluid pt-3 px-lg-4 pb-4 d-none animate__animated animate__fadeIn" style="font-family: 'Plus Jakarta Sans', sans-serif; background-color: #f8f9fc;">
+
+    <div class="row mb-3 mb-md-4">
+        <div class="col-12">
+            <h1 class="fw-bolder text-dark mb-1 fs-3 fs-md-2" style="letter-spacing: -0.5px;">Operasyonel Genel Bakış</h1>
+            <div class="d-flex align-items-center">
+                <div class="bg-primary rounded-pill me-2" style="width: 12px; height: 4px;"></div>
+                <p class="text-secondary mb-0 small text-uppercase fw-bold" style="letter-spacing: 2px; font-size: 0.7rem;">Yönetim Paneli / Dashboard</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-3 mb-4">
+        <div class="col-6 col-xl-3">
+            <div class="card border-0 border-bottom border-primary border-4 shadow-sm rounded-4 p-2 p-md-3 bg-white h-100 card-hover">
+                <div class="d-flex align-items-center">
+                    <div class="bg-primary bg-opacity-10 p-2 p-md-3 rounded-circle text-primary me-2 me-md-3 d-none d-sm-block"><i class="fas fa-users fs-5"></i></div>
+                    <div>
+                        <div class="text-muted fw-bold text-uppercase" style="font-size: 0.65rem; letter-spacing: 0.5px;">Toplam Ekip</div>
+                        <div class="h3 fw-bolder mb-0 text-dark counter-value">@aktifPersonelAdet</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-6 col-xl-3">
+            <div class="card border-0 border-bottom border-warning border-4 shadow-sm rounded-4 p-2 p-md-3 bg-white h-100 card-hover">
+                <div class="d-flex align-items-center">
+                    <div class="bg-warning bg-opacity-10 p-2 p-md-3 rounded-circle text-warning me-2 me-md-3 d-none d-sm-block"><i class="fas fa-exclamation-triangle fs-5"></i></div>
+                    <div>
+                        <div class="text-muted fw-bold text-uppercase" style="font-size: 0.65rem; letter-spacing: 0.5px;">Açık</div>
+                        <div class="h3 fw-bolder mb-0 text-dark counter-value">@beklemedeAdet</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-6 col-xl-3">
+            <div class="card border-0 border-bottom border-danger border-4 shadow-sm rounded-4 p-2 p-md-3 bg-white h-100 card-hover">
+                <div class="d-flex align-items-center">
+                    <div class="bg-danger bg-opacity-10 p-2 p-md-3 rounded-circle text-danger me-2 me-md-3 d-none d-sm-block"><i class="fas fa-spinner fa-spin fs-5"></i></div>
+                    <div>
+                        <div class="text-muted fw-bold text-uppercase" style="font-size: 0.65rem; letter-spacing: 0.5px;">İşlemde</div>
+                        <div class="h3 fw-bolder mb-0 text-dark counter-value">@islemdeAdet</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-6 col-xl-3">
+            <div class="card border-0 border-bottom border-success border-4 shadow-sm rounded-4 p-2 p-md-3 bg-white h-100 card-hover">
+                <div class="d-flex align-items-center">
+                    <div class="bg-success bg-opacity-10 p-2 p-md-3 rounded-circle text-success me-2 me-md-3 d-none d-sm-block"><i class="fas fa-check-double fs-5"></i></div>
+                    <div>
+                        <div class="text-muted fw-bold text-uppercase" style="font-size: 0.65rem; letter-spacing: 0.5px;">Bitti</div>
+                        <div class="h3 fw-bolder mb-0 text-dark counter-value">@bittiAdet</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row mb-4 mt-2">
+        <div class="col-12">
+            <div class="d-flex align-items-center justify-content-center shadow-sm w-100 py-2" style="background-color: #f0f4ff; border-radius: 12px; border: 1px solid rgba(92, 124, 250, 0.1);">
+                <h6 class="mb-0 text-uppercase fw-900" style="letter-spacing: 5px; color: #5c7cfa; font-size: 0.75rem;">
+                    <i class="fas fa-hotel me-2"></i> @hotelAdi
+                </h6>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-4 mb-4">
+        <div class="col-lg-5">
+            <div class="card border-0 shadow-sm rounded-4 p-3 h-100 bg-white border-top border-primary border-4">
+                <div class="d-flex align-items-center mb-3">
+                    <div class="bg-primary bg-opacity-10 p-2 rounded-3 me-2"><i class="fas fa-chart-pie text-primary small"></i></div>
+                    <h6 class="fw-bold text-dark mb-0 small">Departman Personel Dağılımı</h6>
+                </div>
+                <div class="chart-container" style="height: 190px; position: relative;">
+                    <canvas id="departmanChart"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-7">
+            <div class="card border-0 shadow-sm rounded-4 p-3 h-100 bg-white border-top border-danger border-4">
+                <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center mb-3 gap-3">
+                    <div class="d-flex align-items-center">
+                        <div class="bg-danger bg-opacity-10 p-2 rounded-3 me-2"><i class="fas fa-tasks text-danger small"></i></div>
+                        <h6 class="fw-bold text-dark mb-0 small">Personel İş Yükü (Görev Analizi)</h6>
+                    </div>
+
+                    <div class="dropdown custom-filter-dropdown" style="min-width: 180px;">
+                        <button class="btn btn-light bg-white border shadow-sm rounded-pill w-100 py-1 px-3 d-flex align-items-center justify-content-between" type="button" id="chartDeptFilterBtn" data-bs-toggle="dropdown" aria-expanded="false" style="font-size: 0.75rem;">
+                            <span><i class="fas fa-filter text-muted me-2 small"></i><span id="selectedDeptText">Tüm Departmanlar</span></span>
+                            <i class="fas fa-chevron-down ms-2 small text-muted"></i>
+                        </button>
+
+                        <ul class="dropdown-menu custom-dropdown-menu border-0 shadow-lg p-2 animate-slide-in w-100" aria-labelledby="chartDeptFilterBtn" style="font-size: 0.8rem; border-radius: 12px;">
+                            <li><a class="dropdown-item active dept-filter-item" href="#" data-value="all">Tüm Departmanlar</a></li>
+
+                            @foreach (var dept in departmanlar)
+                            {
+                                <li><a class="dropdown-item dept-filter-item" href="#" data-value="@dept.Adi">@dept.Adi</a></li>
+                            }
+                        </ul>
+                    </div>
+                </div>
+                <div class="chart-container" style="height: 190px; position: relative;">
+                    <canvas id="personelIsYukuChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@{
+    var rawPersonelJson = JsonConvert.SerializeObject(personelList.Select(p => new {
+        ad = p.Adi,
+        soyad = p.Soyadi,
+        departman = new { ad = p.DepartmanRefNavigation?.Adi }
+    }));
+
+    var rawGorevlerJson = JsonConvert.SerializeObject(gorevList.Select(g => new {
+        durum = g.Durum,
+        personel = new {
+            id = g.PersonelRef,
+            ad = g.PersonelRefNavigation?.Adi,
+            departman = new { ad = g.PersonelRefNavigation?.DepartmanRefNavigation?.Adi }
+        }
+    }));
+}
+
+@section Scripts {
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", function () {
+            document.getElementById('skeletonLoader').classList.add('d-none');
+            document.getElementById('mainContent').classList.remove('d-none');
+
+            const rawPersonel = @Html.Raw(rawPersonelJson);
+            const rawGorevler = @Html.Raw(rawGorevlerJson);
+
+            const colors = ['#4e73df', '#1cc88a', '#36b9cc', '#f6c23e', '#e74a3b', '#858796'];
+
+            const deptCtx = document.getElementById('departmanChart');
+            let departmanChartInstance = null;
+
+            function ekranıGuncelle(personelVerisi) {
+                if (!personelVerisi || personelVerisi.length === 0) return;
+                const groupedData = personelVerisi.reduce((acc, p) => {
+                    const deptName = p.departman?.ad || "Belirtilmemiş";
+                    if (!acc[deptName]) acc[deptName] = [];
+                    acc[deptName].push(p);
+                    return acc;
+                }, {});
+
+                if (deptCtx) {
+                    const labels = Object.keys(groupedData);
+                    const dataCounts = Object.values(groupedData).map(persons => persons.length);
+
+                    if (departmanChartInstance) { departmanChartInstance.destroy(); }
+
+                    departmanChartInstance = new Chart(deptCtx, {
+                        type: 'bar',
+                        data: {
+                            labels: labels,
+                            datasets: [{
+                                label: 'Personel Sayısı',
+                                data: dataCounts,
+                                backgroundColor: colors,
+                                borderRadius: 8,
+                                barThickness: 18
+                            }]
+                        },
+                        options: {
+                            maintainAspectRatio: false,
+                            indexAxis: 'y',
+                            plugins: { legend: { display: false } },
+                            scales: { x: { beginAtZero: true, ticks: { stepSize: 1 } }, y: { ticks: { font: { weight: 'bold' } } } }
+                        }
+                    });
+                }
+            }
+
+            ekranıGuncelle(rawPersonel);
+
+            const perCtx = document.getElementById('personelIsYukuChart');
+            let perChart;
+
+            function getFilteredData(deptName) {
+                const filtered = (deptName === 'all') ? rawGorevler : rawGorevler.filter(g => g.personel?.departman?.ad === deptName);
+                const pIds = [...new Set(filtered.map(g => g.personel?.id).filter(id => id != null && id !== 0))];
+
+                return {
+                    labels: pIds.map(id => {
+                        const g = filtered.find(x => x.personel?.id === id);
+                        return g ? g.personel.ad : "Bilinmeyen";
+                    }),
+                    datasets: [
+                        { label: 'Beklemede', data: pIds.map(id => filtered.filter(g => g.personel?.id === id && g.durum === 1).length), backgroundColor: '#e74a3b', borderRadius: 4 },
+                        { label: 'İşlemde', data: pIds.map(id => filtered.filter(g => g.personel?.id === id && g.durum === 2).length), backgroundColor: '#f6c23e', borderRadius: 4 },
+                        { label: 'Tamamlandı', data: pIds.map(id => filtered.filter(g => g.personel?.id === id && g.durum === 3).length), backgroundColor: '#1cc88a', borderRadius: 4 }
+                    ]
+                };
+            }
+
+            if (perCtx && rawGorevler.length > 0) {
+                perChart = new Chart(perCtx, {
+                    type: 'bar',
+                    data: getFilteredData('all'),
+                    options: {
+                        maintainAspectRatio: false,
+                        responsive: true,
+                        plugins: { legend: { position: 'top', labels: { boxWidth: 10 } } },
+                        scales: { x: { stacked: false }, y: { beginAtZero: true, ticks: { stepSize: 1 } } }
+                    }
+                });
+
+                const filterItems = document.querySelectorAll('.dept-filter-item');
+                const selectedText = document.getElementById('selectedDeptText');
+
+                if (filterItems.length > 0) {
+                    filterItems.forEach(item => {
+                        item.addEventListener('click', function(e) {
+                            e.preventDefault();
+                            filterItems.forEach(i => i.classList.remove('active'));
+                            this.classList.add('active');
+                            
+                            const value = this.getAttribute('data-value');
+                            selectedText.innerText = this.innerText;
+                            
+                            perChart.data = getFilteredData(value);
+                            perChart.update();
+                        });
+                    });
+                }
+            }
+
+            const counters = document.querySelectorAll('.counter-value');
+            const speed = 15;
+
+            counters.forEach(counter => {
+                const targetValue = parseInt(counter.innerText) || 0;
+                counter.setAttribute('data-target', targetValue);
+                counter.innerText = '0';
+
+                const updateCount = () => {
+                    const target = +counter.getAttribute('data-target');
+                    const count = +counter.innerText;
+                    const inc = target / speed;
+
+                    if (count < target) {
+                        counter.innerText = Math.ceil(count + inc);
+                        requestAnimationFrame(updateCount);
+                    } else {
+                        counter.innerText = target;
+                    }
+                };
+
+                if (targetValue > 0) { updateCount(); } else { counter.innerText = targetValue; }
+            });
+        });
+    </script>
+}

@@ -1,0 +1,244 @@
+﻿using AxonInn.Models;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+using Newtonsoft.Json;
+using System.IO;
+
+namespace AxonInn.Controllers
+{
+    public class GorevController : Controller
+    {
+        private readonly AxonInnContext _context;
+
+        public GorevController(AxonInnContext context)
+        {
+            _context = context;
+        }
+
+        [Route("Gorevler")]
+        public async Task<IActionResult> GorevList()
+        {
+            try
+            {
+                var personelJson = HttpContext.Session.GetString("GirisYapanPersonel");
+                if (string.IsNullOrEmpty(personelJson))
+                    return RedirectToAction("Login", "Login");
+
+                var loginOlanPersonel = JsonConvert.DeserializeObject<Personel>(personelJson);
+                await LogKaydet(loginOlanPersonel, "Görev Sayfasına Giriş Yapıldı", "Görev Listesi Görüntüleme", null);
+
+                // Otelin ID'sini bul
+                var hotelId = await _context.Departmen
+                    .Where(d => d.Id == loginOlanPersonel.DepartmanRef)
+                    .Select(d => d.HotelRef)
+                    .FirstOrDefaultAsync();
+
+                // Tek bir sorgu ile Hotel -> Departmanlar -> Aktif Personeller -> Görevler -> Görev Fotoğrafları hiyerarşisini çekiyoruz
+                var hotel = await _context.Hotels
+                    .Include(h => h.Departmen)
+                        .ThenInclude(d => d.Personels.Where(p => p.AktifMi == 1))
+                            .ThenInclude(p => p.Gorevs)
+                                .ThenInclude(g => g.GorevFotografs)
+                    .FirstOrDefaultAsync(h => h.Id == hotelId);
+
+                if (hotel == null)
+                    return RedirectToAction("Login", "Login");
+
+                // HATA ÇÖZÜMÜ: Dosya adın Gorev.cshtml olduğu için burayı "Gorev" olarak güncelledik.
+                return View("Gorev", hotel);
+            }
+            catch (Exception ex)
+            {
+                return View("~/Views/Error/Error.cshtml", new ErrorViewModel { RequestId = ex.Message });
+            }
+        }
+
+        [HttpPost]
+        public async Task<IActionResult> Ekle(Gorev model, List<IFormFile> Fotograf)
+        {
+            try
+            {
+                var personelJson = HttpContext.Session.GetString("GirisYapanPersonel");
+                if (string.IsNullOrEmpty(personelJson)) return RedirectToAction("Login", "Login");
+                var loginOlanPersonel = JsonConvert.DeserializeObject<Personel>(personelJson);
+
+                model.KayitTarihi = DateTime.Now;
+                model.Durum = 1;
+
+                _context.Gorevs.Add(model);
+                await _context.SaveChangesAsync();
+
+                if (Fotograf != null && Fotograf.Count > 0)
+                {
+                    foreach (var dosya in Fotograf)
+                    {
+                        if (dosya.Length > 0)
+                        {
+                            using (var ms = new MemoryStream())
+                            {
+                                await dosya.CopyToAsync(ms);
+                                _context.GorevFotografs.Add(new GorevFotograf
+                                {
+                                    GorevRef = model.Id,
+                                    Fotograf = ms.ToArray()
+                                });
+                            }
+                        }
+                    }
+                    await _context.SaveChangesAsync();
+                }
+
+                await LogKaydet(loginOlanPersonel, "Yeni Görev Eklendi", $"Görev ID: {model.Id} oluşturuldu.", null);
+                return RedirectToAction("GorevList");
+            }
+            catch (Exception ex)
+            {
+                return View("~/Views/Error/Error.cshtml", new ErrorViewModel { RequestId = ex.Message });
+            }
+        }
+
+        public async Task<IActionResult> Sil(long id)
+        {
+            try
+            {
+                var personelJson = HttpContext.Session.GetString("GirisYapanPersonel");
+                if (string.IsNullOrEmpty(personelJson)) return RedirectToAction("Login", "Login");
+                var loginOlanPersonel = JsonConvert.DeserializeObject<Personel>(personelJson);
+
+                var gorev = await _context.Gorevs.FindAsync(id);
+                if (gorev != null)
+                {
+                    var fotograflar = _context.GorevFotografs.Where(f => f.GorevRef == id);
+                    _context.GorevFotografs.RemoveRange(fotograflar);
+
+                    _context.Gorevs.Remove(gorev);
+                    await _context.SaveChangesAsync();
+
+                    await LogKaydet(loginOlanPersonel, "Görev Silindi", $"Görev ID: {id} silindi.", null);
+                }
+
+                return RedirectToAction("GorevList");
+            }
+            catch (Exception ex)
+            {
+                return View("~/Views/Error/Error.cshtml", new ErrorViewModel { RequestId = ex.Message });
+            }
+        }
+
+        [HttpPost]
+        public async Task<IActionResult> Guncelle(Gorev model, List<IFormFile> YeniFotograflar)
+        {
+            try
+            {
+                var personelJson = HttpContext.Session.GetString("GirisYapanPersonel");
+                if (string.IsNullOrEmpty(personelJson)) return RedirectToAction("Login", "Login");
+                var loginOlanPersonel = JsonConvert.DeserializeObject<Personel>(personelJson);
+
+                var dbGorev = await _context.Gorevs.FindAsync(model.Id);
+                if (dbGorev != null)
+                {
+                    dbGorev.PersonelRef = model.PersonelRef;
+                    dbGorev.Gorev1 = model.Gorev1;
+                    dbGorev.PersonelNotu = model.PersonelNotu;
+
+                    if (dbGorev.Durum != model.Durum)
+                    {
+                        if (model.Durum == 2 && dbGorev.CozumBaslamaTarihi == null)
+                            dbGorev.CozumBaslamaTarihi = DateTime.Now;
+                        else if (model.Durum == 3 && dbGorev.CozumBitisTarihi == null)
+                            dbGorev.CozumBitisTarihi = DateTime.Now;
+                    }
+
+                    dbGorev.Durum = model.Durum;
+                    _context.Gorevs.Update(dbGorev);
+
+                    if (YeniFotograflar != null && YeniFotograflar.Count > 0)
+                    {
+                        foreach (var dosya in YeniFotograflar)
+                        {
+                            if (dosya.Length > 0)
+                            {
+                                using (var ms = new MemoryStream())
+                                {
+                                    await dosya.CopyToAsync(ms);
+                                    _context.GorevFotografs.Add(new GorevFotograf
+                                    {
+                                        GorevRef = dbGorev.Id,
+                                        Fotograf = ms.ToArray()
+                                    });
+                                }
+                            }
+                        }
+                    }
+
+                    await _context.SaveChangesAsync();
+                    await LogKaydet(loginOlanPersonel, "Görev Güncellendi", $"Görev ID: {dbGorev.Id} güncellendi.", null);
+                }
+
+                return RedirectToAction("GorevList");
+            }
+            catch (Exception ex)
+            {
+                return View("~/Views/Error/Error.cshtml", new ErrorViewModel { RequestId = ex.Message });
+            }
+        }
+
+        [HttpGet]
+        public async Task<IActionResult> PersonelFotoGetir(long id)
+        {
+            var foto = await _context.PersonelFotografs.FirstOrDefaultAsync(f => f.PersonelRef == id);
+            if (foto != null && foto.Fotograf != null)
+            {
+                return File(foto.Fotograf, "image/jpeg");
+            }
+            return NotFound();
+        }
+
+        [HttpGet]
+        public async Task<IActionResult> KanitFotoGetir(long id)
+        {
+            var foto = await _context.GorevFotografs.FirstOrDefaultAsync(f => f.Id == id);
+            if (foto != null && foto.Fotograf != null)
+            {
+                return File(foto.Fotograf, "image/jpeg");
+            }
+            return NotFound();
+        }
+
+        private async Task<bool> LogKaydet(Personel? personel, string islemTipi, string yeniDeger, Gorev? gorev)
+        {
+            try
+            {
+                string departmanAdi = personel?.DepartmanRefNavigation?.Adi ?? "";
+                string hotelAdi = "";
+
+                if (personel != null && personel.DepartmanRef != 0)
+                {
+                    var hotelId = await _context.Departmen.Where(d => d.Id == personel.DepartmanRef).Select(d => d.HotelRef).FirstOrDefaultAsync();
+                    if (hotelId != 0) hotelAdi = await _context.Hotels.Where(h => h.Id == hotelId).Select(h => h.Adi).FirstOrDefaultAsync() ?? "";
+                }
+
+                var log = new AuditLog
+                {
+                    IslemTarihi = DateTime.Now,
+                    IlgiliTablo = "Gorev",
+                    KayitRefId = gorev?.Id ?? personel?.Id ?? 0,
+                    IslemTipi = islemTipi,
+                    EskiDeger = "",
+                    YeniDeger = yeniDeger,
+                    YapanHotelAd = hotelAdi,
+                    YapanDepartmanAd = departmanAdi,
+                    YapanAdSoyad = personel != null ? $"{personel.Adi} {personel.Soyadi}" : "Bilinmeyen"
+                };
+
+                _context.AuditLogs.Add(log);
+                await _context.SaveChangesAsync();
+                return true;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+    }
+}

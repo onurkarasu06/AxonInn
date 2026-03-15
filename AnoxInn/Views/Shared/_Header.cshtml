@@ -1,0 +1,114 @@
+﻿@using Microsoft.AspNetCore.Http
+@using Newtonsoft.Json
+@using AxonInn.Models
+
+@{
+    // Hangi sayfada olduğumuzu anlamak için mevcut Controller ve Action'ı alıyoruz
+    var currentController = ViewContext.RouteData.Values["Controller"]?.ToString();
+    var currentAction = ViewContext.RouteData.Values["Action"]?.ToString();
+    
+    // Session'dan kullanıcıyı JSON formatında alıp Deserialize ediyoruz
+    var personelJson = Context.Session.GetString("GirisYapanPersonel");
+    Personel personel = null;
+    
+    if (!string.IsNullOrEmpty(personelJson))
+    {
+        personel = JsonConvert.DeserializeObject<Personel>(personelJson);
+    }
+
+    // EF Core modelimize göre Ad -> Adi, Soyad -> Soyadi olarak güncellendi
+    string aktifKullanici = personel != null ? (personel.Adi + " " + personel.Soyadi) : "Giriş Yapılmadı";
+}
+
+<style>
+    /* --- 1. BUZLU CAM EFEKTİ (GLASSMORPHISM) --- */
+    .navbar-glass {
+        background: rgba(255, 255, 255, 0.85) !important;
+        backdrop-filter: blur(12px);
+        -webkit-backdrop-filter: blur(12px);
+        border-bottom: 1px solid rgba(0, 0, 0, 0.05) !important;
+        transition: all 0.3s ease;
+    }
+
+    /* --- 2. MENÜ LİNKLERİ (HOVER VE AKTİF DURUM) --- */
+    .custom-nav-link {
+        font-weight: 600;
+        font-size: 0.85rem;
+        color: #6c757d !important;
+        padding: 0.5rem 1rem !important;
+        border-radius: 50rem;
+        transition: all 0.2s ease-in-out;
+        margin: 0 0.15rem;
+    }
+
+        .custom-nav-link:hover {
+            color: #0d6efd !important;
+            background-color: #f0f4ff;
+        }
+
+        .custom-nav-link.active {
+            color: #0d6efd !important;
+            background-color: #e6f0ff;
+            font-weight: 700;
+        }
+</style>
+
+<header class="sticky-top">
+    <nav class="navbar navbar-expand-md navbar-light navbar-glass py-2 shadow-sm">
+        <div class="container">
+
+            <a class="navbar-brand d-flex align-items-center" asp-area="" asp-controller="Home" asp-action="Index">
+                <div class="bg-primary rounded-3 d-flex align-items-center justify-content-center shadow-sm"
+                     style="width: 32px; height: 32px; background: linear-gradient(135deg, #0d6efd 0%, #0dcaf0 100%);">
+                    <span class="text-white fw-bold small" style="font-size: 0.8rem; letter-spacing: 0.5px;">AI</span>
+                </div>
+                <span class="ms-2 fw-bolder text-dark" style="letter-spacing: -0.5px; font-size: 1.2rem;">
+                    Axon<span class="text-primary">Inn</span>
+                </span>
+            </a>
+
+            <button class="navbar-toggler border-0 shadow-none bg-light rounded-3 p-2" type="button" data-bs-toggle="collapse"
+                    data-bs-target="#navbarContent" aria-controls="navbarContent" aria-expanded="false" aria-label="Menüyü Aç/Kapat">
+                <i class="fas fa-bars text-primary" style="font-size: 1.1rem;"></i>
+            </button>
+
+            <div class="collapse navbar-collapse" id="navbarContent">
+
+                <ul class="navbar-nav me-auto mb-2 mb-md-0 mt-3 mt-md-0 gap-1 text-center text-md-start">
+                    <li class="nav-item">
+                        <a class="nav-link custom-nav-link @(currentController == "Home" && currentAction == "Index" ? "active" : "")" asp-controller="Home" asp-action="Index">Anasayfa</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link custom-nav-link @(currentController == "Departman" ? "active" : "")" asp-controller="Departman" asp-action="Departman">Departmanlar</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link custom-nav-link @(currentController == "Gorev" ? "active" : "")" asp-controller="Gorev" asp-action="GorevList">Görevler</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link custom-nav-link @(currentController == "Iletisim" ? "active" : "")" asp-controller="Iletisim" asp-action="Index">İletişim</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link custom-nav-link @(currentController == "Gizlilik" ? "active" : "")" asp-controller="Gizlilik" asp-action="Index">Gizlilik</a>
+                    </li>
+                </ul>
+
+                <div class="d-flex flex-column align-items-center align-items-md-end pt-2 pt-md-0 border-top border-md-0 mt-2 mt-md-0">
+                    <div class="d-flex align-items-center mb-0">
+                        <span class="badge rounded-circle bg-success p-0 me-2" style="width: 7px; height: 7px;">
+                            <span class="visually-hidden">Online</span>
+                        </span>
+
+                        <span class="text-dark fw-bold" style="font-size: 0.8rem;">
+                            @aktifKullanici
+                        </span>
+                    </div>
+
+                    <a asp-controller="Error" asp-action="SafeLogout" class="btn btn-sm btn-outline-danger border-0 px-2 py-0 mt-1 mt-md-0" style="font-size: 0.75rem;">
+                        <i class="fas fa-power-off me-1" style="font-size: 0.65rem;"></i>Güvenli Çıkış
+                    </a>
+                </div>
+
+            </div>
+        </div>
+    </nav>
+</header>

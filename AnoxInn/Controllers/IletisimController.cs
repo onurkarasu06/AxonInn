@@ -16,7 +16,8 @@ namespace AxonInn.Controllers
             _context = context;
         }
 
-        public async Task<IActionResult> Index()
+        [Route("Iletisim")]
+        public async Task<IActionResult> Iletisim()
         {
             try
             {

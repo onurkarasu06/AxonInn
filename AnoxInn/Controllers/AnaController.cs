@@ -5,18 +5,17 @@ using Newtonsoft.Json;
 
 namespace AxonInn.Controllers
 {
-    public class HomeController : Controller
+    public class AnaController : Controller
     {
         private readonly AxonInnContext _context;
 
-        public HomeController(AxonInnContext context)
+        public AnaController(AxonInnContext context)
         {
             _context = context;
         }
 
-        [Route("AnaSayfa/Index")]
-        [Route("")]
-        public async Task<IActionResult> Index()
+        [Route("AnaSayfa")]
+        public async Task<IActionResult> Ana()
         {
             try
             {

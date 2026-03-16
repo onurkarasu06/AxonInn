@@ -15,7 +15,7 @@ namespace AxonInn.Controllers
         }
 
         [Route("Gizlilik")]
-        public async Task<IActionResult> Index()
+        public async Task<IActionResult> Gizlilik()
         {
             try
             {

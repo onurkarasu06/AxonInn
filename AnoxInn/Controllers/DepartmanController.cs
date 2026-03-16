@@ -15,7 +15,7 @@ namespace AxonInn.Controllers
         }
 
 
-        [Route("Departman/Personel")]
+        [Route("Departmanlar")]
         [HttpGet]
         public async Task<IActionResult> Departman()
         {

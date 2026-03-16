@@ -17,7 +17,7 @@ namespace AxonInn.Controllers
 
    
         [Route("Gorevler")]
-        public async Task<IActionResult> GorevList()
+        public async Task<IActionResult> Gorev()
         {
             try
             {

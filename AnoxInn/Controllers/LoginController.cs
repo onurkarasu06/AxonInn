@@ -1,10 +1,7 @@
 ﻿using AxonInn.Models;
-using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Newtonsoft.Json;
-using System;
-using System.Threading.Tasks;
 
 namespace AxonInn.Controllers
 {
@@ -31,7 +28,7 @@ namespace AxonInn.Controllers
         }
 
         [HttpPost]
-        public async Task<ActionResult> KullaniciGiris(string identifier, string password)
+        public async Task<ActionResult> Login(string identifier, string password)
         {
             try
             {
@@ -67,7 +64,7 @@ namespace AxonInn.Controllers
 
                             HttpContext.Session.SetString("GirisYapanPersonel", JsonConvert.SerializeObject(sessionPersonel));
 
-                            return RedirectToAction("Index", "Home");
+                            return RedirectToAction("Ana", "Ana");
                         }
                         else
                         {

@@ -85,6 +85,7 @@ namespace AxonInn.Controllers
             return RedirectToAction("Index");
         }
 
+
         // Local Loglama Metodu
         private async Task<bool> LogKaydet(Personel? personel, string islemTipi, string yeniDeger)
         {
@@ -95,8 +96,11 @@ namespace AxonInn.Controllers
 
                 if (personel != null && personel.DepartmanRef != 0)
                 {
-                    var hotelId = await _context.Departmen.Where(d => d.Id == personel.DepartmanRef).Select(d => d.HotelRef).FirstOrDefaultAsync();
-                    if (hotelId != 0) hotelAdi = await _context.Hotels.Where(h => h.Id == hotelId).Select(h => h.Adi).FirstOrDefaultAsync() ?? "";
+                    // DEĞİŞİKLİK: 2 ayrı veritabanı turu yerine Navigation Property ile tek sorguya (JOIN) düşürüldü.
+                    hotelAdi = await _context.Departmen
+                        .Where(d => d.Id == personel.DepartmanRef)
+                        .Select(d => d.HotelRefNavigation.Adi)
+                        .FirstOrDefaultAsync() ?? "";
                 }
 
                 var log = new AuditLog

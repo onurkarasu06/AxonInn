@@ -5,7 +5,6 @@
 
 @{
     Layout = "~/Views/Shared/_Layout.cshtml";
-    
     // HATA ÇÖZÜMÜ: Eski GetObject yerine standart JSON Deserialize işlemini kullanıyoruz
     var personelJson = Context.Session.GetString("GirisYapanPersonel");
     AxonInn.Models.Personel girisYapanPersonel = null;
@@ -16,14 +15,14 @@
     }
     
     int yetki = girisYapanPersonel?.Yetki ?? 0;
-    
     // Modelden gelen verileri hiyerarşiden çıkarıp düz listelere dönüştürüyoruz
     var departmanlar = Model?.Departmen?.ToList() ?? new List<AxonInn.Models.Departman>();
     var personelList = departmanlar.SelectMany(d => d.Personels).ToList();
     var gorevList = personelList.SelectMany(p => p.Gorevs).OrderByDescending(g => g.KayitTarihi).ToList();
 }
 
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css" />
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css" media="print" onload="this.media='all'" />
+<noscript><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css" /></noscript>
 
 <style>
     /* Orijinal CSS tasarımın birebir korunmuştur */
@@ -157,7 +156,7 @@
     <div class="card border-0 shadow-lg rounded-4 overflow-hidden">
         <div class="card-body p-0">
             <div class="table-responsive" style="max-height: 550px; overflow-y: auto;">
-                <table class="table table-hover align-middle mb-0">
+                <table class="table table-hover align-middle mb-0" id="gorevTablosu">
                     <thead class="bg-light border-bottom sticky-top" style="z-index: 10;">
                         <tr class="text-uppercase fw-800" style="font-size: 0.7rem;">
                             <th class="ps-4 py-3">PERSONEL</th>
@@ -508,11 +507,10 @@
     </div>
 </div>
 
-<script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11" defer></script>
 
 <script>
-    // JS Kodların birebir aynı bırakıldı
+    // DEĞİŞİKLİK: Tüm jQuery ($) fonksiyonları saf JavaScript'e çevrildi
     document.addEventListener("DOMContentLoaded", function () {
         setTimeout(function() {
             const loader = document.getElementById('skeletonLoader');
@@ -535,34 +533,9 @@
                 }
             });
         });
-    });
 
-    let currentDurum = "";
-    let currentDept = "";
-
-    function tabloyuFiltrele() {
-        var arama = $("#tabloAra").val().toLocaleLowerCase('tr-TR');
-        var $tbody = $("table tbody");
-
-        $tbody.find("tr").each(function () {
-            var metin = $(this).text().toLocaleLowerCase('tr-TR');
-            var searchDurum = currentDurum.toLocaleLowerCase('tr-TR');
-            var searchDept = currentDept.toLocaleLowerCase('tr-TR');
-
-            var metinVar = arama === "" || metin.includes(arama);
-            var durumVar = searchDurum === "" || metin.includes(searchDurum);
-            var depVar = searchDept === "" || metin.includes(searchDept);
-
-            if (metinVar && durumVar && depVar) {
-                $(this).show();
-            } else {
-                $(this).hide();
-            }
-        });
-    }
-
-    $(document).ready(function () {
-        $("#tabloAra").on("keyup", tabloyuFiltrele);
+        // Event Listener'lar
+        document.getElementById("tabloAra").addEventListener("keyup", tabloyuFiltrele);
 
         document.querySelectorAll('.durum-filter-item').forEach(item => {
             item.addEventListener('click', function(e) {
@@ -586,6 +559,30 @@
             });
         });
     });
+
+    let currentDurum = "";
+    let currentDept = "";
+
+    function tabloyuFiltrele() {
+        var arama = document.getElementById("tabloAra").value.toLocaleLowerCase('tr-TR');
+        var trs = document.querySelectorAll("#gorevTablosu tbody tr");
+        
+        trs.forEach(function(tr) {
+            var metin = tr.innerText.toLocaleLowerCase('tr-TR');
+            var searchDurum = currentDurum.toLocaleLowerCase('tr-TR');
+            var searchDept = currentDept.toLocaleLowerCase('tr-TR');
+
+            var metinVar = arama === "" || metin.includes(arama);
+            var durumVar = searchDurum === "" || metin.includes(searchDurum);
+            var depVar = searchDept === "" || metin.includes(searchDept);
+
+            if (metinVar && durumVar && depVar) {
+                tr.style.display = "";
+            } else {
+                tr.style.display = "none";
+            }
+        });
+    }
 
     function prepareEdit(id, pId, aciklama, not, durum) {
         document.getElementById('editGorevID').value = id;
@@ -650,28 +647,51 @@
 
     function yeniGorevPersonelFiltrele(selectElement) {
         var secilenDept = selectElement.value;
-        var $personelSelect = $('.modal-pers-select');
-        $personelSelect.val("");
-        if (secilenDept === "all") {
-            $personelSelect.find('.pers-item').show().prop('disabled', false);
-        } else {
-            $personelSelect.find('.pers-item').hide().prop('disabled', true);
-            $personelSelect.find('.' + secilenDept).show().prop('disabled', false);
-        }
+        var personelSelect = document.querySelector('.modal-pers-select');
+        personelSelect.value = "";
+        
+        var options = personelSelect.querySelectorAll('.pers-item');
+        options.forEach(opt => {
+            if (secilenDept === "all") {
+                opt.style.display = "";
+                opt.disabled = false;
+            } else {
+                if(opt.classList.contains(secilenDept)) {
+                    opt.style.display = "";
+                    opt.disabled = false;
+                } else {
+                    opt.style.display = "none";
+                    opt.disabled = true;
+                }
+            }
+        });
     }
 
     function guncellePersonelFiltrele(selectElement) {
         var secilenDept = selectElement.value;
-        var $personelSelect = $('.edit-pers-select');
-        if (secilenDept === "all") {
-            $personelSelect.find('.edit-pers-item').show().prop('disabled', false);
-        } else {
-            $personelSelect.find('.edit-pers-item').hide().prop('disabled', true);
-            var $uygunlar = $personelSelect.find('.' + secilenDept);
-            $uygunlar.show().prop('disabled', false);
-            if ($personelSelect.find('option:selected').css('display') === 'none') {
-                $personelSelect.val($uygunlar.first().val());
+        var personelSelect = document.querySelector('.edit-pers-select');
+        var options = personelSelect.querySelectorAll('.edit-pers-item');
+        var ilkUygun = null;
+        
+        options.forEach(opt => {
+            if (secilenDept === "all") {
+                opt.style.display = "";
+                opt.disabled = false;
+            } else {
+                if(opt.classList.contains(secilenDept)) {
+                    opt.style.display = "";
+                    opt.disabled = false;
+                    if(!ilkUygun) ilkUygun = opt;
+                } else {
+                    opt.style.display = "none";
+                    opt.disabled = true;
+                }
             }
+        });
+        
+        var selectedOpt = personelSelect.options[personelSelect.selectedIndex];
+        if (secilenDept !== "all" && selectedOpt && selectedOpt.style.display === "none" && ilkUygun) {
+            personelSelect.value = ilkUygun.value;
         }
     }
 </script>
@@ -679,15 +699,19 @@
 @if (TempData["Mesaj"] != null)
 {
     <script>
-        $(document).ready(function () {
-            Swal.fire({
-                icon: '@(TempData["MesajTipi"] ?? "warning")',
-                title: 'Bilgilendirme',
-                text: '@Html.Raw(TempData["Mesaj"])',
-                confirmButtonText: 'Tamam',
-                confirmButtonColor: '#0d6efd',
-                customClass: { confirmButton: 'rounded-pill px-4' }
-            });
+        document.addEventListener("DOMContentLoaded", function () {
+            setTimeout(() => {
+                if (typeof Swal !== 'undefined') {
+                    Swal.fire({
+                        icon: '@(TempData["MesajTipi"] ?? "warning")',
+                        title: 'Bilgilendirme',
+                        text: '@Html.Raw(TempData["Mesaj"])',
+                        confirmButtonText: 'Tamam',
+                        confirmButtonColor: '#0d6efd',
+                        customClass: { confirmButton: 'rounded-pill px-4' }
+                    });
+                }
+            }, 100);
         });
     </script>
 }

@@ -15,6 +15,7 @@ namespace AxonInn.Controllers
             _context = context;
         }
 
+   
         [Route("Gorevler")]
         public async Task<IActionResult> GorevList()
         {
@@ -33,18 +34,43 @@ namespace AxonInn.Controllers
                     .Select(d => d.HotelRef)
                     .FirstOrDefaultAsync();
 
-                // Tek bir sorgu ile Hotel -> Departmanlar -> Aktif Personeller -> Görevler -> Görev Fotoğrafları hiyerarşisini çekiyoruz
+                // DEĞİŞİKLİK 1: .AsNoTracking() eklendi ve .ThenInclude(g => g.GorevFotografs) KALDIRILDI!
                 var hotel = await _context.Hotels
+                    .AsNoTracking()
                     .Include(h => h.Departmen)
                         .ThenInclude(d => d.Personels.Where(p => p.AktifMi == 1))
                             .ThenInclude(p => p.Gorevs)
-                                .ThenInclude(g => g.GorevFotografs)
                     .FirstOrDefaultAsync(h => h.Id == hotelId);
 
                 if (hotel == null)
                     return RedirectToAction("Login", "Login");
 
-                // HATA ÇÖZÜMÜ: Dosya adın Gorev.cshtml olduğu için burayı "Gorev" olarak güncelledik.
+                // DEĞİŞİKLİK 2: RAM'i patlatmamak için fotoğrafların BYTE[] verisini değil, SADECE ID'lerini çekiyoruz!
+                var gorevIds = hotel.Departmen.SelectMany(d => d.Personels).SelectMany(p => p.Gorevs).Select(g => g.Id).ToList();
+
+                if (gorevIds.Any())
+                {
+                    var fotoIdListesi = await _context.GorevFotografs
+                        .Where(gf => gorevIds.Contains(gf.GorevRef))
+                        .Select(gf => new { gf.Id, gf.GorevRef }) // Sadece bu iki sütun çekilir, byte[] atlanır.
+                        .ToListAsync();
+
+                    // DEĞİŞİKLİK 3: View tarafındaki item.GorevFotografs.Any() kodları hata vermesin diye ID'leri yerleştiriyoruz.
+                    foreach (var departman in hotel.Departmen)
+                    {
+                        foreach (var personel in departman.Personels)
+                        {
+                            foreach (var gorev in personel.Gorevs)
+                            {
+                                gorev.GorevFotografs = fotoIdListesi
+                                    .Where(f => f.GorevRef == gorev.Id)
+                                    .Select(f => new GorevFotograf { Id = f.Id, GorevRef = f.GorevRef })
+                                    .ToList();
+                            }
+                        }
+                    }
+                }
+
                 return View("Gorev", hotel);
             }
             catch (Exception ex)
@@ -52,7 +78,6 @@ namespace AxonInn.Controllers
                 return View("~/Views/Error/Error.cshtml", new ErrorViewModel { RequestId = ex.Message });
             }
         }
-
         [HttpPost]
         public async Task<IActionResult> Ekle(Gorev model, List<IFormFile> Fotograf)
         {
@@ -96,7 +121,7 @@ namespace AxonInn.Controllers
                 return View("~/Views/Error/Error.cshtml", new ErrorViewModel { RequestId = ex.Message });
             }
         }
-
+        [HttpPost]
         public async Task<IActionResult> Sil(long id)
         {
             try
@@ -108,9 +133,13 @@ namespace AxonInn.Controllers
                 var gorev = await _context.Gorevs.FindAsync(id);
                 if (gorev != null)
                 {
-                    var fotograflar = _context.GorevFotografs.Where(f => f.GorevRef == id);
-                    _context.GorevFotografs.RemoveRange(fotograflar);
+                    // YENİ YÖNTEM: RAM'e hiçbir şey çekmeden, doğrudan SQL bazlı toplu silme işlemi.
+                    // EF Core 7.0+ destekler.
+                    await _context.GorevFotografs
+                        .Where(f => f.GorevRef == id)
+                        .ExecuteDeleteAsync();
 
+                    // Fotoğraflar silindiğine göre artık ana görevi silebiliriz
                     _context.Gorevs.Remove(gorev);
                     await _context.SaveChangesAsync();
 
@@ -121,7 +150,11 @@ namespace AxonInn.Controllers
             }
             catch (Exception ex)
             {
-                return View("~/Views/Error/Error.cshtml", new ErrorViewModel { RequestId = ex.Message });
+                // İPUCU: Ekranda "Inner Exception" uyarısı görüyordun çünkü asıl hata mesajı ex.Message içinde değil, 
+                // ex.InnerException.Message içindeydi. Aşağıdaki satır ile asıl hatayı doğrudan yakalayabiliriz.
+                string gercekHata = ex.InnerException != null ? ex.InnerException.Message : ex.Message;
+
+                return View("~/Views/Error/Error.cshtml", new ErrorViewModel { RequestId = gercekHata });
             }
         }
 
@@ -214,8 +247,11 @@ namespace AxonInn.Controllers
 
                 if (personel != null && personel.DepartmanRef != 0)
                 {
-                    var hotelId = await _context.Departmen.Where(d => d.Id == personel.DepartmanRef).Select(d => d.HotelRef).FirstOrDefaultAsync();
-                    if (hotelId != 0) hotelAdi = await _context.Hotels.Where(h => h.Id == hotelId).Select(h => h.Adi).FirstOrDefaultAsync() ?? "";
+                    // DEĞİŞİKLİK: 2 ayrı veritabanı turu yerine tek seferde Select atıyoruz.
+                    hotelAdi = await _context.Departmen
+                        .Where(d => d.Id == personel.DepartmanRef)
+                        .Select(d => d.HotelRefNavigation.Adi)
+                        .FirstOrDefaultAsync() ?? "";
                 }
 
                 var log = new AuditLog
@@ -240,5 +276,6 @@ namespace AxonInn.Controllers
                 return false;
             }
         }
+
     }
 }

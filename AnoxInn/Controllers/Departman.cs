@@ -14,6 +14,7 @@ namespace AxonInn.Controllers
             _context = context;
         }
 
+
         [Route("Departman/Personel")]
         [HttpGet]
         public async Task<IActionResult> Departman()
@@ -33,8 +34,10 @@ namespace AxonInn.Controllers
                     .Select(d => d.HotelRef)
                     .FirstOrDefaultAsync();
 
-                // Sadece Hotel'i, o hotele bağlı departmanları ve aktif personelleri tek seferde getir
+                // DEĞİŞİKLİK: .AsNoTracking() eklendi! 
+                // Sadece okuma yapıldığı için EF Core nesneleri takip etmez, RAM ciddi oranda rahatlar.
                 var hotel = await _context.Hotels
+                    .AsNoTracking()
                     .Include(h => h.Departmen)
                         .ThenInclude(d => d.Personels.Where(p => p.AktifMi == 1))
                     .FirstOrDefaultAsync(h => h.Id == hotelId);
@@ -45,8 +48,6 @@ namespace AxonInn.Controllers
                 }
 
                 ViewData["Title"] = "AxonInn";
-
-                // View dosyamızın adı "Departman.cshtml" olduğu için açıkça belirtiyoruz
                 return View("Departman", hotel);
             }
             catch (Exception ex)
@@ -118,26 +119,32 @@ namespace AxonInn.Controllers
                     await LogKaydet(loginOlanPersonel, "Personel Silme Hatası", "Personele kayıtlı görev bulunduğu için silinemez.", null);
                     TempData["Mesaj"] = "Personele kayıtlı görev bulunduğu için silinemez.";
                     TempData["MesajTipi"] = "warning";
-                    return RedirectToAction("Departman", "Departman"); // Hata çözümü: Controller eklendi
+                    return RedirectToAction("Departman", "Departman");
                 }
 
                 var silinecekPersonel = await _context.Personels.FindAsync(id);
                 if (silinecekPersonel != null)
                 {
-                    var foto = await _context.PersonelFotografs.FirstOrDefaultAsync(f => f.PersonelRef == id);
-                    if (foto != null) _context.PersonelFotografs.Remove(foto);
+                    // YENİ VE EN HIZLI YÖNTEM: RAM'e hiçbir şey çekmeden, doğrudan SQL bazlı silme.
+                    // EF Core 7.0+ destekler.
+                    await _context.PersonelFotografs
+                        .Where(f => f.PersonelRef == id)
+                        .ExecuteDeleteAsync();
 
+                    // Fotoğraf (eğer varsa) silindiğine göre artık ana personeli silebiliriz
                     _context.Personels.Remove(silinecekPersonel);
                     await _context.SaveChangesAsync();
 
                     await LogKaydet(loginOlanPersonel, "Personel Silindi", $"Personel ID: {id} başarıyla silindi.", null);
                 }
 
-                return RedirectToAction("Departman", "Departman"); // Hata çözümü: Controller eklendi
+                return RedirectToAction("Departman", "Departman");
             }
             catch (Exception ex)
             {
-                return View("~/Views/Error/Error.cshtml", new ErrorViewModel { RequestId = ex.Message });
+                // Asıl hatayı (Inner Exception) yakalayarak ekranda daha net görünmesini sağlıyoruz.
+                string gercekHata = ex.InnerException != null ? ex.InnerException.Message : ex.Message;
+                return View("~/Views/Error/Error.cshtml", new ErrorViewModel { RequestId = gercekHata });
             }
         }
 
@@ -208,8 +215,12 @@ namespace AxonInn.Controllers
 
                 if (personel != null && personel.DepartmanRef != 0)
                 {
-                    var hotelId = await _context.Departmen.Where(d => d.Id == personel.DepartmanRef).Select(d => d.HotelRef).FirstOrDefaultAsync();
-                    if (hotelId != 0) hotelAdi = await _context.Hotels.Where(h => h.Id == hotelId).Select(h => h.Adi).FirstOrDefaultAsync() ?? "";
+                    // DEĞİŞİKLİK: 2 ayrı SQL sorgusu yerine Navigation Property (HotelRefNavigation) 
+                    // kullanarak SQL tarafında JOIN işlemi yapılmasını sağladık. Tek sorgu atılacak.
+                    hotelAdi = await _context.Departmen
+                        .Where(d => d.Id == personel.DepartmanRef)
+                        .Select(d => d.HotelRefNavigation.Adi)
+                        .FirstOrDefaultAsync() ?? "";
                 }
 
                 var log = new AuditLog
@@ -231,8 +242,11 @@ namespace AxonInn.Controllers
             }
             catch
             {
+                // Sayfa çökmesin diye hatayı yutuyoruz
                 return false;
             }
         }
+
+
     }
 }

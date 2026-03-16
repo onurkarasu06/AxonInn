@@ -16,13 +16,5 @@ namespace AxonInn.Controllers
             }
             return View(model);
         }
-
-        // Hata sayfasından çıkış yapmak için (GET metodu daha kullanışlıdır)
-        [HttpGet]
-        public IActionResult SafeLogout()
-        {
-            HttpContext.Session.Clear();
-            return RedirectToAction("Login", "Login");
-        }
     }
 }

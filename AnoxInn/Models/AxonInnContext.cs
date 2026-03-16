@@ -57,7 +57,7 @@ public partial class AxonInnContext : DbContext
             entity.ToTable("Gorev");
 
             entity.HasIndex(e => e.PersonelRef, "IX_Gorev_PersonelRef");
-
+            entity.HasIndex(e => e.Durum, "IX_Gorev_Durum");
             entity.Property(e => e.Id).HasColumnName("ID");
             entity.Property(e => e.CozumBaslamaTarihi).HasColumnType("datetime");
             entity.Property(e => e.CozumBitisTarihi).HasColumnType("datetime");

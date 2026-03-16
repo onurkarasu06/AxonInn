@@ -17,7 +17,7 @@ namespace AxonInn.Models
         public string? IlgiliTablo { get; set; }
 
         public long? KayitRefId { get; set; }
-
+        [MaxLength(250)]
         public string? IslemTipi { get; set; }
         public string? EskiDeger { get; set; }
         public string? YeniDeger { get; set; }

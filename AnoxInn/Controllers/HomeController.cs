@@ -15,7 +15,7 @@ namespace AxonInn.Controllers
         }
 
         [Route("AnaSayfa/Index")]
-        [Route("")] // Uygulama açıldığında direkt buraya gelmesi için
+        [Route("")]
         public async Task<IActionResult> Index()
         {
             try
@@ -25,28 +25,69 @@ namespace AxonInn.Controllers
                     return RedirectToAction("Login", "Login");
 
                 var loginOlanPersonel = JsonConvert.DeserializeObject<Personel>(personelJson);
-
-                // Ana sayfaya giriş logu
                 await LogKaydet(loginOlanPersonel, "Ana Sayfaya Giriş Yapıldı", "Dashboard Görüntüleme");
 
-                // Kullanıcının bağlı olduğu departmanın Hotel ID'sini bul
+                // Otel ID'sini bul
                 var hotelId = await _context.Departmen
                     .Where(d => d.Id == loginOlanPersonel.DepartmanRef)
                     .Select(d => d.HotelRef)
                     .FirstOrDefaultAsync();
 
-                // Tek sorguda Hotel -> Departmanlar -> Aktif Personeller -> Personel Görevleri zincirini çekiyoruz
-                var hotel = await _context.Hotels
-                    .Include(h => h.Departmen)
-                        .ThenInclude(d => d.Personels.Where(p => p.AktifMi == 1))
-                            .ThenInclude(p => p.Gorevs)
-                    .FirstOrDefaultAsync(h => h.Id == hotelId);
+                if (hotelId == 0) return RedirectToAction("Login", "Login");
 
-                if (hotel == null)
-                    return RedirectToAction("Login", "Login");
+                // DEĞİŞİKLİK 1: RAM'e almak yerine doğrudan SQL'e saydırıyoruz (Çok Hızlıdır)
+                var hotelAdi = await _context.Hotels.Where(h => h.Id == hotelId).Select(h => h.Adi).FirstOrDefaultAsync();
 
-                // View'a doğrudan EF Core Hotel modelini yolluyoruz (Tıpkı View sayfasında tanımladığımız gibi)
-                return View(hotel);
+                var aktifPersonelAdet = await _context.Personels
+                    .CountAsync(p => p.DepartmanRefNavigation.HotelRef == hotelId && p.AktifMi == 1);
+
+                var beklemedeAdet = await _context.Gorevs
+                    .CountAsync(g => g.PersonelRefNavigation.DepartmanRefNavigation.HotelRef == hotelId && g.Durum == 1);
+
+                var islemdeAdet = await _context.Gorevs
+                    .CountAsync(g => g.PersonelRefNavigation.DepartmanRefNavigation.HotelRef == hotelId && g.Durum == 2);
+
+                var bittiAdet = await _context.Gorevs
+                    .CountAsync(g => g.PersonelRefNavigation.DepartmanRefNavigation.HotelRef == hotelId && g.Durum == 3);
+
+                // DEĞİŞİKLİK 2: Grafikler için tüm tabloyu değil, sadece ad, soyad ve durum çekiyoruz (Select)
+                var personelChartData = await _context.Personels
+                    .Where(p => p.DepartmanRefNavigation.HotelRef == hotelId && p.AktifMi == 1)
+                    .Select(p => new {
+                        ad = p.Adi,
+                        soyad = p.Soyadi,
+                        departman = new { ad = p.DepartmanRefNavigation.Adi }
+                    }).ToListAsync();
+
+                var gorevChartData = await _context.Gorevs
+                    .Where(g => g.PersonelRefNavigation.DepartmanRefNavigation.HotelRef == hotelId)
+                    .Select(g => new {
+                        durum = g.Durum,
+                        personel = new
+                        {
+                            id = g.PersonelRef,
+                            ad = g.PersonelRefNavigation.Adi,
+                            departman = new { ad = g.PersonelRefNavigation.DepartmanRefNavigation.Adi }
+                        }
+                    }).ToListAsync();
+
+                // View'daki filtre için sadece departman listesi
+                var departmanlar = await _context.Departmen
+                    .Where(d => d.HotelRef == hotelId)
+                    .Select(d => new Departman { Id = d.Id, Adi = d.Adi })
+                    .ToListAsync();
+
+                // Verileri View'a ViewBag ile gönderiyoruz (Ağır Model yapısını bıraktık)
+                ViewBag.HotelAdi = hotelAdi;
+                ViewBag.AktifPersonelAdet = aktifPersonelAdet;
+                ViewBag.BeklemedeAdet = beklemedeAdet;
+                ViewBag.IslemdeAdet = islemdeAdet;
+                ViewBag.BittiAdet = bittiAdet;
+                ViewBag.PersonelJson = JsonConvert.SerializeObject(personelChartData);
+                ViewBag.GorevJson = JsonConvert.SerializeObject(gorevChartData);
+                ViewBag.Departmanlar = departmanlar;
+
+                return View();
             }
             catch (Exception ex)
             {
@@ -54,9 +95,6 @@ namespace AxonInn.Controllers
             }
         }
 
-      
-
-        // Local Loglama Metodu
         private async Task<bool> LogKaydet(Personel? personel, string islemTipi, string yeniDeger)
         {
             try
@@ -66,15 +104,11 @@ namespace AxonInn.Controllers
 
                 if (personel != null && personel.DepartmanRef != 0)
                 {
-                    var hotelId = await _context.Departmen
+                    // DEĞİŞİKLİK 3: Join mantığıyla tek SQL sorgusu
+                    hotelAdi = await _context.Departmen
                         .Where(d => d.Id == personel.DepartmanRef)
-                        .Select(d => d.HotelRef)
-                        .FirstOrDefaultAsync();
-
-                    if (hotelId != 0)
-                    {
-                        hotelAdi = await _context.Hotels.Where(h => h.Id == hotelId).Select(h => h.Adi).FirstOrDefaultAsync() ?? "";
-                    }
+                        .Select(d => d.HotelRefNavigation.Adi)
+                        .FirstOrDefaultAsync() ?? "";
                 }
 
                 var log = new AuditLog
@@ -96,7 +130,7 @@ namespace AxonInn.Controllers
             }
             catch
             {
-                return false; // Sayfa çökmesin diye hatayı yutuyoruz
+                return false;
             }
         }
     }

@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.ComponentModel.DataAnnotations;
 
 namespace AxonInn.Models;
 
@@ -11,6 +12,7 @@ public partial class Gorev
 
     public byte Durum { get; set; }
 
+    [MaxLength(2000)]
     public string Gorev1 { get; set; } = null!;
 
     public DateTime KayitTarihi { get; set; }
@@ -19,6 +21,7 @@ public partial class Gorev
 
     public DateTime? CozumBitisTarihi { get; set; }
 
+    [MaxLength(2000)]
     public string? PersonelNotu { get; set; }
 
     public virtual ICollection<GorevFotograf> GorevFotografs { get; set; } = new List<GorevFotograf>();

@@ -14,7 +14,6 @@ namespace AxonInn.Controllers
             _context = context;
         }
 
-
         [Route("Departmanlar")]
         [HttpGet]
         public async Task<IActionResult> Departman()
@@ -28,19 +27,13 @@ namespace AxonInn.Controllers
                 var loginOlanPersonel = JsonConvert.DeserializeObject<Personel>(personelJson);
                 await LogKaydet(loginOlanPersonel, "Departman Sayfasına Giriş Yapıldı", "Sayfa Görüntüleme", null);
 
-                // Kullanıcının bağlı olduğu departmanın Hotel ID'sini bul
-                var hotelId = await _context.Departmen
-                    .Where(d => d.Id == loginOlanPersonel.DepartmanRef)
-                    .Select(d => d.HotelRef)
-                    .FirstOrDefaultAsync();
-
-                // DEĞİŞİKLİK: .AsNoTracking() eklendi! 
-                // Sadece okuma yapıldığı için EF Core nesneleri takip etmez, RAM ciddi oranda rahatlar.
+                // İYİLEŞTİRME: İki ayrı veritabanı sorgusu tek bir sorguya indirgendi. 
+                // Hotel tablosuna giderken, doğrudan kullanıcının DepartmanRef'i üzerinden filtreleme yapıldı.
                 var hotel = await _context.Hotels
                     .AsNoTracking()
                     .Include(h => h.Departmen)
                         .ThenInclude(d => d.Personels.Where(p => p.AktifMi == 1))
-                    .FirstOrDefaultAsync(h => h.Id == hotelId);
+                    .FirstOrDefaultAsync(h => h.Departmen.Any(d => d.Id == loginOlanPersonel.DepartmanRef));
 
                 if (hotel == null)
                 {
@@ -71,30 +64,35 @@ namespace AxonInn.Controllers
                     await LogKaydet(loginOlanPersonel, "Personel Ekleme Hatası", "Mail adresi veya telefon numarası eşleştiği için kayıt yapılamadı.", yeniPersonel);
                     TempData["Mesaj"] = "Mail adresi veya telefon numarası ile eşleşen bir personel kayıtlı olduğu için kaydet işlemi yapılamaz.";
                     TempData["MesajTipi"] = "warning";
-                    return RedirectToAction("Departman", "Departman"); // Hata çözümü: Controller eklendi
+                    return RedirectToAction("Departman", "Departman");
                 }
 
                 yeniPersonel.AktifMi = 1;
                 _context.Personels.Add(yeniPersonel);
+
+                // DÜZELTME 1: Önce personeli kaydediyoruz ki veritabanı yeniPersonel.Id değerini oluştursun.
                 await _context.SaveChangesAsync();
 
                 if (yuklenenFoto != null && yuklenenFoto.Length > 0)
                 {
-                    using (var ms = new MemoryStream())
+                    using var ms = new MemoryStream(); // Modern Using (süslü parantez kalabalığını azaltır)
+                    await yuklenenFoto.CopyToAsync(ms);
+
+                    var foto = new PersonelFotograf
                     {
-                        await yuklenenFoto.CopyToAsync(ms);
-                        var foto = new PersonelFotograf
-                        {
-                            PersonelRef = yeniPersonel.Id,
-                            Fotograf = ms.ToArray()
-                        };
-                        _context.PersonelFotografs.Add(foto);
-                        await _context.SaveChangesAsync();
-                    }
+                        // DÜZELTME 2: Hata veren "Personel = yeniPersonel" satırını kaldırıp, ID atamasını yapıyoruz.
+                        PersonelRef = yeniPersonel.Id,
+                        Fotograf = ms.ToArray()
+                    };
+                    _context.PersonelFotografs.Add(foto);
+
+                    // DÜZELTME 3: Fotoğrafı da veritabanına işliyoruz.
+                    await _context.SaveChangesAsync();
                 }
 
                 await LogKaydet(loginOlanPersonel, "Yeni Personel Eklendi", "Personel Başarıyla Kaydedildi", yeniPersonel);
-                return RedirectToAction("Departman", "Departman"); // Hata çözümü: Controller eklendi
+
+                return RedirectToAction("Departman", "Departman");
             }
             catch (Exception ex)
             {
@@ -122,27 +120,17 @@ namespace AxonInn.Controllers
                     return RedirectToAction("Departman", "Departman");
                 }
 
-                var silinecekPersonel = await _context.Personels.FindAsync(id);
-                if (silinecekPersonel != null)
-                {
-                    // YENİ VE EN HIZLI YÖNTEM: RAM'e hiçbir şey çekmeden, doğrudan SQL bazlı silme.
-                    // EF Core 7.0+ destekler.
-                    await _context.PersonelFotografs
-                        .Where(f => f.PersonelRef == id)
-                        .ExecuteDeleteAsync();
+                // İYİLEŞTİRME: Ana nesneyi bellekten çağırıp (FindAsync) sonra silmek (Remove) gereksiz bir işlemdir. 
+                // ExecuteDeleteAsync ile doğrudan SQL üzerinde siliyoruz.
+                await _context.PersonelFotografs.Where(f => f.PersonelRef == id).ExecuteDeleteAsync();
+                await _context.Personels.Where(p => p.Id == id).ExecuteDeleteAsync();
 
-                    // Fotoğraf (eğer varsa) silindiğine göre artık ana personeli silebiliriz
-                    _context.Personels.Remove(silinecekPersonel);
-                    await _context.SaveChangesAsync();
-
-                    await LogKaydet(loginOlanPersonel, "Personel Silindi", $"Personel ID: {id} başarıyla silindi.", null);
-                }
+                await LogKaydet(loginOlanPersonel, "Personel Silindi", $"Personel ID: {id} başarıyla silindi.", null);
 
                 return RedirectToAction("Departman", "Departman");
             }
             catch (Exception ex)
             {
-                // Asıl hatayı (Inner Exception) yakalayarak ekranda daha net görünmesini sağlıyoruz.
                 string gercekHata = ex.InnerException != null ? ex.InnerException.Message : ex.Message;
                 return View("~/Views/Error/Error.cshtml", new ErrorViewModel { RequestId = gercekHata });
             }
@@ -173,24 +161,24 @@ namespace AxonInn.Controllers
                         dbPersonel.Sifre = p.Sifre;
                     }
 
-                    _context.Personels.Update(dbPersonel);
+                    // İYİLEŞTİRME: _context.Personels.Update(dbPersonel); SATIRI KALDIRILDI.
+                    // EF Core zaten dbPersonel'i takip (track) ettiği için, sadece değişen property'leri bulur ve veritabanına o kısımlar için Update atar.
+                    // Update() metodunu çağırmak ise nesnenin TÜM alanlarını değişmiş gibi işaretler ve gereksiz SQL yükü oluşturur.
 
                     if (yuklenenFoto != null && yuklenenFoto.Length > 0)
                     {
                         var mevcutFoto = await _context.PersonelFotografs.FirstOrDefaultAsync(f => f.PersonelRef == p.Id);
 
-                        using (var ms = new MemoryStream())
+                        using var ms = new MemoryStream();
+                        await yuklenenFoto.CopyToAsync(ms);
+                        if (mevcutFoto != null)
                         {
-                            await yuklenenFoto.CopyToAsync(ms);
-                            if (mevcutFoto != null)
-                            {
-                                mevcutFoto.Fotograf = ms.ToArray();
-                                _context.PersonelFotografs.Update(mevcutFoto);
-                            }
-                            else
-                            {
-                                _context.PersonelFotografs.Add(new PersonelFotograf { PersonelRef = p.Id, Fotograf = ms.ToArray() });
-                            }
+                            mevcutFoto.Fotograf = ms.ToArray();
+                            // Burada da Update'e gerek yok, referans takipte.
+                        }
+                        else
+                        {
+                            _context.PersonelFotografs.Add(new PersonelFotograf { PersonelRef = p.Id, Fotograf = ms.ToArray() });
                         }
                     }
 
@@ -198,7 +186,7 @@ namespace AxonInn.Controllers
                     await LogKaydet(loginOlanPersonel, "Personel Güncellendi", $"Personel ID: {p.Id} başarıyla güncellendi.", dbPersonel);
                 }
 
-                return RedirectToAction("Departman", "Departman"); // Hata çözümü: Controller eklendi
+                return RedirectToAction("Departman", "Departman");
             }
             catch (Exception ex)
             {
@@ -215,8 +203,6 @@ namespace AxonInn.Controllers
 
                 if (personel != null && personel.DepartmanRef != 0)
                 {
-                    // DEĞİŞİKLİK: 2 ayrı SQL sorgusu yerine Navigation Property (HotelRefNavigation) 
-                    // kullanarak SQL tarafında JOIN işlemi yapılmasını sağladık. Tek sorgu atılacak.
                     hotelAdi = await _context.Departmen
                         .Where(d => d.Id == personel.DepartmanRef)
                         .Select(d => d.HotelRefNavigation.Adi)
@@ -242,11 +228,8 @@ namespace AxonInn.Controllers
             }
             catch
             {
-                // Sayfa çökmesin diye hatayı yutuyoruz
                 return false;
             }
         }
-
-
     }
 }

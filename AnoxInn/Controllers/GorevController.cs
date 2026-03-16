@@ -1,7 +1,7 @@
 ﻿using AxonInn.Models;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using Newtonsoft.Json;
+using System.Text.Json; // Newtonsoft yerine daha hızlı olan System.Text.Json eklendi
 using System.IO;
 
 namespace AxonInn.Controllers
@@ -15,7 +15,6 @@ namespace AxonInn.Controllers
             _context = context;
         }
 
-   
         [Route("Gorevler")]
         public async Task<IActionResult> Gorev()
         {
@@ -25,18 +24,18 @@ namespace AxonInn.Controllers
                 if (string.IsNullOrEmpty(personelJson))
                     return RedirectToAction("Login", "Login");
 
-                var loginOlanPersonel = JsonConvert.DeserializeObject<Personel>(personelJson);
+                var loginOlanPersonel = JsonSerializer.Deserialize<Personel>(personelJson);
                 await LogKaydet(loginOlanPersonel, "Görev Sayfasına Giriş Yapıldı", "Görev Listesi Görüntüleme", null);
 
-                // Otelin ID'sini bul
                 var hotelId = await _context.Departmen
                     .Where(d => d.Id == loginOlanPersonel.DepartmanRef)
                     .Select(d => d.HotelRef)
                     .FirstOrDefaultAsync();
 
-                // DEĞİŞİKLİK 1: .AsNoTracking() eklendi ve .ThenInclude(g => g.GorevFotografs) KALDIRILDI!
+                // PERFORMANS 1: AsSplitQuery eklendi. RAM'i şişiren kartezyen patlamasını önler.
                 var hotel = await _context.Hotels
                     .AsNoTracking()
+                    .AsSplitQuery()
                     .Include(h => h.Departmen)
                         .ThenInclude(d => d.Personels.Where(p => p.AktifMi == 1))
                             .ThenInclude(p => p.Gorevs)
@@ -45,25 +44,25 @@ namespace AxonInn.Controllers
                 if (hotel == null)
                     return RedirectToAction("Login", "Login");
 
-                // DEĞİŞİKLİK 2: RAM'i patlatmamak için fotoğrafların BYTE[] verisini değil, SADECE ID'lerini çekiyoruz!
                 var gorevIds = hotel.Departmen.SelectMany(d => d.Personels).SelectMany(p => p.Gorevs).Select(g => g.Id).ToList();
 
                 if (gorevIds.Any())
                 {
                     var fotoIdListesi = await _context.GorevFotografs
                         .Where(gf => gorevIds.Contains(gf.GorevRef))
-                        .Select(gf => new { gf.Id, gf.GorevRef }) // Sadece bu iki sütun çekilir, byte[] atlanır.
+                        .Select(gf => new { gf.Id, gf.GorevRef })
                         .ToListAsync();
 
-                    // DEĞİŞİKLİK 3: View tarafındaki item.GorevFotografs.Any() kodları hata vermesin diye ID'leri yerleştiriyoruz.
+                    // PERFORMANS 2: ToLookup kullanılarak veriler bellekte indekslendi. Eşleşme O(1) hızına çıktı.
+                    var fotoLookup = fotoIdListesi.ToLookup(f => f.GorevRef);
+
                     foreach (var departman in hotel.Departmen)
                     {
                         foreach (var personel in departman.Personels)
                         {
                             foreach (var gorev in personel.Gorevs)
                             {
-                                gorev.GorevFotografs = fotoIdListesi
-                                    .Where(f => f.GorevRef == gorev.Id)
+                                gorev.GorevFotografs = fotoLookup[gorev.Id]
                                     .Select(f => new GorevFotograf { Id = f.Id, GorevRef = f.GorevRef })
                                     .ToList();
                             }
@@ -78,6 +77,7 @@ namespace AxonInn.Controllers
                 return View("~/Views/Error/Error.cshtml", new ErrorViewModel { RequestId = ex.Message });
             }
         }
+
         [HttpPost]
         public async Task<IActionResult> Ekle(Gorev model, List<IFormFile> Fotograf)
         {
@@ -85,7 +85,7 @@ namespace AxonInn.Controllers
             {
                 var personelJson = HttpContext.Session.GetString("GirisYapanPersonel");
                 if (string.IsNullOrEmpty(personelJson)) return RedirectToAction("Login", "Login");
-                var loginOlanPersonel = JsonConvert.DeserializeObject<Personel>(personelJson);
+                var loginOlanPersonel = JsonSerializer.Deserialize<Personel>(personelJson);
 
                 model.KayitTarihi = DateTime.Now;
                 model.Durum = 1;
@@ -99,7 +99,8 @@ namespace AxonInn.Controllers
                     {
                         if (dosya.Length > 0)
                         {
-                            using (var ms = new MemoryStream())
+                            // PERFORMANS 3: Allocation overhead'i engellemek için Stream boyutu belirtildi.
+                            using (var ms = new MemoryStream((int)dosya.Length))
                             {
                                 await dosya.CopyToAsync(ms);
                                 _context.GorevFotografs.Add(new GorevFotograf
@@ -114,13 +115,15 @@ namespace AxonInn.Controllers
                 }
 
                 await LogKaydet(loginOlanPersonel, "Yeni Görev Eklendi", $"Görev ID: {model.Id} oluşturuldu.", null);
-                return RedirectToAction("GorevList");
+                // Dikkat: Yönlendirme Route yapınızla aynı olmalı
+                return RedirectToAction("Gorev");
             }
             catch (Exception ex)
             {
                 return View("~/Views/Error/Error.cshtml", new ErrorViewModel { RequestId = ex.Message });
             }
         }
+
         [HttpPost]
         public async Task<IActionResult> Sil(long id)
         {
@@ -128,32 +131,27 @@ namespace AxonInn.Controllers
             {
                 var personelJson = HttpContext.Session.GetString("GirisYapanPersonel");
                 if (string.IsNullOrEmpty(personelJson)) return RedirectToAction("Login", "Login");
-                var loginOlanPersonel = JsonConvert.DeserializeObject<Personel>(personelJson);
+                var loginOlanPersonel = JsonSerializer.Deserialize<Personel>(personelJson);
 
                 var gorev = await _context.Gorevs.FindAsync(id);
                 if (gorev != null)
                 {
-                    // YENİ YÖNTEM: RAM'e hiçbir şey çekmeden, doğrudan SQL bazlı toplu silme işlemi.
-                    // EF Core 7.0+ destekler.
+                    // EF Core 7.0+ ExecuteDeleteAsync kullanımı çok iyi, değiştirilmedi.
                     await _context.GorevFotografs
                         .Where(f => f.GorevRef == id)
                         .ExecuteDeleteAsync();
 
-                    // Fotoğraflar silindiğine göre artık ana görevi silebiliriz
                     _context.Gorevs.Remove(gorev);
                     await _context.SaveChangesAsync();
 
                     await LogKaydet(loginOlanPersonel, "Görev Silindi", $"Görev ID: {id} silindi.", null);
                 }
 
-                return RedirectToAction("GorevList");
+                return RedirectToAction("Gorev");
             }
             catch (Exception ex)
             {
-                // İPUCU: Ekranda "Inner Exception" uyarısı görüyordun çünkü asıl hata mesajı ex.Message içinde değil, 
-                // ex.InnerException.Message içindeydi. Aşağıdaki satır ile asıl hatayı doğrudan yakalayabiliriz.
                 string gercekHata = ex.InnerException != null ? ex.InnerException.Message : ex.Message;
-
                 return View("~/Views/Error/Error.cshtml", new ErrorViewModel { RequestId = gercekHata });
             }
         }
@@ -165,7 +163,7 @@ namespace AxonInn.Controllers
             {
                 var personelJson = HttpContext.Session.GetString("GirisYapanPersonel");
                 if (string.IsNullOrEmpty(personelJson)) return RedirectToAction("Login", "Login");
-                var loginOlanPersonel = JsonConvert.DeserializeObject<Personel>(personelJson);
+                var loginOlanPersonel = JsonSerializer.Deserialize<Personel>(personelJson);
 
                 var dbGorev = await _context.Gorevs.FindAsync(model.Id);
                 if (dbGorev != null)
@@ -183,7 +181,9 @@ namespace AxonInn.Controllers
                     }
 
                     dbGorev.Durum = model.Durum;
-                    _context.Gorevs.Update(dbGorev);
+
+                    // PERFORMANS 4: Update(dbGorev) kaldırıldı! FindAsync ile veri Track ediliyor. 
+                    // SaveChangesAsync otomatik olarak sadece değişen kolonların sorgusunu oluşturur.
 
                     if (YeniFotograflar != null && YeniFotograflar.Count > 0)
                     {
@@ -191,7 +191,7 @@ namespace AxonInn.Controllers
                         {
                             if (dosya.Length > 0)
                             {
-                                using (var ms = new MemoryStream())
+                                using (var ms = new MemoryStream((int)dosya.Length))
                                 {
                                     await dosya.CopyToAsync(ms);
                                     _context.GorevFotografs.Add(new GorevFotograf
@@ -208,7 +208,7 @@ namespace AxonInn.Controllers
                     await LogKaydet(loginOlanPersonel, "Görev Güncellendi", $"Görev ID: {dbGorev.Id} güncellendi.", null);
                 }
 
-                return RedirectToAction("GorevList");
+                return RedirectToAction("Gorev");
             }
             catch (Exception ex)
             {
@@ -216,25 +216,34 @@ namespace AxonInn.Controllers
             }
         }
 
+        // PERFORMANS 5: Tarayıcı 1 gün boyunca DB'yi yormayacak. Sadece byte[] çekilerek RAM ferahlatıldı.
         [HttpGet]
+        [ResponseCache(Duration = 86400, Location = ResponseCacheLocation.Client)]
         public async Task<IActionResult> PersonelFotoGetir(long id)
         {
-            var foto = await _context.PersonelFotografs.FirstOrDefaultAsync(f => f.PersonelRef == id);
-            if (foto != null && foto.Fotograf != null)
-            {
-                return File(foto.Fotograf, "image/jpeg");
-            }
+            var fotoBytes = await _context.PersonelFotografs
+                .Where(f => f.PersonelRef == id)
+                .Select(f => f.Fotograf)
+                .FirstOrDefaultAsync();
+
+            if (fotoBytes != null)
+                return File(fotoBytes, "image/jpeg");
+
             return NotFound();
         }
 
         [HttpGet]
+        [ResponseCache(Duration = 86400, Location = ResponseCacheLocation.Client)]
         public async Task<IActionResult> KanitFotoGetir(long id)
         {
-            var foto = await _context.GorevFotografs.FirstOrDefaultAsync(f => f.Id == id);
-            if (foto != null && foto.Fotograf != null)
-            {
-                return File(foto.Fotograf, "image/jpeg");
-            }
+            var fotoBytes = await _context.GorevFotografs
+                .Where(f => f.Id == id)
+                .Select(f => f.Fotograf)
+                .FirstOrDefaultAsync();
+
+            if (fotoBytes != null)
+                return File(fotoBytes, "image/jpeg");
+
             return NotFound();
         }
 
@@ -247,7 +256,6 @@ namespace AxonInn.Controllers
 
                 if (personel != null && personel.DepartmanRef != 0)
                 {
-                    // DEĞİŞİKLİK: 2 ayrı veritabanı turu yerine tek seferde Select atıyoruz.
                     hotelAdi = await _context.Departmen
                         .Where(d => d.Id == personel.DepartmanRef)
                         .Select(d => d.HotelRefNavigation.Adi)
@@ -276,6 +284,5 @@ namespace AxonInn.Controllers
                 return false;
             }
         }
-
     }
 }

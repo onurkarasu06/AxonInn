@@ -1,7 +1,7 @@
 ﻿using AxonInn.Models;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using Newtonsoft.Json;
+using System.Text.Json; // DEĞİŞİKLİK: Ağır Newtonsoft yerine Microsoft'un yüksek performanslı yerleşik kütüphanesi eklendi
 
 namespace AxonInn.Controllers
 {
@@ -19,6 +19,13 @@ namespace AxonInn.Controllers
         {
             try
             {
+                // PERFORMANS: Eğer kullanıcı zaten giriş yapmışsa direkt yönlendir, sayfayı boşuna render etme.
+                var mevcutSession = HttpContext.Session.GetString("GirisYapanPersonel");
+                if (!string.IsNullOrEmpty(mevcutSession))
+                {
+                    return RedirectToAction("Ana", "Ana");
+                }
+
                 return View();
             }
             catch (Exception ex)
@@ -28,19 +35,32 @@ namespace AxonInn.Controllers
         }
 
         [HttpPost]
+        [ValidateAntiForgeryToken] // GÜVENLİK: Dışarıdan sahte form gönderimlerini (CSRF / Bot saldırılarını) engeller.
         public async Task<ActionResult> Login(string identifier, string password)
         {
             try
             {
                 if (!string.IsNullOrEmpty(identifier) && !string.IsNullOrEmpty(password))
                 {
-                    // DEĞİŞİKLİK 1: Sadece okuma yaptığımız için .AsNoTracking() ekledik (Hızlandırır)
+                    // PERFORMANS: Include etmeye veya tüm objeyi çekmeye gerek yok.
+                    // Veritabanından (SQL seviyesinde) sadece ihtiyacımız olan sütunları Select ile çekiyoruz.
+                    // Bu sayede sessionPersonel gibi ikinci bir kopyalama işlemine gerek kalmıyor.
                     var personel = await _context.Personels
                         .AsNoTracking()
-                        .Include(p => p.DepartmanRefNavigation)
-                        .FirstOrDefaultAsync(p => (p.MailAdresi == identifier || p.TelefonNumarasi == identifier)
-                                               && p.Sifre == password
-                                               && p.AktifMi == 1);
+                        .Where(p => (p.MailAdresi == identifier || p.TelefonNumarasi == identifier)
+                                 && p.Sifre == password
+                                 && p.AktifMi == 1)
+                        .Select(p => new Personel
+                        {
+                            Id = p.Id,
+                            Adi = p.Adi,
+                            Soyadi = p.Soyadi,
+                            Yetki = p.Yetki,
+                            DepartmanRef = p.DepartmanRef,
+                            MailAdresi = p.MailAdresi,
+                            TelefonNumarasi = p.TelefonNumarasi
+                        })
+                        .FirstOrDefaultAsync();
 
                     if (personel != null)
                     {
@@ -48,21 +68,9 @@ namespace AxonInn.Controllers
 
                         if (logKayit)
                         {
-                            // DEĞİŞİKLİK 2: Ağır Entity Framework nesnesini değil,
-                            // sadece diğer sayfalarda bize gerekecek olan verileri içeren HAFİF bir kopya oluşturduk.
-                            // JSON boyutu %90 oranında küçülecek ve CPU rahatlayacak.
-                            var sessionPersonel = new Personel
-                            {
-                                Id = personel.Id,
-                                Adi = personel.Adi,
-                                Soyadi = personel.Soyadi,
-                                Yetki = personel.Yetki,
-                                DepartmanRef = personel.DepartmanRef,
-                                MailAdresi = personel.MailAdresi,
-                                TelefonNumarasi = personel.TelefonNumarasi
-                            };
-
-                            HttpContext.Session.SetString("GirisYapanPersonel", JsonConvert.SerializeObject(sessionPersonel));
+                            // PERFORMANS: Newtonsoft yerine yüksek hızlı System.Text.Json kullanımı
+                            var personelJson = JsonSerializer.Serialize(personel);
+                            HttpContext.Session.SetString("GirisYapanPersonel", personelJson);
 
                             return RedirectToAction("Ana", "Ana");
                         }
@@ -100,9 +108,11 @@ namespace AxonInn.Controllers
                 if (string.IsNullOrEmpty(personelJson))
                     return RedirectToAction("Login", "Login");
 
-                var loginOlanPersonel = JsonConvert.DeserializeObject<Personel>(personelJson);
+                // PERFORMANS: System.Text.Json ile Deserialization
+                var loginOlanPersonel = JsonSerializer.Deserialize<Personel>(personelJson);
 
-                bool logkayit = await LogKaydet(loginOlanPersonel, "Güvenli Çıkış Yapıldı", "Logout İşlemi", loginOlanPersonel.MailAdresi);
+                // GÜVENLİK: Olası null hatasına karşı güvenlik önlemi (?? "") eklendi
+                bool logkayit = await LogKaydet(loginOlanPersonel, "Güvenli Çıkış Yapıldı", "Logout İşlemi", loginOlanPersonel?.MailAdresi ?? "");
 
                 if (logkayit)
                 {
@@ -120,7 +130,6 @@ namespace AxonInn.Controllers
             }
         }
 
-        // DEĞİŞİKLİK 3: LogKaydet içerisindeki veritabanı trafiği tek sorguya düşürüldü
         private async Task<bool> LogKaydet(Personel? personel, string islemTipi, string yeniDeger, string girilenVeri)
         {
             try
@@ -130,7 +139,7 @@ namespace AxonInn.Controllers
 
                 if (personel != null && personel.DepartmanRef != 0)
                 {
-                    // Hem departman adını hem de otel adını tek SQL sorgusu ile JOIN yaparak alıyoruz
+                    // Sizin yazdığınız harika performanslı tek SQL sorgusu korundu.
                     var depBilgisi = await _context.Departmen
                         .AsNoTracking()
                         .Where(d => d.Id == personel.DepartmanRef)
@@ -150,8 +159,8 @@ namespace AxonInn.Controllers
                     IlgiliTablo = "Personel",
                     KayitRefId = personel?.Id ?? 0,
                     IslemTipi = islemTipi,
-                    EskiDeger = girilenVeri,
-                    YeniDeger = yeniDeger,
+                    EskiDeger = girilenVeri ?? "",
+                    YeniDeger = yeniDeger ?? "",
                     YapanHotelAd = hotelAdi,
                     YapanDepartmanAd = departmanAdi,
                     YapanAdSoyad = personel != null ? $"{personel.Adi} {personel.Soyadi}" : "Bilinmeyen Kullanıcı"

@@ -24,7 +24,7 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css" />
 
     <style>
-        /* CSS kodların render hızını artırmak için ufak düzenlemeler */
+        /* CSS kodların render hızını artırmak için ufak düzenlemeler korundu */
         body {
             font-family: 'Inter', sans-serif;
             background-color: #f8f9fa;
@@ -36,7 +36,6 @@
             padding: 0;
             width: 100%;
             overflow-x: hidden;
-            /* Font yüklenene kadar metin görünürlüğünü sağla (FOUC önleme) */
             font-display: swap; 
         }
 
@@ -45,7 +44,6 @@
             max-width: 850px;
             padding: 20px;
             animation: fadeIn 0.8s ease-out;
-            /* Donanım hızlandırmayı devreye sok (Hardware Acceleration) */
             will-change: transform, opacity; 
         }
 
@@ -54,7 +52,6 @@
             border: none !important;
             box-shadow: 0 15px 40px rgba(0, 0, 0, 0.06) !important;
             background: #ffffff;
-            /* Donanım hızlandırmayı devreye sok */
             will-change: transform, box-shadow; 
         }
 
@@ -71,14 +68,13 @@
             border-radius: 20px;
             box-shadow: 0 10px 25px rgba(13, 110, 253, 0.2);
             object-fit: contain;
-            /* Resmi oluştururken performansı artır */
             image-rendering: optimizeQuality;
         }
 
         .fw-black { font-weight: 900 !important; }
 
         .transition-focus {
-            transition: border-color 0.2s ease, box-shadow 0.2s ease; /* Sadece değişen özellikleri canlandır */
+            transition: border-color 0.2s ease, box-shadow 0.2s ease;
             border: 1px solid #dee2e6;
         }
 
@@ -88,7 +84,7 @@
         }
 
         .transition-hover {
-            transition: transform 0.2s ease, box-shadow 0.2s ease; /* Sadece değişen özellikleri canlandır */
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
         }
 
         .transition-hover:hover {
@@ -155,6 +151,9 @@
 
                     <div class="col-md-7 ps-md-5 mt-4 mt-md-0">
                         <form id="loginForm" method="post" asp-controller="Login" asp-action="Login">
+                            
+                            @Html.AntiForgeryToken()
+
                             <div class="mb-3">
                                 <label for="Identifier" class="form-label small fw-bold text-secondary ms-1 text-uppercase" style="font-size: 0.65rem; letter-spacing: 1px;">E-posta veya Telefon</label>
                                 <div class="input-group rounded-4 overflow-hidden shadow-sm transition-focus">
@@ -202,7 +201,7 @@
 
         <div class="text-center mt-4">
             <span style="font-size: 0.65rem; color: #adb5bd; letter-spacing: 1.5px; font-weight: 700; text-transform: uppercase;">
-                © 2026 AXONINN | Tasarım ve Geliştirme: Onur Karasu
+                © @DateTime.Now.Year AXONINN | Tasarım ve Geliştirme: Onur Karasu
             </span>
         </div>
     </div>
@@ -211,13 +210,29 @@
     
     <script>
         document.getElementById('loginForm').addEventListener('submit', function (e) {
-            const btn = document.getElementById('loginBtn');
-            const text = document.getElementById('btnText');
-            const spinner = document.getElementById('btnSpinner');
+            // JS OPTİMİZASYONU: HTML5 zorunluluk kontrolleri (boş form vb.) başarılıysa loading efektini başlat
+            if (this.checkValidity()) {
+                const btn = document.getElementById('loginBtn');
+                const text = document.getElementById('btnText');
+                const spinner = document.getElementById('btnSpinner');
 
-            btn.classList.add('btn-loading');
-            text.innerText = 'Giriş Yapılıyor...';
-            spinner.classList.remove('d-none');
+                btn.classList.add('btn-loading');
+                text.innerText = 'Giriş Yapılıyor...';
+                spinner.classList.remove('d-none');
+            }
+        });
+
+        // KULLANICI DENEYİMİ (BFCache): Kullanıcı giriş yaptıktan sonra tarayıcıda "Geri" tuşuna basarsa butonun takılı kalmasını engeller
+        window.addEventListener('pageshow', function (event) {
+            if (event.persisted) {
+                const btn = document.getElementById('loginBtn');
+                const text = document.getElementById('btnText');
+                const spinner = document.getElementById('btnSpinner');
+                
+                if (btn) btn.classList.remove('btn-loading');
+                if (text) text.innerText = 'Sisteme Giriş';
+                if (spinner) spinner.classList.add('d-none');
+            }
         });
     </script>
 </body>

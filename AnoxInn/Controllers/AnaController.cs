@@ -1,7 +1,7 @@
 using AxonInn.Models;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using Newtonsoft.Json;
+using System.Text.Json; // DEĞİŞİKLİK: Ağır Newtonsoft yerine yüksek hızlı System.Text.Json eklendi
 
 namespace AxonInn.Controllers
 {
@@ -23,34 +23,25 @@ namespace AxonInn.Controllers
                 if (string.IsNullOrEmpty(personelJson))
                     return RedirectToAction("Login", "Login");
 
-                var loginOlanPersonel = JsonConvert.DeserializeObject<Personel>(personelJson);
+                var loginOlanPersonel = JsonSerializer.Deserialize<Personel>(personelJson);
                 await LogKaydet(loginOlanPersonel, "Ana Sayfaya Giriş Yapıldı", "Dashboard Görüntüleme");
 
-                // Otel ID'sini bul
-                var hotelId = await _context.Departmen
+                // PERFORMANS 1: Otel Id ve Otel Adı bilgisini 2 ayrı sorgu yerine TEK bir bağlantı (Select) ile çekiyoruz.
+                var hotelBilgisi = await _context.Departmen
+                    .AsNoTracking()
                     .Where(d => d.Id == loginOlanPersonel.DepartmanRef)
-                    .Select(d => d.HotelRef)
+                    .Select(d => new { d.HotelRef, HotelAdi = d.HotelRefNavigation.Adi })
                     .FirstOrDefaultAsync();
 
-                if (hotelId == 0) return RedirectToAction("Login", "Login");
+                if (hotelBilgisi == null || hotelBilgisi.HotelRef == 0)
+                    return RedirectToAction("Login", "Login");
 
-                // DEĞİŞİKLİK 1: RAM'e almak yerine doğrudan SQL'e saydırıyoruz (Çok Hızlıdır)
-                var hotelAdi = await _context.Hotels.Where(h => h.Id == hotelId).Select(h => h.Adi).FirstOrDefaultAsync();
+                int hotelId = (int)hotelBilgisi.HotelRef;
+                string hotelAdi = hotelBilgisi.HotelAdi;
 
-                var aktifPersonelAdet = await _context.Personels
-                    .CountAsync(p => p.DepartmanRefNavigation.HotelRef == hotelId && p.AktifMi == 1);
-
-                var beklemedeAdet = await _context.Gorevs
-                    .CountAsync(g => g.PersonelRefNavigation.DepartmanRefNavigation.HotelRef == hotelId && g.Durum == 1);
-
-                var islemdeAdet = await _context.Gorevs
-                    .CountAsync(g => g.PersonelRefNavigation.DepartmanRefNavigation.HotelRef == hotelId && g.Durum == 2);
-
-                var bittiAdet = await _context.Gorevs
-                    .CountAsync(g => g.PersonelRefNavigation.DepartmanRefNavigation.HotelRef == hotelId && g.Durum == 3);
-
-                // DEĞİŞİKLİK 2: Grafikler için tüm tabloyu değil, sadece ad, soyad ve durum çekiyoruz (Select)
+                // PERFORMANS 2: Sadece okuma yaptığımız için tüm tablolara AsNoTracking eklendi (RAM Tasarrufu).
                 var personelChartData = await _context.Personels
+                    .AsNoTracking()
                     .Where(p => p.DepartmanRefNavigation.HotelRef == hotelId && p.AktifMi == 1)
                     .Select(p => new {
                         ad = p.Adi,
@@ -59,6 +50,7 @@ namespace AxonInn.Controllers
                     }).ToListAsync();
 
                 var gorevChartData = await _context.Gorevs
+                    .AsNoTracking()
                     .Where(g => g.PersonelRefNavigation.DepartmanRefNavigation.HotelRef == hotelId)
                     .Select(g => new {
                         durum = g.Durum,
@@ -70,20 +62,28 @@ namespace AxonInn.Controllers
                         }
                     }).ToListAsync();
 
-                // View'daki filtre için sadece departman listesi
                 var departmanlar = await _context.Departmen
+                    .AsNoTracking()
                     .Where(d => d.HotelRef == hotelId)
                     .Select(d => new Departman { Id = d.Id, Adi = d.Adi })
                     .ToListAsync();
 
-                // Verileri View'a ViewBag ile gönderiyoruz (Ağır Model yapısını bıraktık)
+                // PERFORMANS 3: Veritabanına 4 kez fazladan CountAsync ile yüklenmek yerine, 
+                // Zaten grafikleri çizmek için RAM'e çektiğimiz listelerin eleman sayısını alarak "Sıfır" maliyetle istatistikleri çıkarıyoruz.
+                int aktifPersonelAdet = personelChartData.Count;
+                int beklemedeAdet = gorevChartData.Count(g => g.durum == 1);
+                int islemdeAdet = gorevChartData.Count(g => g.durum == 2);
+                int bittiAdet = gorevChartData.Count(g => g.durum == 3);
+
                 ViewBag.HotelAdi = hotelAdi;
                 ViewBag.AktifPersonelAdet = aktifPersonelAdet;
                 ViewBag.BeklemedeAdet = beklemedeAdet;
                 ViewBag.IslemdeAdet = islemdeAdet;
                 ViewBag.BittiAdet = bittiAdet;
-                ViewBag.PersonelJson = JsonConvert.SerializeObject(personelChartData);
-                ViewBag.GorevJson = JsonConvert.SerializeObject(gorevChartData);
+
+                // PERFORMANS 4: Daha hafif JSON serileştirme
+                ViewBag.PersonelJson = JsonSerializer.Serialize(personelChartData);
+                ViewBag.GorevJson = JsonSerializer.Serialize(gorevChartData);
                 ViewBag.Departmanlar = departmanlar;
 
                 return View();
@@ -98,16 +98,23 @@ namespace AxonInn.Controllers
         {
             try
             {
-                string departmanAdi = personel?.DepartmanRefNavigation?.Adi ?? "";
+                string departmanAdi = "";
                 string hotelAdi = "";
 
                 if (personel != null && personel.DepartmanRef != 0)
                 {
-                    // DEĞİŞİKLİK 3: Join mantığıyla tek SQL sorgusu
-                    hotelAdi = await _context.Departmen
+                    // Diğer sayfalardaki gibi hem departman adını hem de otel adını tek SQL sorgusu ile JOIN yaparak alıyoruz
+                    var depBilgisi = await _context.Departmen
+                        .AsNoTracking()
                         .Where(d => d.Id == personel.DepartmanRef)
-                        .Select(d => d.HotelRefNavigation.Adi)
-                        .FirstOrDefaultAsync() ?? "";
+                        .Select(d => new { d.Adi, HotelAdi = d.HotelRefNavigation.Adi })
+                        .FirstOrDefaultAsync();
+
+                    if (depBilgisi != null)
+                    {
+                        departmanAdi = depBilgisi.Adi;
+                        hotelAdi = depBilgisi.HotelAdi;
+                    }
                 }
 
                 var log = new AuditLog

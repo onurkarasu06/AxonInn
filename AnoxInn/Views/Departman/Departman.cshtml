@@ -14,7 +14,7 @@
     
     string isReadOnly = girisYapanPersonel?.Yetki != 1 ? "disabled" : "";
     string opacityClass = girisYapanPersonel?.Yetki != 1 ? "opacity-50" : "";
-    // Güvenli Liste Çağırımı: Hotel modeli içindeki Departmen listesini kullanıyoruz
+    // Güvenli Liste Çağırımı
     var departmanListesi = Model?.Departmen?.ToList() ?? new List<AxonInn.Models.Departman>();
 }
 
@@ -154,14 +154,16 @@
                                                         string fNumara = personel.TelefonNumarasi;
                                                         if (!string.IsNullOrEmpty(personel.TelefonNumarasi))
                                                         {
-                                                            var temizNumara = new string(personel.TelefonNumarasi.Where(char.IsDigit).ToArray());
-                                                            if (temizNumara.Length == 11 && temizNumara.StartsWith("0"))
+                                                            // İYİLEŞTİRME: Gereksiz Substring allocation'ları kaldırıldı. 
+                                                            // Character Indexing ve Interpolation ile çok daha performanslı hale getirildi.
+                                                            var d = personel.TelefonNumarasi.Where(char.IsDigit).ToArray();
+                                                            if (d.Length == 11 && d[0] == '0')
                                                             {
-                                                                fNumara = string.Format("{0} ({1}) {2} {3} {4}", temizNumara.Substring(0, 1), temizNumara.Substring(1, 3), temizNumara.Substring(4, 3), temizNumara.Substring(7, 2), temizNumara.Substring(9, 2));
+                                                                fNumara = $"{d[0]} ({d[1]}{d[2]}{d[3]}) {d[4]}{d[5]}{d[6]} {d[7]}{d[8]} {d[9]}{d[10]}";
                                                             }
-                                                            else if (temizNumara.Length == 10)
+                                                            else if (d.Length == 10)
                                                             {
-                                                                fNumara = string.Format("0 ({0}) {1} {2} {3}", temizNumara.Substring(0, 3), temizNumara.Substring(3, 3), temizNumara.Substring(6, 2), temizNumara.Substring(8, 2));
+                                                                fNumara = $"0 ({d[0]}{d[1]}{d[2]}) {d[3]}{d[4]}{d[5]} {d[6]}{d[7]} {d[8]}{d[9]}";
                                                             }
                                                         }
                                                     }
@@ -188,8 +190,8 @@
                                                 </td>
                                                 <td data-label="MEDENİ HAL" class="text-muted">@(personel.MedenHali == 1 ? "Evli" : "Bekar")</td>
                                                 <td data-label="FOTO">
-                                                   <div class="avatar-container d-inline-block text-center" style="width:32px; height:32px;">
-                                                        <img id="tabloFoto_@uniqueRowId" src="/Gorev/PersonelFotoGetir?id=@personel.Id" width="32" height="32" loading="lazy" class="rounded-circle border shadow-sm avatar-img pointer" style="width: 32px; height: 32px; object-fit: cover;" onerror="this.style.display='none'; document.getElementById('fallbackIcon_@uniqueRowId').style.display='inline-block';" onclick="personelFotoGoster(this.src, '@personel.Adi @personel.Soyadi')">
+                                                    <div class="avatar-container d-inline-block text-center" style="width:32px; height:32px;">
+                                                       <img id="tabloFoto_@uniqueRowId" src="/Gorev/PersonelFotoGetir?id=@personel.Id&t=@DateTime.Now.Ticks" width="32" height="32" loading="lazy" class="rounded-circle border shadow-sm avatar-img pointer" style="width: 32px; height: 32px; object-fit: cover;" onerror="this.style.display='none'; document.getElementById('fallbackIcon_@uniqueRowId').style.display='inline-block';" onclick="personelFotoGoster(this.src, '@personel.Adi @personel.Soyadi')">
                                                         <i id="fallbackIcon_@uniqueRowId" class="fas fa-user-circle text-secondary fs-4" style="display: none; line-height: 32px;"></i>
                                                     </div>
                                                 </td>
@@ -198,7 +200,7 @@
                                                         <button class="btn btn-outline-primary btn-sm border-0" onclick="openPersonelEditModal(@personel.Id, '@personel.Adi', '@personel.Soyadi', @departman.Id, '@personel.TelefonNumarasi', '@personel.MailAdresi', @(personel.MedenHali ?? 2), @(personel.Yetki))" data-bs-toggle="modal" data-bs-target="#personelGuncelleModal" @isReadOnly title="Düzenle">
                                                             <i class="fas fa-edit"></i>
                                                         </button>
-                                                         <button class="btn btn-outline-danger btn-sm border-0" onclick="setSilId(@personel.Id, '@personel.Adi @personel.Soyadi', '@uniqueRowId')" data-bs-toggle="modal" data-bs-target="#silOnayModal" @isReadOnly title="Sil">
+                                                        <button class="btn btn-outline-danger btn-sm border-0" onclick="setSilId(@personel.Id, '@personel.Adi @personel.Soyadi', '@uniqueRowId')" data-bs-toggle="modal" data-bs-target="#silOnayModal" @isReadOnly title="Sil">
                                                             <i class="fas fa-trash-alt"></i>
                                                         </button>
                                                     </div>
@@ -385,7 +387,7 @@
             <div class="modal-body text-center px-4 pb-4">
                 <h6 class="fw-bold mb-2"><span id="silModalIsim" class="text-danger"></span> Silinecek!</h6>
                 <p class="text-muted small mb-0">Bu işlem geri alınamaz. Personelin tüm verileri kalıcı olarak silinecektir.</p>
-               <form asp-controller="Departman" asp-action="PersonelSil" method="post" class="mt-4">
+                <form asp-controller="Departman" asp-action="PersonelSil" method="post" class="mt-4">
                     <input type="hidden" name="id" id="silinecekPersonelId" />
                     <div class="row g-2">
                         <div class="col-6">
@@ -508,12 +510,10 @@
     @if (TempData["Mesaj"] != null)
     {
         <script>
-            // DEĞİŞİKLİK: jQuery yerine Vanilla JS (saf javascript) kullanıldı
             document.addEventListener("DOMContentLoaded", function () {
                 var tip = '@(TempData["MesajTipi"] ?? "warning")';
                 var mesaj = '@Html.Raw(TempData["Mesaj"])';
                 
-                // SweetAlert defer ile yüklendiği için kısa bir gecikme ekliyoruz
                 setTimeout(() => {
                     if (typeof Swal !== 'undefined') {
                         Swal.fire({

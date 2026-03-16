@@ -251,18 +251,45 @@
                 const perCtx = document.getElementById('personelIsYukuChart');
                 let perChart;
 
+                // JS PERFORMANS OPTİMİZASYONU: Karmaşık Map-Filter O(N*M) döngüleri yerine, Tek Yönlü Map O(N) algoritması kullanılarak tarayıcı kilitlenmesi engellendi!
                 function getFilteredData(deptName) {
-                    const filtered = (deptName === 'all') ? rawGorevler : rawGorevler.filter(g => g.personel?.departman?.ad === deptName);
-                    const pIds = [...new Set(filtered.map(g => g.personel?.id).filter(id => id != null && id !== 0))];
+                    const personelPerformans = {};
+                    
+                    // Görevleri tek bir döngüyle tarayıp Hash Map'e yerleştiriyoruz (Çok Yüksek Hız)
+                    rawGorevler.forEach(g => {
+                        if (deptName !== 'all' && g.personel?.departman?.ad !== deptName) return;
+                        
+                        const pId = g.personel?.id;
+                        if (!pId) return;
+
+                        if (!personelPerformans[pId]) {
+                            personelPerformans[pId] = { ad: g.personel.ad, durum1: 0, durum2: 0, durum3: 0 };
+                        }
+
+                        if (g.durum === 1) personelPerformans[pId].durum1++;
+                        if (g.durum === 2) personelPerformans[pId].durum2++;
+                        if (g.durum === 3) personelPerformans[pId].durum3++;
+                    });
+
+                    const labels = [];
+                    const beklemedeData = [];
+                    const islemdeData = [];
+                    const tamamlandiData = [];
+
+                    // Elde edilen Hash Map verisini Chart.js'ye uygun Array formatına çeviriyoruz
+                    for (const key in personelPerformans) {
+                        labels.push(personelPerformans[key].ad);
+                        beklemedeData.push(personelPerformans[key].durum1);
+                        islemdeData.push(personelPerformans[key].durum2);
+                        tamamlandiData.push(personelPerformans[key].durum3);
+                    }
+
                     return {
-                        labels: pIds.map(id => {
-                            const g = filtered.find(x => x.personel?.id === id);
-                            return g ? g.personel.ad : "Bilinmeyen";
-                        }),
+                        labels: labels,
                         datasets: [
-                            { label: 'Beklemede', data: pIds.map(id => filtered.filter(g => g.personel?.id === id && g.durum === 1).length), backgroundColor: '#e74a3b', borderRadius: 4 },
-                            { label: 'İşlemde', data: pIds.map(id => filtered.filter(g => g.personel?.id === id && g.durum === 2).length), backgroundColor: '#f6c23e', borderRadius: 4 },
-                            { label: 'Tamamlandı', data: pIds.map(id => filtered.filter(g => g.personel?.id === id && g.durum === 3).length), backgroundColor: '#1cc88a', borderRadius: 4 }
+                            { label: 'Beklemede', data: beklemedeData, backgroundColor: '#e74a3b', borderRadius: 4 },
+                            { label: 'İşlemde', data: islemdeData, backgroundColor: '#f6c23e', borderRadius: 4 },
+                            { label: 'Tamamlandı', data: tamamlandiData, backgroundColor: '#1cc88a', borderRadius: 4 }
                         ]
                     };
                 }

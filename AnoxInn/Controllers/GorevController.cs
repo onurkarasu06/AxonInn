@@ -169,7 +169,7 @@ namespace AxonInn.Controllers
                 if (dbGorev != null)
                 {
                     dbGorev.PersonelRef = model.PersonelRef;
-                    dbGorev.Gorev1 = model.Gorev1;
+                    dbGorev.Aciklama = model.Aciklama;
                     dbGorev.PersonelNotu = model.PersonelNotu;
 
                     if (dbGorev.Durum != model.Durum)

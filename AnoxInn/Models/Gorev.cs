@@ -13,7 +13,7 @@ public partial class Gorev
     public byte Durum { get; set; }
 
     [MaxLength(2000)]
-    public string Gorev1 { get; set; } = null!;
+    public string Aciklama { get; set; } = null!;
 
     public DateTime KayitTarihi { get; set; }
 

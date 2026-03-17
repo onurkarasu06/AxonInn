@@ -160,7 +160,7 @@
                     <thead class="bg-light border-bottom sticky-top" style="z-index: 10;">
                         <tr class="text-uppercase fw-800" style="font-size: 0.7rem;">
                             <th class="ps-4 py-3">PERSONEL</th>
-                            <th class="py-3">GÖREV DETAYI</th>
+                            <th class="py-3">AÇIKLAMA</th>
                             <th class="py-3 text-center">İŞ DURUMU</th>
                             <th class="py-3 text-center">KAYIT BİLGİSİ</th>
                             <th class="py-3 text-center">FOTOĞRAF</th>
@@ -172,7 +172,7 @@
                         {
                             var tamAd = $"{item.PersonelRefNavigation?.Adi} {item.PersonelRefNavigation?.Soyadi}";
                             var departmanAdi = item.PersonelRefNavigation?.DepartmanRefNavigation?.Adi;
-                            var aramaData = $"{tamAd} {item.Gorev1} {departmanAdi}".ToLowerInvariant();
+                            var aramaData = $"{tamAd} {item.Aciklama} {departmanAdi}".ToLowerInvariant();
 
                             <tr class="gorev-satiri" data-search="@aramaData" data-durum="@item.Durum" data-dept="@(departmanAdi?.ToLowerInvariant() ?? "")" style="font-size: 0.85rem;">
                                 <td class="ps-4">
@@ -196,10 +196,10 @@
                                 <td style="max-width: 220px;">
                                     <div class="gorev-link fw-semibold text-dark text-truncate w-100"
                                          data-bs-toggle="modal" data-bs-target="#detayModal"
-                                         onclick="openDetayModal('@Html.Raw(JavaScriptEncoder.Default.Encode(item.Gorev1 ?? ""))', '@Html.Raw(JavaScriptEncoder.Default.Encode(item.PersonelNotu ?? ""))')"
+                                         onclick="openDetayModal('@Html.Raw(JavaScriptEncoder.Default.Encode(item.Aciklama ?? ""))', '@Html.Raw(JavaScriptEncoder.Default.Encode(item.PersonelNotu ?? ""))')"
                                          title="Detayları gör">
                                         <i class="fas fa-external-link-alt me-1 small opacity-50"></i>
-                                        @item.Gorev1
+                                        @item.Aciklama
                                     </div>
                                     @if (!string.IsNullOrEmpty(item.PersonelNotu))
                                     {
@@ -215,7 +215,7 @@
         @if (yetki == 1 || yetki == 2)
         {
             <button class="btn btn-outline-primary btn-edit-small" data-bs-toggle="modal" data-bs-target="#guncelleModal"
-                    onclick="prepareEdit('@item.Id', '@item.PersonelRef', '@Html.Raw(JavaScriptEncoder.Default.Encode(item.Gorev1 ?? ""))', '@Html.Raw(JavaScriptEncoder.Default.Encode(item.PersonelNotu ?? ""))', '@item.Durum')">
+                    onclick="prepareEdit('@item.Id', '@item.PersonelRef', '@Html.Raw(JavaScriptEncoder.Default.Encode(item.Aciklama ?? ""))', '@Html.Raw(JavaScriptEncoder.Default.Encode(item.PersonelNotu ?? ""))', '@item.Durum')">
                 <i class="fas fa-pencil-alt"></i>
             </button>
         }
@@ -283,7 +283,7 @@
                                         @if (yetki <= 2)
                                         {
                                             <button class="btn btn-outline-primary btn-edit-small" data-bs-toggle="modal" data-bs-target="#guncelleModal"
-                                                    onclick="prepareEdit('@item.Id', '@item.PersonelRef', '@Html.Raw(JavaScriptEncoder.Default.Encode(item.Gorev1 ?? ""))', '@Html.Raw(JavaScriptEncoder.Default.Encode(item.PersonelNotu ?? ""))', '@item.Durum')">
+                                                    onclick="prepareEdit('@item.Id', '@item.PersonelRef', '@Html.Raw(JavaScriptEncoder.Default.Encode(item.Aciklama ?? ""))', '@Html.Raw(JavaScriptEncoder.Default.Encode(item.PersonelNotu ?? ""))', '@item.Durum')">
                                                 <i class="fas fa-pencil-alt"></i>
                                             </button>
                                         }
@@ -416,7 +416,7 @@
 
                     <div class="mb-3">
                         <label class="small fw-bold text-muted mb-1 text-uppercase">Görev Açıklaması</label>
-                        <textarea name="Gorev1" id="editGorevAciklama" class="form-control form-control-sm shadow-none" rows="2" required></textarea>
+                        <textarea name="Aciklama" id="editGorevAciklama" class="form-control form-control-sm shadow-none" rows="2" required></textarea>
                     </div>
 
                     <div class="mb-3">

@@ -2,6 +2,8 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Newtonsoft.Json;
+using System.Net;
+using System.Net.Mail;
 
 namespace AxonInn.Controllers
 {
@@ -27,8 +29,6 @@ namespace AxonInn.Controllers
                 var loginOlanPersonel = JsonConvert.DeserializeObject<Personel>(personelJson);
                 await LogKaydet(loginOlanPersonel, "Departman Sayfasına Giriş Yapıldı", "Sayfa Görüntüleme", null);
 
-                // İYİLEŞTİRME: İki ayrı veritabanı sorgusu tek bir sorguya indirgendi. 
-                // Hotel tablosuna giderken, doğrudan kullanıcının DepartmanRef'i üzerinden filtreleme yapıldı.
                 var hotel = await _context.Hotels
                     .AsNoTracking()
                     .Include(h => h.Departmen)
@@ -57,6 +57,7 @@ namespace AxonInn.Controllers
                 var personelJson = HttpContext.Session.GetString("GirisYapanPersonel");
                 var loginOlanPersonel = JsonConvert.DeserializeObject<Personel>(personelJson);
 
+                // 1. KONTROL: Kullanıcı zaten var mı?
                 bool kullaniciVarmi = await _context.Personels.AnyAsync(p => p.TelefonNumarasi == yeniPersonel.TelefonNumarasi || p.MailAdresi == yeniPersonel.MailAdresi);
 
                 if (kullaniciVarmi)
@@ -68,35 +69,67 @@ namespace AxonInn.Controllers
                 }
 
                 yeniPersonel.AktifMi = 1;
+                yeniPersonel.MailOnayliMi = 0;
+                yeniPersonel.VerificationToken = Guid.NewGuid().ToString();
+
                 _context.Personels.Add(yeniPersonel);
 
-                // DÜZELTME 1: Önce personeli kaydediyoruz ki veritabanı yeniPersonel.Id değerini oluştursun.
-                await _context.SaveChangesAsync();
+                // 2. KONTROL: Veritabanına Kayıt Başarılı mı?
+                try
+                {
+                    await _context.SaveChangesAsync();
+                }
+                catch (Exception)
+                {
+                    // Eğer veritabanı çökerse veya bağlantı koparsa bu bloğa düşer
+                    TempData["Mesaj"] = "Veritabanına kullanıcı kayıt edilemedi.";
+                    TempData["MesajTipi"] = "error";
+                    return RedirectToAction("Departman", "Departman");
+                }
+
+                // --- Veritabanı kaydı başarılıysa foto ve mail işlemlerine geç ---
 
                 if (yuklenenFoto != null && yuklenenFoto.Length > 0)
                 {
-                    using var ms = new MemoryStream(); // Modern Using (süslü parantez kalabalığını azaltır)
+                    using var ms = new MemoryStream();
                     await yuklenenFoto.CopyToAsync(ms);
 
                     var foto = new PersonelFotograf
                     {
-                        // DÜZELTME 2: Hata veren "Personel = yeniPersonel" satırını kaldırıp, ID atamasını yapıyoruz.
                         PersonelRef = yeniPersonel.Id,
                         Fotograf = ms.ToArray()
                     };
                     _context.PersonelFotografs.Add(foto);
-
-                    // DÜZELTME 3: Fotoğrafı da veritabanına işliyoruz.
-                    await _context.SaveChangesAsync();
+                    await _context.SaveChangesAsync(); // Fotoğraf hatası sistemi durdurmasın diye burayı ayrı tutuyoruz.
                 }
 
-                await LogKaydet(loginOlanPersonel, "Yeni Personel Eklendi", "Personel Başarıyla Kaydedildi", yeniPersonel);
+                // 3. KONTROL: Mail Başarıyla Gitti mi?
+                // Not: SendVerificationEmailAsync metodunun Task<bool> döndüğünden emin ol.
+                bool mailBasariliMi = await SendVerificationEmailAsync(yeniPersonel.MailAdresi, yeniPersonel.VerificationToken);
+
+                if (mailBasariliMi)
+                {
+                    // Senaryo 1: Her şey kusursuz
+                    await LogKaydet(loginOlanPersonel, "Yeni Personel Eklendi", "Personel Başarıyla Kaydedildi ve Doğrulama Maili Gönderildi", yeniPersonel);
+                    TempData["Mesaj"] = "Kullanıcı kayıt edildi, kendi mailinden aktive etmesi gerekmektedir.";
+                    TempData["MesajTipi"] = "success";
+                }
+                else
+                {
+                    // Senaryo 2: Veritabanına eklendi ama mail sunucusunda hata çıktı
+                    await LogKaydet(loginOlanPersonel, "Yeni Personel Eklendi (Mail Hatası)", "Personel kaydedildi fakat doğrulama maili gönderilemedi.", yeniPersonel);
+                    TempData["Mesaj"] = "Kullanıcı kayıt edildi ancak doğrulama maili gönderilemedi. Lütfen sistem yöneticisiyle iletişime geçin.";
+                    TempData["MesajTipi"] = "warning";
+                }
 
                 return RedirectToAction("Departman", "Departman");
             }
-            catch (Exception ex)
+            catch (Exception)
             {
-                return View("~/Views/Error/Error.cshtml", new ErrorViewModel { RequestId = ex.Message });
+                // Tüm sistemi etkileyen çok kritik ve beklenmedik bir kod hatası olursa çalışır
+                TempData["Mesaj"] = "Sistemsel bir hata nedeniyle kullanıcı kayıt edilemedi.";
+                TempData["MesajTipi"] = "error";
+                return RedirectToAction("Departman", "Departman");
             }
         }
 
@@ -120,8 +153,6 @@ namespace AxonInn.Controllers
                     return RedirectToAction("Departman", "Departman");
                 }
 
-                // İYİLEŞTİRME: Ana nesneyi bellekten çağırıp (FindAsync) sonra silmek (Remove) gereksiz bir işlemdir. 
-                // ExecuteDeleteAsync ile doğrudan SQL üzerinde siliyoruz.
                 await _context.PersonelFotografs.Where(f => f.PersonelRef == id).ExecuteDeleteAsync();
                 await _context.Personels.Where(p => p.Id == id).ExecuteDeleteAsync();
 
@@ -161,10 +192,6 @@ namespace AxonInn.Controllers
                         dbPersonel.Sifre = p.Sifre;
                     }
 
-                    // İYİLEŞTİRME: _context.Personels.Update(dbPersonel); SATIRI KALDIRILDI.
-                    // EF Core zaten dbPersonel'i takip (track) ettiği için, sadece değişen property'leri bulur ve veritabanına o kısımlar için Update atar.
-                    // Update() metodunu çağırmak ise nesnenin TÜM alanlarını değişmiş gibi işaretler ve gereksiz SQL yükü oluşturur.
-
                     if (yuklenenFoto != null && yuklenenFoto.Length > 0)
                     {
                         var mevcutFoto = await _context.PersonelFotografs.FirstOrDefaultAsync(f => f.PersonelRef == p.Id);
@@ -174,7 +201,6 @@ namespace AxonInn.Controllers
                         if (mevcutFoto != null)
                         {
                             mevcutFoto.Fotograf = ms.ToArray();
-                            // Burada da Update'e gerek yok, referans takipte.
                         }
                         else
                         {
@@ -191,6 +217,46 @@ namespace AxonInn.Controllers
             catch (Exception ex)
             {
                 return View("~/Views/Error/Error.cshtml", new ErrorViewModel { RequestId = ex.Message });
+            }
+        }
+
+        // --- E-POSTA GÖNDERME METODU ---
+        private async Task<bool> SendVerificationEmailAsync(string toEmail, string token)
+        {
+            try
+            {
+                // YENİ: Dinamik URL oluşturma. Visual Studio'da localhost, canlıda axoninn.com.tr olur.
+                string baseUrl = $"{Request.Scheme}://{Request.Host}";
+                string verificationLink = $"{baseUrl}/Login/VerifyEmail?token={token}";
+
+                var mailMessage = new MailMessage
+                {
+                    From = new MailAddress("info@axoninn.com.tr", "AxonInn Otomasyon"),
+                    Subject = "AxonInn - Hesabınızı Doğrulayın",
+                    Body = $@"                 <div style='font-family: Arial, sans-serif; max-width: 600px; margin: auto; border: 1px solid #ddd; padding: 20px; border-radius: 10px;'>                     <h2 style='color: #2c3e50; text-align: center;'>AxonInn'e Hoş Geldiniz!</h2>                     <p style='font-size: 16px; color: #555;'>Merhaba,</p>                     <p style='font-size: 16px; color: #555;'>Hesabınızı aktifleştirmek ve sisteme giriş yapabilmek için lütfen aşağıdaki butona tıklayın:</p>                     <div style='text-align: center; margin: 30px 0;'>                         <a href='{verificationLink}' style='background-color: #008CBA; color: white; padding: 12px 25px; text-decoration: none; border-radius: 5px; font-weight: bold; font-size: 16px;'>Hesabımı Doğrula</a>                     </div>                     <p style='font-size: 14px; color: #777;'>Eğer butona tıklayamıyorsanız, aşağıdaki linki kopyalayıp tarayıcınıza yapıştırabilirsiniz:</p>                     <p style='font-size: 12px; color: #3498db; word-break: break-all;'>{verificationLink}</p>                     <hr style='border: none; border-top: 1px solid #eee; margin-top: 30px;'/>                     <p style='font-size: 12px; color: #aaa; text-align: center;'>Bu e-posta otomatik olarak gönderilmiştir, lütfen cevaplamayınız.</p>                 </div>",
+                    IsBodyHtml = true,
+                };
+
+                mailMessage.To.Add(toEmail);
+
+                using (var smtpClient = new SmtpClient("mail.axoninn.com.tr"))
+                {
+                    smtpClient.Port = 587;
+                    smtpClient.Credentials = new NetworkCredential("info@axoninn.com.tr", "12345+pl");
+                    smtpClient.EnableSsl = false;
+
+                    await smtpClient.SendMailAsync(mailMessage);
+
+                    // İşlem başarılıysa true döndür
+                    return true;
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Mail gönderme hatası: {ex.Message}");
+
+                // Hata oluşursa sisteme çöktürmeden false döndür
+                return false;
             }
         }
 
@@ -215,7 +281,7 @@ namespace AxonInn.Controllers
                     IlgiliTablo = "Personel",
                     KayitRefId = islemGorenPersonel?.Id ?? personel?.Id ?? 0,
                     IslemTipi = islemTipi,
-                    EskiDeger = "",
+                    EskiDeger = "", // <-- Şifre güvenlik açığı düzeltilmiş hali
                     YeniDeger = yeniDeger,
                     YapanHotelAd = hotelAdi,
                     YapanDepartmanAd = departmanAdi,

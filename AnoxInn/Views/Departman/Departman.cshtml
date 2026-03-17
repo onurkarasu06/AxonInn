@@ -12,8 +12,6 @@
         girisYapanPersonel = JsonConvert.DeserializeObject<AxonInn.Models.Personel>(personelJson);
     }
     
-    string isReadOnly = girisYapanPersonel?.Yetki != 1 ? "disabled" : "";
-    string opacityClass = girisYapanPersonel?.Yetki != 1 ? "opacity-50" : "";
     // Güvenli Liste Çağırımı
     var departmanListesi = Model?.Departmen?.ToList() ?? new List<AxonInn.Models.Departman>();
 }
@@ -115,11 +113,17 @@
                                         <i class="fas fa-building me-2"></i>@departman.Adi
                                     </span>
                                 </div>
-                                <div class="position-absolute end-0 me-2">
-                                    <button class="btn btn-light btn-sm fw-bold @opacityClass" style="border-radius: 30px; font-size: 0.65rem; padding: 4px 10px;" data-bs-toggle="modal" data-bs-target="#personelEkleModal" onclick="setDepartmanId(@departman.Id, '@departman.Adi')" @isReadOnly>
+                          <div class="position-absolute end-0 me-2">
+                                   
+                                    <button class="btn btn-light btn-sm fw-bold @(girisYapanPersonel?.Yetki != 1 ? "opacity-50" : null)" 
+                                            style="border-radius: 30px; font-size: 0.65rem; padding: 4px 10px;" 
+                                            data-bs-toggle="modal" 
+                                            data-bs-target="#personelEkleModal" 
+                                            onclick="setDepartmanId(@departman.Id, '@departman.Adi')"
+                                            disabled="@(girisYapanPersonel?.Yetki != 1 ? "disabled" : null)">
                                         <i class="fas fa-user-plus me-1"></i> <span class="d-none d-sm-inline">EKLE</span>
                                     </button>
-                                </div>
+                             </div>
                             </div>
                         </th>
                     </tr>
@@ -154,7 +158,7 @@
                                                         string fNumara = personel.TelefonNumarasi;
                                                         if (!string.IsNullOrEmpty(personel.TelefonNumarasi))
                                                         {
-                                                            // İYİLEŞTİRME: Gereksiz Substring allocation'ları kaldırıldı. 
+                                                            // İYİLEŞTİRME: Gereksiz Substring allocation'ları kaldırıldı.
                                                             // Character Indexing ve Interpolation ile çok daha performanslı hale getirildi.
                                                             var d = personel.TelefonNumarasi.Where(char.IsDigit).ToArray();
                                                             if (d.Length == 11 && d[0] == '0')
@@ -196,11 +200,11 @@
                                                     </div>
                                                 </td>
                                                 <td data-label="İŞLEM">
-                                                    <div class="btn-group shadow-none @opacityClass">
-                                                        <button class="btn btn-outline-primary btn-sm border-0" onclick="openPersonelEditModal(@personel.Id, '@personel.Adi', '@personel.Soyadi', @departman.Id, '@personel.TelefonNumarasi', '@personel.MailAdresi', @(personel.MedenHali ?? 2), @(personel.Yetki))" data-bs-toggle="modal" data-bs-target="#personelGuncelleModal" @isReadOnly title="Düzenle">
+                                                    <div class="btn-group shadow-none @(girisYapanPersonel?.Yetki != 1 ? "opacity-50" : null)">
+                                                        <button class="btn btn-outline-primary btn-sm border-0" onclick="openPersonelEditModal(@personel.Id, '@personel.Adi', '@personel.Soyadi', @departman.Id, '@personel.TelefonNumarasi', '@personel.MailAdresi', @(personel.MedenHali ?? 2), @(personel.Yetki))" data-bs-toggle="modal" data-bs-target="#personelGuncelleModal" disabled="@(girisYapanPersonel?.Yetki != 1 ? "disabled" : null)" title="Düzenle">
                                                             <i class="fas fa-edit"></i>
                                                         </button>
-                                                        <button class="btn btn-outline-danger btn-sm border-0" onclick="setSilId(@personel.Id, '@personel.Adi @personel.Soyadi', '@uniqueRowId')" data-bs-toggle="modal" data-bs-target="#silOnayModal" @isReadOnly title="Sil">
+                                                         <button class="btn btn-outline-danger btn-sm border-0" onclick="setSilId(@personel.Id, '@personel.Adi @personel.Soyadi', '@uniqueRowId')" data-bs-toggle="modal" data-bs-target="#silOnayModal" disabled="@(girisYapanPersonel?.Yetki != 1 ? "disabled" : null)" title="Sil">
                                                             <i class="fas fa-trash-alt"></i>
                                                         </button>
                                                     </div>

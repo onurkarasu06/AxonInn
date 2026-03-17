@@ -27,9 +27,14 @@ public partial class Personel
 
     public byte Yetki { get; set; }
 
+
+
     public virtual Departman DepartmanRefNavigation { get; set; } = null!;
 
     public virtual ICollection<Gorev> Gorevs { get; set; } = new List<Gorev>();
 
     public virtual ICollection<PersonelFotograf> PersonelFotografs { get; set; } = new List<PersonelFotograf>();
+
+    public byte MailOnayliMi { get; set; } // SQL'de TinyInt (Default 0 olmalı)
+    public string? VerificationToken { get; set; } // SQL'de nvarchar (Nullable olmalı)
 }

@@ -1,7 +1,7 @@
 ﻿using AxonInn.Models;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using System.Text.Json; // DEĞİŞİKLİK: Ağır Newtonsoft yerine Microsoft'un yüksek performanslı yerleşik kütüphanesi eklendi
+using System.Text.Json;
 
 namespace AxonInn.Controllers
 {
@@ -19,7 +19,6 @@ namespace AxonInn.Controllers
         {
             try
             {
-                // PERFORMANS: Eğer kullanıcı zaten giriş yapmışsa direkt yönlendir, sayfayı boşuna render etme.
                 var mevcutSession = HttpContext.Session.GetString("GirisYapanPersonel");
                 if (!string.IsNullOrEmpty(mevcutSession))
                 {
@@ -35,16 +34,26 @@ namespace AxonInn.Controllers
         }
 
         [HttpPost]
-        [ValidateAntiForgeryToken] // GÜVENLİK: Dışarıdan sahte form gönderimlerini (CSRF / Bot saldırılarını) engeller.
+        [ValidateAntiForgeryToken]
         public async Task<ActionResult> Login(string identifier, string password)
         {
             try
             {
                 if (!string.IsNullOrEmpty(identifier) && !string.IsNullOrEmpty(password))
                 {
-                    // PERFORMANS: Include etmeye veya tüm objeyi çekmeye gerek yok.
-                    // Veritabanından (SQL seviyesinde) sadece ihtiyacımız olan sütunları Select ile çekiyoruz.
-                    // Bu sayede sessionPersonel gibi ikinci bir kopyalama işlemine gerek kalmıyor.
+                    identifier = identifier.Trim();
+
+                    // --- YENİ: FORMAT KONTROLÜ ---
+                    if (identifier.Contains("@"))
+                    {
+                        var emailValidator = new System.ComponentModel.DataAnnotations.EmailAddressAttribute();
+                        if (!emailValidator.IsValid(identifier))
+                        {
+                            TempData["ErrorMessage"] = "Lütfen geçerli bir e-posta adresi formatı giriniz!";
+                            return RedirectToAction("Login", "Login");
+                        }
+                    }
+
                     var personel = await _context.Personels
                         .AsNoTracking()
                         .Where(p => (p.MailAdresi == identifier || p.TelefonNumarasi == identifier)
@@ -58,17 +67,24 @@ namespace AxonInn.Controllers
                             Yetki = p.Yetki,
                             DepartmanRef = p.DepartmanRef,
                             MailAdresi = p.MailAdresi,
-                            TelefonNumarasi = p.TelefonNumarasi
+                            TelefonNumarasi = p.TelefonNumarasi,
+                            MailOnayliMi = p.MailOnayliMi // YENİ EKLENDİ
                         })
                         .FirstOrDefaultAsync();
 
                     if (personel != null)
                     {
+                        // --- YENİ: MAİL ONAYI KONTROLÜ ---
+                        if (personel.MailOnayliMi == 0)
+                        {
+                            TempData["ErrorMessage"] = "Hesabınız henüz doğrulanmamış. Lütfen e-postanıza gönderilen linke tıklayarak hesabınızı onaylayın.";
+                            return RedirectToAction("Login", "Login");
+                        }
+
                         bool logKayit = await LogKaydet(personel, "Sisteme Giriş Başarılı", "Login İşlemi", identifier);
 
                         if (logKayit)
                         {
-                            // PERFORMANS: Newtonsoft yerine yüksek hızlı System.Text.Json kullanımı
                             var personelJson = JsonSerializer.Serialize(personel);
                             HttpContext.Session.SetString("GirisYapanPersonel", personelJson);
 
@@ -99,6 +115,43 @@ namespace AxonInn.Controllers
             }
         }
 
+        // --- YENİ: E-POSTA DOĞRULAMA ENDPOINT'İ ---
+        [HttpGet]
+        public async Task<IActionResult> VerifyEmail(string token)
+        {
+            try
+            {
+                if (string.IsNullOrEmpty(token))
+                {
+                    TempData["ErrorMessage"] = "Geçersiz doğrulama linki.";
+                    return RedirectToAction("Login");
+                }
+
+                // Not: DB'de güncelleme yapacağımız için burada AsNoTracking KULLANMIYORUZ!
+                var personel = await _context.Personels.FirstOrDefaultAsync(p => p.VerificationToken == token);
+
+                if (personel == null)
+                {
+                    TempData["ErrorMessage"] = "Bu doğrulama kodu geçersiz veya daha önce kullanılmış.";
+                    return RedirectToAction("Login");
+                }
+
+                // Doğrulama başarılı! Hesabı aktif et ve token'ı uçur.
+                personel.MailOnayliMi = 1;
+                personel.VerificationToken = null;
+
+                await _context.SaveChangesAsync();
+
+                // View tarafında bu SuccessMessage'ı yeşil bir alert ile göstermelisin.
+                TempData["SuccessMessage"] = "E-posta adresiniz başarıyla doğrulandı! Şimdi giriş yapabilirsiniz.";
+                return RedirectToAction("Login");
+            }
+            catch (Exception ex)
+            {
+                return View("~/Views/Error/Error.cshtml", new ErrorViewModel { RequestId = ex.Message });
+            }
+        }
+
         [HttpGet]
         public async Task<IActionResult> Logout()
         {
@@ -108,10 +161,8 @@ namespace AxonInn.Controllers
                 if (string.IsNullOrEmpty(personelJson))
                     return RedirectToAction("Login", "Login");
 
-                // PERFORMANS: System.Text.Json ile Deserialization
                 var loginOlanPersonel = JsonSerializer.Deserialize<Personel>(personelJson);
 
-                // GÜVENLİK: Olası null hatasına karşı güvenlik önlemi (?? "") eklendi
                 bool logkayit = await LogKaydet(loginOlanPersonel, "Güvenli Çıkış Yapıldı", "Logout İşlemi", loginOlanPersonel?.MailAdresi ?? "");
 
                 if (logkayit)
@@ -139,7 +190,6 @@ namespace AxonInn.Controllers
 
                 if (personel != null && personel.DepartmanRef != 0)
                 {
-                    // Sizin yazdığınız harika performanslı tek SQL sorgusu korundu.
                     var depBilgisi = await _context.Departmen
                         .AsNoTracking()
                         .Where(d => d.Id == personel.DepartmanRef)

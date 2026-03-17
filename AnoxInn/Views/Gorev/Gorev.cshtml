@@ -93,24 +93,24 @@
         <div class="col-8 col-md-6">
             <h5 class="fw-bold text-dark mb-0"><i class="fas fa-tasks me-2 text-primary"></i>Görev Yönetimi</h5>
         </div>
-        <div class="col-4 col-md-6 text-end">
-            @if (yetki == 1 || yetki == 2)
-            {
-                <button type="button" class="btn btn-primary btn-sm rounded-pill px-4 shadow-sm" data-bs-toggle="modal" data-bs-target="#yeniGorevModal">
-                    <i class="fas fa-plus me-2"></i>
-                    <span class="d-none d-md-inline">Yeni Görev Ekle</span>
-                    <span class="d-inline d-md-none">Ekle</span>
-                </button>
-            }
-            else
-            {
-                <button type="button" class="btn btn-primary btn-sm rounded-pill px-4 shadow-sm opacity-50" disabled>
-                    <i class="fas fa-plus me-2"></i>
-                    <span class="d-none d-md-inline">Yeni Görev Ekle</span>
-                    <span class="d-inline d-md-none">Ekle</span>
-                </button>
-            }
-        </div>
+      <div class="col-4 col-md-6 text-end">
+    @if (yetki == 1)
+    {
+        <button type="button" class="btn btn-primary btn-sm rounded-pill px-4 shadow-sm" data-bs-toggle="modal" data-bs-target="#yeniGorevModal">
+            <i class="fas fa-plus me-2"></i>
+            <span class="d-none d-md-inline">Yeni Görev Ekle</span>
+            <span class="d-inline d-md-none">Ekle</span>
+        </button>
+    }
+    else
+    {
+        <button type="button" class="btn btn-primary btn-sm rounded-pill px-4 shadow-sm opacity-50" disabled title="Ekleme yetkiniz yok">
+            <i class="fas fa-plus me-2"></i>
+            <span class="d-none d-md-inline">Yeni Görev Ekle</span>
+            <span class="d-inline d-md-none">Ekle</span>
+        </button>
+    }
+</div>
     </div>
 
     <div class="row mb-4 g-3">
@@ -209,14 +209,39 @@
                                     }
                                 </td>
 
-                                <td class="text-center">
-                                    @switch (item.Durum)
-                                    {
-                                        case 1: <span class="text-danger fw-bold"><i class="fas fa-circle me-1 small opacity-50"></i> Beklemede</span> break;
-                                        case 2: <span class="text-warning fw-bold"><i class="fas fa-spinner fa-spin me-1"></i> İşlemde</span> break;
-                                        case 3: <span class="text-success fw-bold"><i class="fas fa-check-circle me-1"></i> Tamamlandı</span> break;
-                                    }
-                                </td>
+                              <td class="text-center">
+    <div class="btn-group gap-1">
+        
+        @if (yetki == 1 || yetki == 2)
+        {
+            <button class="btn btn-outline-primary btn-edit-small" data-bs-toggle="modal" data-bs-target="#guncelleModal"
+                    onclick="prepareEdit('@item.Id', '@item.PersonelRef', '@Html.Raw(JavaScriptEncoder.Default.Encode(item.Gorev1 ?? ""))', '@Html.Raw(JavaScriptEncoder.Default.Encode(item.PersonelNotu ?? ""))', '@item.Durum')">
+                <i class="fas fa-pencil-alt"></i>
+            </button>
+        }
+        else
+        {
+            <button class="btn btn-outline-primary btn-edit-small opacity-50" disabled title="Düzenleme yetkiniz yok">
+                <i class="fas fa-pencil-alt"></i>
+            </button>
+        }
+
+        @if (yetki == 1)
+        {
+            <button class="btn btn-outline-danger btn-edit-small" data-bs-toggle="modal" data-bs-target="#gorevSilOnayModal"
+                    onclick="prepareDelete('@item.Id', '@tamAd')">
+                <i class="fas fa-trash-alt"></i>
+            </button>
+        }
+        else
+        {
+            <button class="btn btn-outline-danger btn-edit-small opacity-50" disabled title="Silme yetkiniz yok">
+                <i class="fas fa-trash-alt"></i>
+            </button>
+        }
+
+    </div>
+</td>
 
                                 <td class="ps-3">
                                     @{ string statusColor = item.Durum switch { 1 => "text-danger", 2 => "text-warning", 3 => "text-success", _ => "text-secondary" }; }

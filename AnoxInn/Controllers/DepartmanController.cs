@@ -57,6 +57,8 @@ namespace AxonInn.Controllers
                 var personelJson = HttpContext.Session.GetString("GirisYapanPersonel");
                 var loginOlanPersonel = JsonConvert.DeserializeObject<Personel>(personelJson);
 
+                yeniPersonel.TelefonNumarasi = FormatTelefon(yeniPersonel.TelefonNumarasi);
+
                 // 1. KONTROL: Kullanıcı zaten var mı?
                 bool kullaniciVarmi = await _context.Personels.AnyAsync(p => p.TelefonNumarasi == yeniPersonel.TelefonNumarasi || p.MailAdresi == yeniPersonel.MailAdresi);
 
@@ -182,7 +184,7 @@ namespace AxonInn.Controllers
                     dbPersonel.Adi = p.Adi;
                     dbPersonel.Soyadi = p.Soyadi;
                     dbPersonel.DepartmanRef = p.DepartmanRef;
-                    dbPersonel.TelefonNumarasi = p.TelefonNumarasi;
+                    dbPersonel.TelefonNumarasi = FormatTelefon(p.TelefonNumarasi);
                     dbPersonel.MailAdresi = p.MailAdresi;
                     dbPersonel.MedenHali = p.MedenHali;
                     dbPersonel.Yetki = p.Yetki;
@@ -296,6 +298,28 @@ namespace AxonInn.Controllers
             {
                 return false;
             }
+        }
+
+        private string FormatTelefon(string telefon)
+        {
+            if (string.IsNullOrWhiteSpace(telefon)) return telefon;
+
+            // Sadece rakamları alıyoruz (boşluk, tire vs. temizlenir)
+            var digits = new string(telefon.Where(char.IsDigit).ToArray());
+
+            // Eğer başında 0 olmadan 10 hane girildiyse (örn: 5321234567)
+            if (digits.Length == 10)
+            {
+                return $"0 ({digits.Substring(0, 3)}) {digits.Substring(3, 3)} {digits.Substring(6, 2)} {digits.Substring(8, 2)}";
+            }
+            // Eğer başında 0 ile 11 hane girildiyse (örn: 05321234567)
+            else if (digits.Length == 11 && digits.StartsWith("0"))
+            {
+                return $"{digits.Substring(0, 1)} ({digits.Substring(1, 3)}) {digits.Substring(4, 3)} {digits.Substring(7, 2)} {digits.Substring(9, 2)}";
+            }
+
+            // Yabancı numara veya eksik girildiyse girildiği gibi bırak
+            return telefon.Trim();
         }
     }
 }

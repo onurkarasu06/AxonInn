@@ -35,19 +35,19 @@ namespace AxonInn.Controllers
 
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<ActionResult> Login(string identifier, string password)
+        public async Task<ActionResult> Login(string email, string password)
         {
             try
             {
-                if (!string.IsNullOrEmpty(identifier) && !string.IsNullOrEmpty(password))
+                if (!string.IsNullOrEmpty(email) && !string.IsNullOrEmpty(password))
                 {
-                    identifier = identifier.Trim();
+                    email = email.Trim();
 
                     // --- YENİ: FORMAT KONTROLÜ ---
-                    if (identifier.Contains("@"))
+                    if (email.Contains("@"))
                     {
                         var emailValidator = new System.ComponentModel.DataAnnotations.EmailAddressAttribute();
-                        if (!emailValidator.IsValid(identifier))
+                        if (!emailValidator.IsValid(email))
                         {
                             TempData["ErrorMessage"] = "Lütfen geçerli bir e-posta adresi formatı giriniz!";
                             return RedirectToAction("Login", "Login");
@@ -56,7 +56,7 @@ namespace AxonInn.Controllers
 
                     var personel = await _context.Personels
                         .AsNoTracking()
-                        .Where(p => (p.MailAdresi == identifier || p.TelefonNumarasi == identifier)
+                        .Where(p => (p.MailAdresi == email)
                                  && p.Sifre == password
                                  && p.AktifMi == 1)
                         .Select(p => new Personel
@@ -81,7 +81,7 @@ namespace AxonInn.Controllers
                             return RedirectToAction("Login", "Login");
                         }
 
-                        bool logKayit = await LogKaydet(personel, "Sisteme Giriş Başarılı", "Login İşlemi", identifier);
+                        bool logKayit = await LogKaydet(personel, "Sisteme Giriş Başarılı", "Login İşlemi", email);
 
                         if (logKayit)
                         {
@@ -98,8 +98,8 @@ namespace AxonInn.Controllers
                     }
                     else
                     {
-                        await LogKaydet(null, "Hatalı Giriş Denemesi", $"Kullanıcı Bulunamadı. Denenen: {identifier}", identifier);
-                        TempData["ErrorMessage"] = "Email-Telefon Numarası veya şifre hatalı!";
+                        await LogKaydet(null, "Hatalı Giriş Denemesi", $"Kullanıcı Bulunamadı. Denenen: {email}", password);
+                        TempData["ErrorMessage"] = "Girdiğiniz bilgiler hatalı veya kullanıcı aktif değil!";
                         return RedirectToAction("Login", "Login");
                     }
                 }

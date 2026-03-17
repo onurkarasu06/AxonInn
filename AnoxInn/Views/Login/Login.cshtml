@@ -154,17 +154,17 @@
                             
                             @Html.AntiForgeryToken()
 
-                            <div class="mb-3">
-                                <label for="Identifier" class="form-label small fw-bold text-secondary ms-1 text-uppercase" style="font-size: 0.65rem; letter-spacing: 1px;">E-posta veya Telefon</label>
-                                <div class="input-group rounded-4 overflow-hidden shadow-sm transition-focus">
-                                    <span class="input-group-text border-0 bg-white ps-3">
-                                        <i class="fas fa-user text-primary opacity-50 small"></i>
-                                    </span>
-                                    <input type="text" class="form-control border-0 py-3 shadow-none"
-                                           id="Identifier" name="identifier" placeholder="Email veya GSM No"
-                                           required autocomplete="username" style="font-size: 0.9rem;">
-                                </div>
-                            </div>
+                           <div class="mb-3">
+    <label for="Email" class="form-label small fw-bold text-secondary ms-1 text-uppercase" style="font-size: 0.65rem; letter-spacing: 1px;">E-posta Adresi</label>
+    <div class="input-group rounded-4 overflow-hidden shadow-sm transition-focus">
+        <span class="input-group-text border-0 bg-white ps-3">
+            <i class="fas fa-envelope text-primary opacity-50 small"></i>
+        </span>
+        <input type="email" class="form-control border-0 py-3 shadow-none"
+               id="Email" name="email" placeholder="ornek@sirket.com"
+               required autocomplete="username" style="font-size: 0.9rem;">
+    </div>
+</div>
 
                             <div class="mb-4">
                                 <label for="Password" class="form-label small fw-bold text-secondary ms-1 text-uppercase" style="font-size: 0.65rem; letter-spacing: 1px;">Güvenli Şifre</label>

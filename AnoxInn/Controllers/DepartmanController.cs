@@ -1,9 +1,10 @@
 ﻿using AxonInn.Models;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using Newtonsoft.Json;
+using System.Text.Json; // YENİ NESİL, HIZLI JSON KÜTÜPHANESİ
 using System.Net;
 using System.Net.Mail;
+using System.IO;
 
 namespace AxonInn.Controllers
 {
@@ -26,7 +27,8 @@ namespace AxonInn.Controllers
                 if (string.IsNullOrEmpty(personelJson))
                     return RedirectToAction("Login", "Login");
 
-                var loginOlanPersonel = JsonConvert.DeserializeObject<Personel>(personelJson);
+                // System.Text.Json ile Deserialization
+                var loginOlanPersonel = JsonSerializer.Deserialize<Personel>(personelJson);
                 await LogKaydet(loginOlanPersonel, "Departman Sayfasına Giriş Yapıldı", "Sayfa Görüntüleme", null);
 
                 var hotel = await _context.Hotels
@@ -55,11 +57,10 @@ namespace AxonInn.Controllers
             try
             {
                 var personelJson = HttpContext.Session.GetString("GirisYapanPersonel");
-                var loginOlanPersonel = JsonConvert.DeserializeObject<Personel>(personelJson);
+                var loginOlanPersonel = JsonSerializer.Deserialize<Personel>(personelJson);
 
                 yeniPersonel.TelefonNumarasi = FormatTelefon(yeniPersonel.TelefonNumarasi);
 
-                // 1. KONTROL: Kullanıcı zaten var mı?
                 bool kullaniciVarmi = await _context.Personels.AnyAsync(p => p.TelefonNumarasi == yeniPersonel.TelefonNumarasi || p.MailAdresi == yeniPersonel.MailAdresi);
 
                 if (kullaniciVarmi)
@@ -76,20 +77,16 @@ namespace AxonInn.Controllers
 
                 _context.Personels.Add(yeniPersonel);
 
-                // 2. KONTROL: Veritabanına Kayıt Başarılı mı?
                 try
                 {
                     await _context.SaveChangesAsync();
                 }
                 catch (Exception)
                 {
-                    // Eğer veritabanı çökerse veya bağlantı koparsa bu bloğa düşer
                     TempData["Mesaj"] = "Veritabanına kullanıcı kayıt edilemedi.";
                     TempData["MesajTipi"] = "error";
                     return RedirectToAction("Departman", "Departman");
                 }
-
-                // --- Veritabanı kaydı başarılıysa foto ve mail işlemlerine geç ---
 
                 if (yuklenenFoto != null && yuklenenFoto.Length > 0)
                 {
@@ -102,23 +99,19 @@ namespace AxonInn.Controllers
                         Fotograf = ms.ToArray()
                     };
                     _context.PersonelFotografs.Add(foto);
-                    await _context.SaveChangesAsync(); // Fotoğraf hatası sistemi durdurmasın diye burayı ayrı tutuyoruz.
+                    await _context.SaveChangesAsync();
                 }
 
-                // 3. KONTROL: Mail Başarıyla Gitti mi?
-                // Not: SendVerificationEmailAsync metodunun Task<bool> döndüğünden emin ol.
                 bool mailBasariliMi = await SendVerificationEmailAsync(yeniPersonel.MailAdresi, yeniPersonel.VerificationToken);
 
                 if (mailBasariliMi)
                 {
-                    // Senaryo 1: Her şey kusursuz
                     await LogKaydet(loginOlanPersonel, "Yeni Personel Eklendi", "Personel Başarıyla Kaydedildi ve Doğrulama Maili Gönderildi", yeniPersonel);
                     TempData["Mesaj"] = "Kullanıcı kayıt edildi, kendi mailinden aktive etmesi gerekmektedir.";
                     TempData["MesajTipi"] = "success";
                 }
                 else
                 {
-                    // Senaryo 2: Veritabanına eklendi ama mail sunucusunda hata çıktı
                     await LogKaydet(loginOlanPersonel, "Yeni Personel Eklendi (Mail Hatası)", "Personel kaydedildi fakat doğrulama maili gönderilemedi.", yeniPersonel);
                     TempData["Mesaj"] = "Kullanıcı kayıt edildi ancak doğrulama maili gönderilemedi. Lütfen sistem yöneticisiyle iletişime geçin.";
                     TempData["MesajTipi"] = "warning";
@@ -128,7 +121,6 @@ namespace AxonInn.Controllers
             }
             catch (Exception)
             {
-                // Tüm sistemi etkileyen çok kritik ve beklenmedik bir kod hatası olursa çalışır
                 TempData["Mesaj"] = "Sistemsel bir hata nedeniyle kullanıcı kayıt edilemedi.";
                 TempData["MesajTipi"] = "error";
                 return RedirectToAction("Departman", "Departman");
@@ -143,7 +135,7 @@ namespace AxonInn.Controllers
                 var personelJson = HttpContext.Session.GetString("GirisYapanPersonel");
                 if (string.IsNullOrEmpty(personelJson)) return RedirectToAction("Login", "Login");
 
-                var loginOlanPersonel = JsonConvert.DeserializeObject<Personel>(personelJson);
+                var loginOlanPersonel = JsonSerializer.Deserialize<Personel>(personelJson);
 
                 bool gorevVarMi = await _context.Gorevs.AnyAsync(g => g.PersonelRef == id);
 
@@ -176,7 +168,7 @@ namespace AxonInn.Controllers
             {
                 var personelJson = HttpContext.Session.GetString("GirisYapanPersonel");
                 if (string.IsNullOrEmpty(personelJson)) return RedirectToAction("Login", "Login");
-                var loginOlanPersonel = JsonConvert.DeserializeObject<Personel>(personelJson);
+                var loginOlanPersonel = JsonSerializer.Deserialize<Personel>(personelJson);
 
                 var dbPersonel = await _context.Personels.FindAsync(p.Id);
                 if (dbPersonel != null)
@@ -222,12 +214,10 @@ namespace AxonInn.Controllers
             }
         }
 
-        // --- E-POSTA GÖNDERME METODU ---
         private async Task<bool> SendVerificationEmailAsync(string toEmail, string token)
         {
             try
             {
-                // YENİ: Dinamik URL oluşturma. Visual Studio'da localhost, canlıda axoninn.com.tr olur.
                 string baseUrl = $"{Request.Scheme}://{Request.Host}";
                 string verificationLink = $"{baseUrl}/Login/VerifyEmail?token={token}";
 
@@ -248,16 +238,12 @@ namespace AxonInn.Controllers
                     smtpClient.EnableSsl = false;
 
                     await smtpClient.SendMailAsync(mailMessage);
-
-                    // İşlem başarılıysa true döndür
                     return true;
                 }
             }
             catch (Exception ex)
             {
                 Console.WriteLine($"Mail gönderme hatası: {ex.Message}");
-
-                // Hata oluşursa sisteme çöktürmeden false döndür
                 return false;
             }
         }
@@ -283,7 +269,7 @@ namespace AxonInn.Controllers
                     IlgiliTablo = "Personel",
                     KayitRefId = islemGorenPersonel?.Id ?? personel?.Id ?? 0,
                     IslemTipi = islemTipi,
-                    EskiDeger = "", // <-- Şifre güvenlik açığı düzeltilmiş hali
+                    EskiDeger = "",
                     YeniDeger = yeniDeger,
                     YapanHotelAd = hotelAdi,
                     YapanDepartmanAd = departmanAdi,
@@ -304,21 +290,17 @@ namespace AxonInn.Controllers
         {
             if (string.IsNullOrWhiteSpace(telefon)) return telefon;
 
-            // Sadece rakamları alıyoruz (boşluk, tire vs. temizlenir)
             var digits = new string(telefon.Where(char.IsDigit).ToArray());
 
-            // Eğer başında 0 olmadan 10 hane girildiyse (örn: 5321234567)
             if (digits.Length == 10)
             {
                 return $"0 ({digits.Substring(0, 3)}) {digits.Substring(3, 3)} {digits.Substring(6, 2)} {digits.Substring(8, 2)}";
             }
-            // Eğer başında 0 ile 11 hane girildiyse (örn: 05321234567)
             else if (digits.Length == 11 && digits.StartsWith("0"))
             {
                 return $"{digits.Substring(0, 1)} ({digits.Substring(1, 3)}) {digits.Substring(4, 3)} {digits.Substring(7, 2)} {digits.Substring(9, 2)}";
             }
 
-            // Yabancı numara veya eksik girildiyse girildiği gibi bırak
             return telefon.Trim();
         }
     }

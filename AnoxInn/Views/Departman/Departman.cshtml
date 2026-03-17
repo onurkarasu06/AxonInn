@@ -1,6 +1,6 @@
 ﻿@model AxonInn.Models.Hotel
 @using Microsoft.AspNetCore.Http
-@using Newtonsoft.Json
+@using System.Text.Json
 
 @{
     Layout = "~/Views/Shared/_Layout.cshtml";
@@ -9,10 +9,10 @@
     AxonInn.Models.Personel girisYapanPersonel = null;
     if (!string.IsNullOrEmpty(personelJson))
     {
-        girisYapanPersonel = JsonConvert.DeserializeObject<AxonInn.Models.Personel>(personelJson);
+        // YENİ NESİL, HIZLI JSON KÜTÜPHANESİ
+        girisYapanPersonel = JsonSerializer.Deserialize<AxonInn.Models.Personel>(personelJson);
     }
     
-    // Güvenli Liste Çağırımı
     var departmanListesi = Model?.Departmen?.ToList() ?? new List<AxonInn.Models.Departman>();
 }
 
@@ -123,7 +123,7 @@
                                             disabled="@(girisYapanPersonel?.Yetki != 1 ? "disabled" : null)">
                                         <i class="fas fa-user-plus me-1"></i> <span class="d-none d-sm-inline">EKLE</span>
                                     </button>
-                             </div>
+                            </div>
                             </div>
                         </th>
                     </tr>
@@ -154,26 +154,9 @@
                                                 <td data-label="SIRA" class="text-muted">@s</td>
                                                 <td data-label="AD SOYAD" class="fw-bold text-dark">@personel.Adi @personel.Soyadi</td>
                                                 <td data-label="İLETİŞİM">
-                                                    @{
-                                                        string fNumara = personel.TelefonNumarasi;
-                                                        if (!string.IsNullOrEmpty(personel.TelefonNumarasi))
-                                                        {
-                                                            // İYİLEŞTİRME: Gereksiz Substring allocation'ları kaldırıldı.
-                                                            // Character Indexing ve Interpolation ile çok daha performanslı hale getirildi.
-                                                            var d = personel.TelefonNumarasi.Where(char.IsDigit).ToArray();
-                                                            if (d.Length == 11 && d[0] == '0')
-                                                            {
-                                                                fNumara = $"{d[0]} ({d[1]}{d[2]}{d[3]}) {d[4]}{d[5]}{d[6]} {d[7]}{d[8]} {d[9]}{d[10]}";
-                                                            }
-                                                            else if (d.Length == 10)
-                                                            {
-                                                                fNumara = $"0 ({d[0]}{d[1]}{d[2]}) {d[3]}{d[4]}{d[5]} {d[6]}{d[7]} {d[8]}{d[9]}";
-                                                            }
-                                                        }
-                                                    }
                                                     <div class="d-flex flex-column lh-sm">
                                                         <a href="tel:@personel.TelefonNumarasi" class="text-primary fw-bold text-decoration-none" style="font-size: 0.8rem;">
-                                                            <i class="fas fa-phone-alt me-1 small"></i>@fNumara
+                                                            <i class="fas fa-phone-alt me-1 small"></i>@(personel.TelefonNumarasi ?? "-")
                                                         </a>
                                                         <small class="text-muted" style="font-size: 0.7rem;">@personel.MailAdresi</small>
                                                     </div>

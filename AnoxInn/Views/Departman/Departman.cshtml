@@ -1,19 +1,15 @@
 ﻿@model AxonInn.Models.Hotel
 @using Microsoft.AspNetCore.Http
 @using System.Text.Json
-
-@{
+@using AxonInn.Controllers @{
     Layout = "~/Views/Shared/_Layout.cshtml";
 
-    var personelJson = Context.Session.GetString("GirisYapanPersonel");
-    AxonInn.Models.Personel girisYapanPersonel = null;
-    if (!string.IsNullOrEmpty(personelJson))
-    {
-        // YENİ NESİL, HIZLI JSON KÜTÜPHANESİ
-        girisYapanPersonel = JsonSerializer.Deserialize<AxonInn.Models.Personel>(personelJson);
-    }
+    // İYİLEŞTİRME 1: View seviyesinde tekrarlı JSON Deserialize YÜKÜ kaldırıldı.
+    // Zaten Controller'da çözülen nesne doğrudan ViewData aracılığı ile alınıyor. İşlemci rahatladı.
+    var girisYapanPersonel = ViewData["GirisYapanPersonel"] as AxonInn.Models.Personel;
     
-    var departmanListesi = Model?.Departmen?.ToList() ?? new List<AxonInn.Models.Departman>();
+    // İYİLEŞTİRME 2: .ToList() çağrısı kaldırılarak bellekte (RAM) gereksiz kopya bir listenin oluşturulması engellendi.
+    var departmanListesi = Model?.Departmen ?? Enumerable.Empty<AxonInn.Models.Departman>();
 }
 
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css" media="print" onload="this.media='all'" />
@@ -150,6 +146,7 @@
                                         {
                                             s++;
                                             string uniqueRowId = $"dep{departman.Id}_pers{personel.Id}_{s}";
+                                          string fotoVersiyon = DepartmanController.PersonelFotoVersiyonlari.TryGetValue(personel.Id, out var v) ? v : DepartmanController.AppStartVersion;
                                             <tr style="font-size: 0.85rem;">
                                                 <td data-label="SIRA" class="text-muted">@s</td>
                                                 <td data-label="AD SOYAD" class="fw-bold text-dark">@personel.Adi @personel.Soyadi</td>
@@ -177,11 +174,27 @@
                                                 </td>
                                                 <td data-label="MEDENİ HAL" class="text-muted">@(personel.MedenHali == 1 ? "Evli" : "Bekar")</td>
                                                 <td data-label="FOTO">
-                                                    <div class="avatar-container d-inline-block text-center" style="width:32px; height:32px;">
-                                                       <img id="tabloFoto_@uniqueRowId" src="/Gorev/PersonelFotoGetir?id=@personel.Id&t=@DateTime.Now.Ticks" width="32" height="32" loading="lazy" class="rounded-circle border shadow-sm avatar-img pointer" style="width: 32px; height: 32px; object-fit: cover;" onerror="this.style.display='none'; document.getElementById('fallbackIcon_@uniqueRowId').style.display='inline-block';" onclick="personelFotoGoster(this.src, '@personel.Adi @personel.Soyadi')">
-                                                        <i id="fallbackIcon_@uniqueRowId" class="fas fa-user-circle text-secondary fs-4" style="display: none; line-height: 32px;"></i>
-                                                    </div>
-                                                </td>
+            <div class="avatar-container d-inline-block text-center" style="width:32px; height:32px;">
+            
+
+
+
+                <img id="tabloFoto_@uniqueRowId" 
+                     src="/Gorev/PersonelFotoGetir?id=@personel.Id&v=@fotoVersiyon" 
+                     width="32" height="32" loading="lazy" decoding="async" 
+                     class="rounded-circle border shadow-sm avatar-img pointer" 
+                     style="width: 32px; height: 32px; object-fit: cover;" 
+                     onerror="this.style.display='none'; document.getElementById('fallbackIcon_@uniqueRowId').style.display='inline-block';" 
+                     onclick="personelFotoGoster(this.src, '@personel.Adi @personel.Soyadi')">
+
+
+
+
+
+                
+                <i id="fallbackIcon_@uniqueRowId" class="fas fa-user-circle text-secondary fs-4" style="display: none; line-height: 32px;"></i>
+            </div>
+                                             </td>
                                                 <td data-label="İŞLEM">
                                                     <div class="btn-group shadow-none @(girisYapanPersonel?.Yetki != 1 ? "opacity-50" : null)">
                                                         <button class="btn btn-outline-primary btn-sm border-0" onclick="openPersonelEditModal(@personel.Id, '@personel.Adi', '@personel.Soyadi', @departman.Id, '@personel.TelefonNumarasi', '@personel.MailAdresi', @(personel.MedenHali ?? 2), @(personel.Yetki))" data-bs-toggle="modal" data-bs-target="#personelGuncelleModal" disabled="@(girisYapanPersonel?.Yetki != 1 ? "disabled" : null)" title="Düzenle">

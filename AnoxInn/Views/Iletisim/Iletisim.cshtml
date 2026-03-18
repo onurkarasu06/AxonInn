@@ -4,7 +4,8 @@
     Layout = "~/Views/Shared/_Layout.cshtml";
 }
 
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css" />
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css" media="print" onload="this.media='all'" />
+<noscript><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css" /></noscript>
 
 <style>
     /* İSKELET ANİMASYONU (SKELETON) */
@@ -81,6 +82,9 @@
                     }
 
                     <form id="iletisimForm" asp-controller="Iletisim" asp-action="MailGonder" method="post">
+                        
+                        @Html.AntiForgeryToken()
+
                         <div class="row g-2">
                             <div class="col-md-6">
                                 <label class="form-label small fw-bold text-secondary text-uppercase mb-1" style="font-size: 0.6rem; letter-spacing: 1px;">Adınız Soyadınız</label>
@@ -103,9 +107,9 @@
                             </div>
 
                             <div class="col-12 mt-2">
-                                <button type="submit" class="btn btn-primary px-4 py-2 fw-bold text-uppercase shadow-sm border-0 float-end d-inline-flex align-items-center justify-content-center" style="border-radius: 10px; font-size: 0.8rem; letter-spacing: 1px; background: linear-gradient(45deg, #0d6efd, #0dcaf0);">
-                                    <span class="btn-text"><i class="fas fa-paper-plane me-2"></i> Gönder</span>
-                                    <div class="spinner-border spinner-border-sm ms-2 d-none btn-spinner" role="status" aria-hidden="true"></div>
+                                <button type="submit" id="btnGonder" class="btn btn-primary px-4 py-2 fw-bold text-uppercase shadow-sm border-0 float-end d-inline-flex align-items-center justify-content-center" style="border-radius: 10px; font-size: 0.8rem; letter-spacing: 1px; background: linear-gradient(45deg, #0d6efd, #0dcaf0);">
+                                    <span id="btnText"><i class="fas fa-paper-plane me-2"></i> Gönder</span>
+                                    <div id="btnSpinner" class="spinner-border spinner-border-sm ms-2 d-none btn-spinner" role="status" aria-hidden="true"></div>
                                 </button>
                             </div>
 
@@ -121,7 +125,7 @@
 @section Scripts {
     <script>
         document.addEventListener("DOMContentLoaded", function () {
-            // İskelet Animasyonunu 400ms Bekleterek Kapat
+            // İskelet Animasyonunu 150ms Bekleterek Kapat
             setTimeout(function() {
                 const loader = document.getElementById('skeletonLoader');
                 if(loader) loader.classList.add('d-none');
@@ -130,16 +134,23 @@
                 if(mainContent) mainContent.classList.remove('d-none');
             }, 150);
 
-            // Form Submit Animasyonu
+            // Form Submit Animasyonu ve Çift Tıklama Koruması
             const form = document.getElementById('iletisimForm');
             if (form) {
-                form.addEventListener('submit', function () {
-                    const submitBtn = this.querySelector('button[type="submit"]');
-                    if (submitBtn) {
-                        const textSpan = submitBtn.querySelector('.btn-text');
-                        const spinner = submitBtn.querySelector('.btn-spinner');
+                form.addEventListener('submit', function (e) {
+                    const submitBtn = document.getElementById('btnGonder');
+                    
+                    // ⚡ ÇİFT TIKLAMA (SPAM) KORUMASI: E-postanın art arda gönderilerek sunucuyu kitlemesini engeller.
+                    if (submitBtn && submitBtn.classList.contains('btn-loading')) {
+                        e.preventDefault();
+                        return;
+                    }
 
-                        submitBtn.classList.add('btn-loading');
+                    if (this.checkValidity()) {
+                        const textSpan = document.getElementById('btnText');
+                        const spinner = document.getElementById('btnSpinner');
+
+                        if (submitBtn) submitBtn.classList.add('btn-loading');
 
                         if(textSpan && spinner) {
                             textSpan.innerHTML = '<i class="fas fa-paper-plane me-2"></i> Gönderiliyor...';
@@ -147,6 +158,20 @@
                         }
                     }
                 });
+            }
+        });
+
+        // ⚡ BFCache (Tarayıcı Önbelleği) Temizliği: Kullanıcı geri tuşuna basarsa butonun takılı kalmasını önler.
+        window.addEventListener('pageshow', function (event) {
+            if (event.persisted) {
+                const submitBtn = document.getElementById('btnGonder');
+                if (submitBtn) {
+                    submitBtn.classList.remove('btn-loading');
+                    const textSpan = document.getElementById('btnText');
+                    const spinner = document.getElementById('btnSpinner');
+                    if(textSpan) textSpan.innerHTML = '<i class="fas fa-paper-plane me-2"></i> Gönder';
+                    if(spinner) spinner.classList.add('d-none');
+                }
             }
         });
     </script>

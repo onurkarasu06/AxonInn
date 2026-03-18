@@ -1,7 +1,7 @@
 ﻿using AxonInn.Models;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using System.Text.Json; // Newtonsoft yerine daha hızlı olan System.Text.Json eklendi
+using System.Text.Json;
 using System.IO;
 
 namespace AxonInn.Controllers
@@ -25,35 +25,52 @@ namespace AxonInn.Controllers
                     return RedirectToAction("Login", "Login");
 
                 var loginOlanPersonel = JsonSerializer.Deserialize<Personel>(personelJson);
-                await LogKaydet(loginOlanPersonel, "Görev Sayfasına Giriş Yapıldı", "Görev Listesi Görüntüleme", null);
 
-                var hotelId = await _context.Departmen
+                // ⚡ CPU OPTİMİZASYONU: View (HTML) tarafında tekrar JSON çözümlememek için veriyi aktarıyoruz.
+                ViewData["GirisYapanPersonel"] = loginOlanPersonel;
+
+                // ⚡ DB OPTİMİZASYONU: Hotel ve Departman adını ilk adımda alıyoruz ki LogKaydet metodunda tekrar DB'ye gidilmesin.
+                var depBilgi = await _context.Departmen
+                    .AsNoTracking()
                     .Where(d => d.Id == loginOlanPersonel.DepartmanRef)
-                    .Select(d => d.HotelRef)
+                    .Select(d => new { d.HotelRef, HotelAdi = d.HotelRefNavigation.Adi, DepartmanAdi = d.Adi })
                     .FirstOrDefaultAsync();
 
-                // PERFORMANS 1: AsSplitQuery eklendi. RAM'i şişiren kartezyen patlamasını önler.
+                if (depBilgi == null || depBilgi.HotelRef == 0)
+                    return RedirectToAction("Login", "Login");
+
+                await LogKaydet(loginOlanPersonel, "Görev Sayfasına Giriş Yapıldı", "Görev Listesi Görüntüleme", null, depBilgi.HotelAdi, depBilgi.DepartmanAdi);
+
+                // ⚡ RAM OPTİMİZASYONU: AsSplitQuery korundu. Kartezyen patlamasını önler.
                 var hotel = await _context.Hotels
                     .AsNoTracking()
                     .AsSplitQuery()
                     .Include(h => h.Departmen)
                         .ThenInclude(d => d.Personels.Where(p => p.AktifMi == 1))
                             .ThenInclude(p => p.Gorevs)
-                    .FirstOrDefaultAsync(h => h.Id == hotelId);
+                    .FirstOrDefaultAsync(h => h.Id == depBilgi.HotelRef);
 
                 if (hotel == null)
                     return RedirectToAction("Login", "Login");
 
                 var gorevIds = hotel.Departmen.SelectMany(d => d.Personels).SelectMany(p => p.Gorevs).Select(g => g.Id).ToList();
 
-                if (gorevIds.Any())
+                if (gorevIds.Count > 0)
                 {
-                    var fotoIdListesi = await _context.GorevFotografs
-                        .Where(gf => gorevIds.Contains(gf.GorevRef))
-                        .Select(gf => new { gf.Id, gf.GorevRef })
-                        .ToListAsync();
+                    // 🚨 SQL IN (2100) ÇÖKME ÖNLEMİ: Dev veri yığınlarında sistemin patlamaması için Chunk (Parçalama) kullanıldı.
+                    var fotoIdListesi = new List<GorevFotograf>();
+                    foreach (var chunk in gorevIds.Chunk(2000))
+                    {
+                        var fotolar = await _context.GorevFotografs
+                            .AsNoTracking() // Sadece listeleme için Track yapmaya gerek yok.
+                            .Where(gf => chunk.Contains(gf.GorevRef))
+                            .Select(gf => new GorevFotograf { Id = gf.Id, GorevRef = gf.GorevRef })
+                            .ToListAsync();
 
-                    // PERFORMANS 2: ToLookup kullanılarak veriler bellekte indekslendi. Eşleşme O(1) hızına çıktı.
+                        fotoIdListesi.AddRange(fotolar);
+                    }
+
+                    // ToLookup ile bellekte O(1) hızında eşleştirme
                     var fotoLookup = fotoIdListesi.ToLookup(f => f.GorevRef);
 
                     foreach (var departman in hotel.Departmen)
@@ -62,9 +79,7 @@ namespace AxonInn.Controllers
                         {
                             foreach (var gorev in personel.Gorevs)
                             {
-                                gorev.GorevFotografs = fotoLookup[gorev.Id]
-                                    .Select(f => new GorevFotograf { Id = f.Id, GorevRef = f.GorevRef })
-                                    .ToList();
+                                gorev.GorevFotografs = fotoLookup[gorev.Id].ToList();
                             }
                         }
                     }
@@ -90,32 +105,31 @@ namespace AxonInn.Controllers
                 model.KayitTarihi = DateTime.Now;
                 model.Durum = 1;
 
-                _context.Gorevs.Add(model);
-                await _context.SaveChangesAsync();
-
+                // ⚡ NETWORK OPTİMİZASYONU: Fotoğraflar baştan göreve bağlanıp veritabanına tek seferde gönderiliyor.
                 if (Fotograf != null && Fotograf.Count > 0)
                 {
+                    model.GorevFotografs = new List<GorevFotograf>(Fotograf.Count);
                     foreach (var dosya in Fotograf)
                     {
                         if (dosya.Length > 0)
                         {
-                            // PERFORMANS 3: Allocation overhead'i engellemek için Stream boyutu belirtildi.
+                            // RAM bellek sızıntısını önlemek için uzunluk baştan verildi.
                             using (var ms = new MemoryStream((int)dosya.Length))
                             {
                                 await dosya.CopyToAsync(ms);
-                                _context.GorevFotografs.Add(new GorevFotograf
+                                model.GorevFotografs.Add(new GorevFotograf
                                 {
-                                    GorevRef = model.Id,
                                     Fotograf = ms.ToArray()
                                 });
                             }
                         }
                     }
-                    await _context.SaveChangesAsync();
                 }
 
+                _context.Gorevs.Add(model);
+                await _context.SaveChangesAsync();
+
                 await LogKaydet(loginOlanPersonel, "Yeni Görev Eklendi", $"Görev ID: {model.Id} oluşturuldu.", null);
-                // Dikkat: Yönlendirme Route yapınızla aynı olmalı
                 return RedirectToAction("Gorev");
             }
             catch (Exception ex)
@@ -133,17 +147,12 @@ namespace AxonInn.Controllers
                 if (string.IsNullOrEmpty(personelJson)) return RedirectToAction("Login", "Login");
                 var loginOlanPersonel = JsonSerializer.Deserialize<Personel>(personelJson);
 
-                var gorev = await _context.Gorevs.FindAsync(id);
-                if (gorev != null)
+                // ⚡ SIFIR RAM TÜKETİMİ (Zero-Memory Delete): Veriyi RAM'e çekmek (FindAsync) yerine SQL üzerinden ışık hızında siliyoruz.
+                await _context.GorevFotografs.Where(f => f.GorevRef == id).ExecuteDeleteAsync();
+                int silinenAdet = await _context.Gorevs.Where(g => g.Id == id).ExecuteDeleteAsync();
+
+                if (silinenAdet > 0)
                 {
-                    // EF Core 7.0+ ExecuteDeleteAsync kullanımı çok iyi, değiştirilmedi.
-                    await _context.GorevFotografs
-                        .Where(f => f.GorevRef == id)
-                        .ExecuteDeleteAsync();
-
-                    _context.Gorevs.Remove(gorev);
-                    await _context.SaveChangesAsync();
-
                     await LogKaydet(loginOlanPersonel, "Görev Silindi", $"Görev ID: {id} silindi.", null);
                 }
 
@@ -182,9 +191,6 @@ namespace AxonInn.Controllers
 
                     dbGorev.Durum = model.Durum;
 
-                    // PERFORMANS 4: Update(dbGorev) kaldırıldı! FindAsync ile veri Track ediliyor. 
-                    // SaveChangesAsync otomatik olarak sadece değişen kolonların sorgusunu oluşturur.
-
                     if (YeniFotograflar != null && YeniFotograflar.Count > 0)
                     {
                         foreach (var dosya in YeniFotograflar)
@@ -216,17 +222,18 @@ namespace AxonInn.Controllers
             }
         }
 
-        // PERFORMANS 5: Tarayıcı 1 gün boyunca DB'yi yormayacak. Sadece byte[] çekilerek RAM ferahlatıldı.
         [HttpGet]
         [ResponseCache(Duration = 86400, Location = ResponseCacheLocation.Client)]
         public async Task<IActionResult> PersonelFotoGetir(long id)
         {
             var fotoBytes = await _context.PersonelFotografs
+                .AsNoTracking()
                 .Where(f => f.PersonelRef == id)
                 .Select(f => f.Fotograf)
                 .FirstOrDefaultAsync();
 
-            if (fotoBytes != null)
+            // Length > 0 kontrolü eklendi
+            if (fotoBytes != null && fotoBytes.Length > 0)
                 return File(fotoBytes, "image/jpeg");
 
             return NotFound();
@@ -237,6 +244,7 @@ namespace AxonInn.Controllers
         public async Task<IActionResult> KanitFotoGetir(long id)
         {
             var fotoBytes = await _context.GorevFotografs
+                .AsNoTracking()
                 .Where(f => f.Id == id)
                 .Select(f => f.Fotograf)
                 .FirstOrDefaultAsync();
@@ -247,19 +255,27 @@ namespace AxonInn.Controllers
             return NotFound();
         }
 
-        private async Task<bool> LogKaydet(Personel? personel, string islemTipi, string yeniDeger, Gorev? gorev)
+        // ⚡ N+1 DB OPTİMİZASYONU: Metoda isimler opsiyonel parametre olarak eklendi, DB hit'i önlendi.
+        private async Task<bool> LogKaydet(Personel? personel, string islemTipi, string yeniDeger, Gorev? gorev, string preHotelAdi = "", string preDeptAdi = "")
         {
             try
             {
-                string departmanAdi = personel?.DepartmanRefNavigation?.Adi ?? "";
-                string hotelAdi = "";
+                string departmanAdi = !string.IsNullOrEmpty(preDeptAdi) ? preDeptAdi : (personel?.DepartmanRefNavigation?.Adi ?? "");
+                string hotelAdi = preHotelAdi;
 
-                if (personel != null && personel.DepartmanRef != 0)
+                if (personel != null && personel.DepartmanRef != 0 && string.IsNullOrEmpty(hotelAdi))
                 {
-                    hotelAdi = await _context.Departmen
+                    var data = await _context.Departmen
+                        .AsNoTracking()
                         .Where(d => d.Id == personel.DepartmanRef)
-                        .Select(d => d.HotelRefNavigation.Adi)
-                        .FirstOrDefaultAsync() ?? "";
+                        .Select(d => new { d.Adi, hAdi = d.HotelRefNavigation.Adi })
+                        .FirstOrDefaultAsync();
+
+                    if (data != null)
+                    {
+                        hotelAdi = data.hAdi;
+                        departmanAdi = data.Adi;
+                    }
                 }
 
                 var log = new AuditLog
@@ -270,8 +286,8 @@ namespace AxonInn.Controllers
                     IslemTipi = islemTipi,
                     EskiDeger = "",
                     YeniDeger = yeniDeger,
-                    YapanHotelAd = hotelAdi,
-                    YapanDepartmanAd = departmanAdi,
+                    YapanHotelAd = hotelAdi ?? "",
+                    YapanDepartmanAd = departmanAdi ?? "",
                     YapanAdSoyad = personel != null ? $"{personel.Adi} {personel.Soyadi}" : "Bilinmeyen"
                 };
 

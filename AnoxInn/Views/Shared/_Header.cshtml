@@ -1,5 +1,5 @@
 ﻿@using Microsoft.AspNetCore.Http
-@using Newtonsoft.Json
+@using System.Text.Json
 @using AxonInn.Models
 
 @{
@@ -7,17 +7,24 @@
     var currentController = ViewContext.RouteData.Values["Controller"]?.ToString();
     var currentAction = ViewContext.RouteData.Values["Action"]?.ToString();
     
-    // Session'dan kullanıcıyı JSON formatında alıp Deserialize ediyoruz
-    var personelJson = Context.Session.GetString("GirisYapanPersonel");
-    Personel personel = null;
+    // ⚡ İŞLEMCİ (CPU) OPTİMİZASYONU: "Çifte Deserialization" Yükü Sıfırlandı!
+    // Her sayfa yenilendiğinde ağır JSON çözümlemesi yapmak yerine, Controller'da zaten
+    // çözülmüş olan hazır nesneyi ViewData üzerinden çekiyoruz. İşlemci aynı işi 2 kere yapmaz.
+    var personel = ViewData["GirisYapanPersonel"] as Personel;
     
-    if (!string.IsNullOrEmpty(personelJson))
+    // Eğer ViewData boşsa (Gelecekte eklenecek bir Controller'da unutulursa diye)
+    // Güvenlik yedeği (Fallback) olarak çok daha hızlı olan System.Text.Json ile Session'dan alıyoruz.
+    if (personel == null)
     {
-        personel = JsonConvert.DeserializeObject<Personel>(personelJson);
+        var personelJson = Context.Session.GetString("GirisYapanPersonel");
+        if (!string.IsNullOrEmpty(personelJson))
+        {
+            personel = JsonSerializer.Deserialize<Personel>(personelJson);
+        }
     }
 
-    // EF Core modelimize göre Ad -> Adi, Soyad -> Soyadi olarak güncellendi
-    string aktifKullanici = personel != null ? (personel.Adi + " " + personel.Soyadi) : "Giriş Yapılmadı";
+    // String birleştirme işlemi daha performanslı interpolation yapısına geçirildi.
+    string aktifKullanici = personel != null ? $"{personel.Adi} {personel.Soyadi}" : "Giriş Yapılmadı";
 }
 
 <style>
@@ -57,7 +64,7 @@
     <nav class="navbar navbar-expand-md navbar-light navbar-glass py-2 shadow-sm">
         <div class="container">
 
-            <a class="navbar-brand d-flex align-items-center" asp-area="" asp-controller="Home" asp-action="Index">
+            <a class="navbar-brand d-flex align-items-center" asp-area="" asp-controller="Ana" asp-action="Ana">
                 <div class="bg-primary rounded-3 d-flex align-items-center justify-content-center shadow-sm"
                      style="width: 32px; height: 32px; background: linear-gradient(135deg, #0d6efd 0%, #0dcaf0 100%);">
                     <span class="text-white fw-bold small" style="font-size: 0.8rem; letter-spacing: 0.5px;">AI</span>
@@ -103,7 +110,7 @@
                         </span>
                     </div>
 
-                    <a asp-controller="login" asp-action="Logout" class="btn btn-sm btn-outline-danger border-0 px-2 py-0 mt-1 mt-md-0" style="font-size: 0.75rem;">
+                    <a asp-controller="Login" asp-action="Logout" class="btn btn-sm btn-outline-danger border-0 px-2 py-0 mt-1 mt-md-0" style="font-size: 0.75rem;">
                         <i class="fas fa-power-off me-1" style="font-size: 0.65rem;"></i>Güvenli Çıkış
                     </a>
                 </div>

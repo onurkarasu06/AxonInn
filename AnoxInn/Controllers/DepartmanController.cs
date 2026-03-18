@@ -1,16 +1,23 @@
-﻿using AxonInn.Models;
+﻿using System.Collections.Concurrent;
+using AxonInn.Models;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using System.Text.Json; // YENİ NESİL, HIZLI JSON KÜTÜPHANESİ
+using System.Text.Json;
 using System.Net;
 using System.Net.Mail;
 using System.IO;
+using System.Text;
 
 namespace AxonInn.Controllers
 {
     public class DepartmanController : Controller
     {
         private readonly AxonInnContext _context;
+
+        // ⚡ AKILLI ÖNBELLEK KIRICI: Sadece resmi değişen personelin önbelleğini kırmak için RAM dostu sözlük.
+        public static ConcurrentDictionary<long, string> PersonelFotoVersiyonlari = new ConcurrentDictionary<long, string>();
+        // YENİ EKLENECEK SATIR: Uygulama her başladığında benzersiz bir versiyon üretir
+        public static readonly string AppStartVersion = DateTime.Now.Ticks.ToString();
 
         public DepartmanController(AxonInnContext context)
         {
@@ -27,12 +34,17 @@ namespace AxonInn.Controllers
                 if (string.IsNullOrEmpty(personelJson))
                     return RedirectToAction("Login", "Login");
 
-                // System.Text.Json ile Deserialization
                 var loginOlanPersonel = JsonSerializer.Deserialize<Personel>(personelJson);
+
+                // CPU OPTİMİZASYONU: View tarafında tekrar Deserialize yapmamak için nesneyi ViewData ile aktarıyoruz.
+                ViewData["GirisYapanPersonel"] = loginOlanPersonel;
+
                 await LogKaydet(loginOlanPersonel, "Departman Sayfasına Giriş Yapıldı", "Sayfa Görüntüleme", null);
 
+                // RAM OPTİMİZASYONU: AsSplitQuery eklendi. İç içe Include'ların yarattığı devasa SQL (Kartezyen) yığınını böler, RAM tüketimini düşürür.
                 var hotel = await _context.Hotels
                     .AsNoTracking()
+                    .AsSplitQuery()
                     .Include(h => h.Departmen)
                         .ThenInclude(d => d.Personels.Where(p => p.AktifMi == 1))
                     .FirstOrDefaultAsync(h => h.Departmen.Any(d => d.Id == loginOlanPersonel.DepartmanRef));
@@ -90,7 +102,7 @@ namespace AxonInn.Controllers
 
                 if (yuklenenFoto != null && yuklenenFoto.Length > 0)
                 {
-                    using var ms = new MemoryStream();
+                    using var ms = new MemoryStream((int)yuklenenFoto.Length);
                     await yuklenenFoto.CopyToAsync(ms);
 
                     var foto = new PersonelFotograf
@@ -100,6 +112,9 @@ namespace AxonInn.Controllers
                     };
                     _context.PersonelFotografs.Add(foto);
                     await _context.SaveChangesAsync();
+
+                    // ⚡ YENİ EKLENDİ: Yeni eklenen resme benzersiz bir zaman damgası (versiyon) atıyoruz.
+                    PersonelFotoVersiyonlari[yeniPersonel.Id] = DateTime.Now.Ticks.ToString();
                 }
 
                 bool mailBasariliMi = await SendVerificationEmailAsync(yeniPersonel.MailAdresi, yeniPersonel.VerificationToken);
@@ -147,6 +162,7 @@ namespace AxonInn.Controllers
                     return RedirectToAction("Departman", "Departman");
                 }
 
+                // ExecuteDeleteAsync doğrudan SQL'e gittiği için oldukça performanslıdır.
                 await _context.PersonelFotografs.Where(f => f.PersonelRef == id).ExecuteDeleteAsync();
                 await _context.Personels.Where(p => p.Id == id).ExecuteDeleteAsync();
 
@@ -190,16 +206,22 @@ namespace AxonInn.Controllers
                     {
                         var mevcutFoto = await _context.PersonelFotografs.FirstOrDefaultAsync(f => f.PersonelRef == p.Id);
 
-                        using var ms = new MemoryStream();
+                        using var ms = new MemoryStream((int)yuklenenFoto.Length);
                         await yuklenenFoto.CopyToAsync(ms);
+                        var imageBytes = ms.ToArray();
+
                         if (mevcutFoto != null)
                         {
-                            mevcutFoto.Fotograf = ms.ToArray();
+                            mevcutFoto.Fotograf = imageBytes;
                         }
                         else
                         {
-                            _context.PersonelFotografs.Add(new PersonelFotograf { PersonelRef = p.Id, Fotograf = ms.ToArray() });
+                            _context.PersonelFotografs.Add(new PersonelFotograf { PersonelRef = p.Id, Fotograf = imageBytes });
                         }
+
+                        // ⚡ YENİ EKLENDİ: Resmi güncellenen personelin versiyon numarasını anında değiştiriyoruz. 
+                        // Böylece tarayıcı SADECE BU KİŞİNİN resmini sunucudan yeniden indirecek! Diğer personeller Cache'den okunacak.
+                        PersonelFotoVersiyonlari[p.Id] = DateTime.Now.Ticks.ToString();
                     }
 
                     await _context.SaveChangesAsync();
@@ -221,7 +243,8 @@ namespace AxonInn.Controllers
                 string baseUrl = $"{Request.Scheme}://{Request.Host}";
                 string verificationLink = $"{baseUrl}/Login/VerifyEmail?token={token}";
 
-                var mailMessage = new MailMessage
+                // BELLEK SIZINTISI (Memory Leak) oluşmaması için using deklarasyonu eklendi.
+                using var mailMessage = new MailMessage
                 {
                     From = new MailAddress("info@axoninn.com.tr", "AxonInn Otomasyon"),
                     Subject = "AxonInn - Hesabınızı Doğrulayın",
@@ -231,15 +254,13 @@ namespace AxonInn.Controllers
 
                 mailMessage.To.Add(toEmail);
 
-                using (var smtpClient = new SmtpClient("mail.axoninn.com.tr"))
-                {
-                    smtpClient.Port = 587;
-                    smtpClient.Credentials = new NetworkCredential("info@axoninn.com.tr", "12345+pl");
-                    smtpClient.EnableSsl = false;
+                using var smtpClient = new SmtpClient("mail.axoninn.com.tr");
+                smtpClient.Port = 587;
+                smtpClient.Credentials = new NetworkCredential("info@axoninn.com.tr", "12345+pl");
+                smtpClient.EnableSsl = false;
 
-                    await smtpClient.SendMailAsync(mailMessage);
-                    return true;
-                }
+                await smtpClient.SendMailAsync(mailMessage);
+                return true;
             }
             catch (Exception ex)
             {
@@ -258,6 +279,7 @@ namespace AxonInn.Controllers
                 if (personel != null && personel.DepartmanRef != 0)
                 {
                     hotelAdi = await _context.Departmen
+                        .AsNoTracking() // EF izleme yapmasın (Performans)
                         .Where(d => d.Id == personel.DepartmanRef)
                         .Select(d => d.HotelRefNavigation.Adi)
                         .FirstOrDefaultAsync() ?? "";
@@ -290,7 +312,17 @@ namespace AxonInn.Controllers
         {
             if (string.IsNullOrWhiteSpace(telefon)) return telefon;
 
-            var digits = new string(telefon.Where(char.IsDigit).ToArray());
+            // GC (Çöp Toplayıcı) yoran LINQ ToArray() iptal edildi. Bellek dostu StringBuilder'a geçildi.
+            var sb = new StringBuilder(telefon.Length);
+            foreach (char c in telefon)
+            {
+                if (char.IsDigit(c))
+                {
+                    sb.Append(c);
+                }
+            }
+
+            var digits = sb.ToString();
 
             if (digits.Length == 10)
             {

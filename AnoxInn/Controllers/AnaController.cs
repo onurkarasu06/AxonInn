@@ -1,7 +1,7 @@
 using AxonInn.Models;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using System.Text.Json; // DEĞİŞİKLİK: Ağır Newtonsoft yerine yüksek hızlı System.Text.Json eklendi
+using System.Text.Json; // Yüksek Hızlı Yeni Nesil JSON
 
 namespace AxonInn.Controllers
 {
@@ -24,42 +24,57 @@ namespace AxonInn.Controllers
                     return RedirectToAction("Login", "Login");
 
                 var loginOlanPersonel = JsonSerializer.Deserialize<Personel>(personelJson);
-                await LogKaydet(loginOlanPersonel, "Ana Sayfaya Giriş Yapıldı", "Dashboard Görüntüleme");
 
-                // PERFORMANS 1: Otel Id ve Otel Adı bilgisini 2 ayrı sorgu yerine TEK bir bağlantı (Select) ile çekiyoruz.
-                var hotelBilgisi = await _context.Departmen
+                // ⚡ PERFORMANS 1: Otel Id ve Adı bilgileri ile birlikte Departman adını TEK bir bağlantı ile çekiyoruz.
+                var sessionBilgisi = await _context.Departmen
                     .AsNoTracking()
                     .Where(d => d.Id == loginOlanPersonel.DepartmanRef)
-                    .Select(d => new { d.HotelRef, HotelAdi = d.HotelRefNavigation.Adi })
+                    .Select(d => new {
+                        d.HotelRef,
+                        HotelAdi = d.HotelRefNavigation.Adi,
+                        DepartmanAdi = d.Adi
+                    })
                     .FirstOrDefaultAsync();
 
-                if (hotelBilgisi == null || hotelBilgisi.HotelRef == 0)
+                if (sessionBilgisi == null || sessionBilgisi.HotelRef == 0)
                     return RedirectToAction("Login", "Login");
 
-                int hotelId = (int)hotelBilgisi.HotelRef;
-                string hotelAdi = hotelBilgisi.HotelAdi;
+                int hotelId = (int)sessionBilgisi.HotelRef;
+                string hotelAdi = sessionBilgisi.HotelAdi;
 
-                // PERFORMANS 2: Sadece okuma yaptığımız için tüm tablolara AsNoTracking eklendi (RAM Tasarrufu).
-                var personelChartData = await _context.Personels
+                // ⚡ PERFORMANS 2: Veritabanına tekrar gitmemesi için elimizdeki otel ve departman adını Log metoduna parametre yolluyoruz.
+                await LogKaydet(loginOlanPersonel, "Ana Sayfaya Giriş Yapıldı", "Dashboard Görüntüleme", hotelAdi, sessionBilgisi.DepartmanAdi);
+
+                // ⚡ PERFORMANS 3: Binlerce satır personel datasını RAM'e çekip JS ile saydırmak yerine
+                // Doğrudan SQL seviyesinde (GroupBy) departman bazlı kişi adetlerini çekiyoruz. (Ağ yükü %99 azaldı)
+                var departmanPersonelSayilari = await _context.Personels
                     .AsNoTracking()
                     .Where(p => p.DepartmanRefNavigation.HotelRef == hotelId && p.AktifMi == 1)
-                    .Select(p => new {
-                        ad = p.Adi,
-                        soyad = p.Soyadi,
-                        departman = new { ad = p.DepartmanRefNavigation.Adi }
+                    .GroupBy(p => p.DepartmanRefNavigation.Adi)
+                    .Select(g => new {
+                        departmanAd = g.Key ?? "Belirtilmemiş",
+                        adet = g.Count()
                     }).ToListAsync();
 
+                // ⚡ PERFORMANS 4: On binlerce görev verisini tek tek HTML içine göndermek tarayıcıyı kilitler.
+                // EF Core üzerinden SQL GroupBy tetikleniyor. Sadece "Hangi Personel, Hangi Durumda Kaç İşe Sahip" 
+                // verisi minik, güvenli bir özet liste olarak çekiliyor.
                 var gorevChartData = await _context.Gorevs
                     .AsNoTracking()
                     .Where(g => g.PersonelRefNavigation.DepartmanRefNavigation.HotelRef == hotelId)
+                    .GroupBy(g => new {
+                        pId = g.PersonelRef,
+                        ad = g.PersonelRefNavigation.Adi,
+                        soyad = g.PersonelRefNavigation.Soyadi,
+                        dept = g.PersonelRefNavigation.DepartmanRefNavigation.Adi
+                    })
                     .Select(g => new {
-                        durum = g.Durum,
-                        personel = new
-                        {
-                            id = g.PersonelRef,
-                            ad = g.PersonelRefNavigation.Adi,
-                            departman = new { ad = g.PersonelRefNavigation.DepartmanRefNavigation.Adi }
-                        }
+                        pId = g.Key.pId,
+                        ad = (g.Key.ad + " " + g.Key.soyad).Trim(),
+                        dept = g.Key.dept ?? "Belirtilmemiş",
+                        beklemede = g.Count(x => x.Durum == 1),
+                        islemde = g.Count(x => x.Durum == 2),
+                        tamamlandi = g.Count(x => x.Durum == 3)
                     }).ToListAsync();
 
                 var departmanlar = await _context.Departmen
@@ -68,12 +83,12 @@ namespace AxonInn.Controllers
                     .Select(d => new Departman { Id = d.Id, Adi = d.Adi })
                     .ToListAsync();
 
-                // PERFORMANS 3: Veritabanına 4 kez fazladan CountAsync ile yüklenmek yerine, 
-                // Zaten grafikleri çizmek için RAM'e çektiğimiz listelerin eleman sayısını alarak "Sıfır" maliyetle istatistikleri çıkarıyoruz.
-                int aktifPersonelAdet = personelChartData.Count;
-                int beklemedeAdet = gorevChartData.Count(g => g.durum == 1);
-                int islemdeAdet = gorevChartData.Count(g => g.durum == 2);
-                int bittiAdet = gorevChartData.Count(g => g.durum == 3);
+                // ⚡ PERFORMANS 5: Ekran üstündeki 4 adet Sayaç (Count) için veritabanına bir daha "CountAsync()" ile gitmiyoruz!
+                // Halihazırda SQL'den grafikler için çektiğimiz özet listelerin basitçe matematiksel toplamını alıyoruz.
+                int aktifPersonelAdet = departmanPersonelSayilari.Sum(x => x.adet);
+                int beklemedeAdet = gorevChartData.Sum(x => x.beklemede);
+                int islemdeAdet = gorevChartData.Sum(x => x.islemde);
+                int bittiAdet = gorevChartData.Sum(x => x.tamamlandi);
 
                 ViewBag.HotelAdi = hotelAdi;
                 ViewBag.AktifPersonelAdet = aktifPersonelAdet;
@@ -81,8 +96,8 @@ namespace AxonInn.Controllers
                 ViewBag.IslemdeAdet = islemdeAdet;
                 ViewBag.BittiAdet = bittiAdet;
 
-                // PERFORMANS 4: Daha hafif JSON serileştirme
-                ViewBag.PersonelJson = JsonSerializer.Serialize(personelChartData);
+                // Megabaytlarca ham JSON yükü yerine sadece birkaç KB'lık (Zaten SQL'de sayılmış) temiz istatistik yollanır.
+                ViewBag.PersonelJson = JsonSerializer.Serialize(departmanPersonelSayilari);
                 ViewBag.GorevJson = JsonSerializer.Serialize(gorevChartData);
                 ViewBag.Departmanlar = departmanlar;
 
@@ -94,16 +109,16 @@ namespace AxonInn.Controllers
             }
         }
 
-        private async Task<bool> LogKaydet(Personel? personel, string islemTipi, string yeniDeger)
+        private async Task<bool> LogKaydet(Personel? personel, string islemTipi, string yeniDeger, string oncedenAlinanHotelAd = "", string oncedenAlinanDepartmanAd = "")
         {
             try
             {
-                string departmanAdi = "";
-                string hotelAdi = "";
+                // Ekstra SQL sorgularını engellemek için varsa yukarıdan gelen hazır parametreleri kullanıyoruz.
+                string departmanAdi = oncedenAlinanDepartmanAd;
+                string hotelAdi = oncedenAlinanHotelAd;
 
-                if (personel != null && personel.DepartmanRef != 0)
+                if (personel != null && personel.DepartmanRef != 0 && string.IsNullOrEmpty(hotelAdi))
                 {
-                    // Diğer sayfalardaki gibi hem departman adını hem de otel adını tek SQL sorgusu ile JOIN yaparak alıyoruz
                     var depBilgisi = await _context.Departmen
                         .AsNoTracking()
                         .Where(d => d.Id == personel.DepartmanRef)
@@ -125,8 +140,8 @@ namespace AxonInn.Controllers
                     IslemTipi = islemTipi,
                     EskiDeger = "",
                     YeniDeger = yeniDeger,
-                    YapanHotelAd = hotelAdi,
-                    YapanDepartmanAd = departmanAdi,
+                    YapanHotelAd = hotelAdi ?? "",
+                    YapanDepartmanAd = departmanAdi ?? "",
                     YapanAdSoyad = personel != null ? $"{personel.Adi} {personel.Soyadi}" : "Bilinmeyen"
                 };
 

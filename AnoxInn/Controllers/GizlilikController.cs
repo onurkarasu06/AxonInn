@@ -1,7 +1,7 @@
 ﻿using AxonInn.Models;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using Newtonsoft.Json;
+using System.Text.Json; // ⚡ Yüksek Hızlı Yeni Nesil JSON kütüphanesine geçildi
 
 namespace AxonInn.Controllers
 {
@@ -23,7 +23,11 @@ namespace AxonInn.Controllers
                 if (string.IsNullOrEmpty(personelJson))
                     return RedirectToAction("Login", "Login");
 
-                var loginOlanPersonel = JsonConvert.DeserializeObject<Personel>(personelJson);
+                // ⚡ RAM OPTİMİZASYONU: Newtonsoft yerine bellek dostu JsonSerializer kullanıldı
+                var loginOlanPersonel = JsonSerializer.Deserialize<Personel>(personelJson);
+
+                // ⚡ İŞLEMCİ (CPU) OPTİMİZASYONU: Layout vb. sayfalarda tekrar JSON çözümlenmemesi için nesne ViewData'ya aktarıldı
+                ViewData["GirisYapanPersonel"] = loginOlanPersonel;
 
                 await LogKaydet(loginOlanPersonel, "Gizlilik Sayfasına Giriş Yapıldı", "Gizlilik Görüntüleme");
 
@@ -41,16 +45,25 @@ namespace AxonInn.Controllers
         {
             try
             {
-                string departmanAdi = personel?.DepartmanRefNavigation?.Adi ?? "";
+                string departmanAdi = "";
                 string hotelAdi = "";
 
                 if (personel != null && personel.DepartmanRef != 0)
                 {
-                    // DEĞİŞİKLİK: 2 ayrı SQL sorgusu yerine Navigation Property ile tek sorguya (JOIN) düşürüldü.
-                    hotelAdi = await _context.Departmen
+                    // ⚡ DB OPTİMİZASYONU & HATA GİDERİMİ: 
+                    // Session içindeki JSON ilişkili nesneleri (Navigation Properties) taşımaz. 
+                    // Bu yüzden Departman adını da Otel adıyla birlikte TEK bir AsNoTracking sorgusu ile anında alıyoruz.
+                    var depBilgisi = await _context.Departmen
+                        .AsNoTracking()
                         .Where(d => d.Id == personel.DepartmanRef)
-                        .Select(d => d.HotelRefNavigation.Adi)
-                        .FirstOrDefaultAsync() ?? "";
+                        .Select(d => new { d.Adi, HotelAdi = d.HotelRefNavigation != null ? d.HotelRefNavigation.Adi : "" })
+                        .FirstOrDefaultAsync();
+
+                    if (depBilgisi != null)
+                    {
+                        departmanAdi = depBilgisi.Adi;
+                        hotelAdi = depBilgisi.HotelAdi;
+                    }
                 }
 
                 var log = new AuditLog

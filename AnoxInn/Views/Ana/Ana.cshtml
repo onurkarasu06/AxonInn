@@ -196,32 +196,27 @@
     <script>
         document.addEventListener("DOMContentLoaded", function () {
             
-            // 1. ADIM: Önce görsel iskeleti gizleyip ana içeriği gösteriyoruz (FCP Hızlandırma)
+            // FCP Hızlandırma: İskeleti gizleyip ana içeriği gösteriyoruz
             document.getElementById('skeletonLoader').classList.add('d-none');
             document.getElementById('mainContent').classList.remove('d-none');
             
-            // 2. ADIM: Ağır JSON okuma ve Chart çizdirme işlemlerini sayfa yüklendikten 150ms sonraya erteliyoruz
             setTimeout(() => {
-                const rawPersonel = @Html.Raw(ViewBag.PersonelJson ?? "[]");
-                const rawGorevler = @Html.Raw(ViewBag.GorevJson ?? "[]");
+                // SQL tarafından zaten gruplanmış, ufacık ve saf nesneleri alıyoruz.
+                const preGroupedPersonel = @Html.Raw(ViewBag.PersonelJson ?? "[]");
+                const preGroupedGorev = @Html.Raw(ViewBag.GorevJson ?? "[]");
 
                 const colors = ['#4e73df', '#1cc88a', '#36b9cc', '#f6c23e', '#e74a3b', '#858796'];
                 const deptCtx = document.getElementById('departmanChart');
                 let departmanChartInstance = null;
 
-                function ekranıGuncelle(personelVerisi) {
-                    if (!personelVerisi || personelVerisi.length === 0) return;
-                    const groupedData = personelVerisi.reduce((acc, p) => {
-                        const deptName = p.departman?.ad || "Belirtilmemiş";
-                        if (!acc[deptName]) acc[deptName] = [];
-                        acc[deptName].push(p);
-                        return acc;
-                    }, {});
+                function ekranıGuncelle() {
+                    if (!preGroupedPersonel || preGroupedPersonel.length === 0) return;
+                    
+                    // JS CPU OPTİMİZASYONU: Eski hantal array reduce döngüsü tamamen çöpe atıldı!
+                    const labels = preGroupedPersonel.map(p => p.departmanAd);
+                    const dataCounts = preGroupedPersonel.map(p => p.adet);
                     
                     if (deptCtx) {
-                        const labels = Object.keys(groupedData);
-                        const dataCounts = Object.values(groupedData).map(persons => persons.length);
-
                         if (departmanChartInstance) { departmanChartInstance.destroy(); }
 
                         departmanChartInstance = new Chart(deptCtx, {
@@ -246,43 +241,27 @@
                     }
                 }
 
-                ekranıGuncelle(rawPersonel);
+                ekranıGuncelle();
                 
                 const perCtx = document.getElementById('personelIsYukuChart');
                 let perChart;
 
-                // JS PERFORMANS OPTİMİZASYONU: Karmaşık Map-Filter O(N*M) döngüleri yerine, Tek Yönlü Map O(N) algoritması kullanılarak tarayıcı kilitlenmesi engellendi!
+                // JS CPU OPTİMİZASYONU: Karmaşık İç içe Map-Filter O(N*M) döngüleri yerine, SQL'den hazır gelmiş diziyi basitçe dağıtıyoruz.
                 function getFilteredData(deptName) {
-                    const personelPerformans = {};
-                    
-                    // Görevleri tek bir döngüyle tarayıp Hash Map'e yerleştiriyoruz (Çok Yüksek Hız)
-                    rawGorevler.forEach(g => {
-                        if (deptName !== 'all' && g.personel?.departman?.ad !== deptName) return;
-                        
-                        const pId = g.personel?.id;
-                        if (!pId) return;
-
-                        if (!personelPerformans[pId]) {
-                            personelPerformans[pId] = { ad: g.personel.ad, durum1: 0, durum2: 0, durum3: 0 };
-                        }
-
-                        if (g.durum === 1) personelPerformans[pId].durum1++;
-                        if (g.durum === 2) personelPerformans[pId].durum2++;
-                        if (g.durum === 3) personelPerformans[pId].durum3++;
-                    });
-
                     const labels = [];
                     const beklemedeData = [];
                     const islemdeData = [];
                     const tamamlandiData = [];
 
-                    // Elde edilen Hash Map verisini Chart.js'ye uygun Array formatına çeviriyoruz
-                    for (const key in personelPerformans) {
-                        labels.push(personelPerformans[key].ad);
-                        beklemedeData.push(personelPerformans[key].durum1);
-                        islemdeData.push(personelPerformans[key].durum2);
-                        tamamlandiData.push(personelPerformans[key].durum3);
-                    }
+                    preGroupedGorev.forEach(p => {
+                        // Seçili filtreye uymuyorsa atla
+                        if (deptName !== 'all' && p.dept !== deptName) return;
+                        
+                        labels.push(p.ad);
+                        beklemedeData.push(p.beklemede);
+                        islemdeData.push(p.islemde);
+                        tamamlandiData.push(p.tamamlandi);
+                    });
 
                     return {
                         labels: labels,
@@ -294,7 +273,7 @@
                     };
                 }
 
-                if (perCtx && rawGorevler.length > 0) {
+                if (perCtx && preGroupedGorev.length > 0) {
                     perChart = new Chart(perCtx, {
                         type: 'bar',
                         data: getFilteredData('all'),

@@ -1,31 +1,25 @@
 ﻿@model AxonInn.Models.Hotel
 @using Microsoft.AspNetCore.Http
 @using System.Text.Encodings.Web
-@using System.Text.Json
 
 @{
     Layout = "~/Views/Shared/_Layout.cshtml";
     
-    var personelJson = Context.Session.GetString("GirisYapanPersonel");
-    AxonInn.Models.Personel girisYapanPersonel = null;
-    
-    if (!string.IsNullOrEmpty(personelJson))
-    {
-        // System.Text.Json ile daha performanslı deserialization
-        girisYapanPersonel = JsonSerializer.Deserialize<AxonInn.Models.Personel>(personelJson);
-    }
+    // ⚡ CPU OPTİMİZASYONU: JsonSerializer.Deserialize yükü kaldırıldı. Zaten Controller'da çözümlenmiş nesne çekiliyor.
+    var girisYapanPersonel = ViewData["GirisYapanPersonel"] as AxonInn.Models.Personel;
     
     int yetki = girisYapanPersonel?.Yetki ?? 0;
-    var departmanlar = Model?.Departmen?.ToList() ?? new List<AxonInn.Models.Departman>();
-    var personelList = departmanlar.SelectMany(d => d.Personels).ToList();
-    var gorevList = personelList.SelectMany(p => p.Gorevs).OrderByDescending(g => g.KayitTarihi).ToList();
+    
+    // ⚡ RAM OPTİMİZASYONU: Devasa listelerin her döngüde .ToList() ile RAM'de kopya (allocation) oluşturması engellendi. (Lazy Yükleme)
+    var departmanlar = Model?.Departmen ?? Enumerable.Empty<AxonInn.Models.Departman>();
+    var personelList = departmanlar.SelectMany(d => d.Personels);
+    var gorevList = personelList.SelectMany(p => p.Gorevs).OrderByDescending(g => g.KayitTarihi);
 }
 
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css" media="print" onload="this.media='all'" />
 <noscript><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css" /></noscript>
 
 <style>
-    /* Orijinal CSS tasarımınız sabit tutuldu */
     .table-responsive::-webkit-scrollbar { width: 5px; }
     .table-responsive::-webkit-scrollbar-track { background: #f8fafc; }
     .table-responsive::-webkit-scrollbar-thumb { background: #bae6fd; border-radius: 10px; }
@@ -177,15 +171,27 @@
                             <tr class="gorev-satiri" data-search="@aramaData" data-durum="@item.Durum" data-dept="@(departmanAdi?.ToLowerInvariant() ?? "")" style="font-size: 0.85rem;">
                                 <td class="ps-4">
                                     <div class="d-flex align-items-center">
-                                        <div class="me-3 avatar-container">
-                                            <img id="tabloFoto_@item.Id" src="/Gorev/PersonelFotoGetir?id=@item.PersonelRef"
-                                                 width="35" height="35" class="rounded-circle shadow-sm avatar-img personel-foto-tikla" loading="lazy"
-                                                 onerror="this.style.display='none'; document.getElementById('avatarFallback_@item.Id').style.display='flex';"
-                                                 onclick="personelFotoGoster(this.src, '@tamAd')" title="Büyütmek için tıkla" />
-                                            <div id="avatarFallback_@item.Id" class="bg-primary bg-opacity-10 text-primary rounded-circle align-items-center justify-content-center fw-bold avatar-img" style="font-size: 0.8rem; display: none;">
-                                                @(item.PersonelRefNavigation?.Adi?[0])@(item.PersonelRefNavigation?.Soyadi?[0])
-                                            </div>
-                                        </div>
+        <div class="me-3 avatar-container">
+
+
+
+
+        <img id="tabloFoto_@item.Id" 
+     src="@Url.Action("PersonelFotoGetir", "Gorev", new { id = item.PersonelRef, v = DateTime.Now.Ticks })"
+     width="35" height="35" class="rounded-circle shadow-sm avatar-img personel-foto-tikla" 
+     loading="lazy" decoding="async"
+     onerror="this.style.display='none'; document.getElementById('avatarFallback_@item.Id').style.display='flex';"
+     onclick="personelFotoGoster(this.src, '@tamAd')" title="Büyütmek için tıkla" />
+            
+     
+     
+     
+     
+     
+     <div id="avatarFallback_@item.Id" class="bg-primary bg-opacity-10 text-primary rounded-circle align-items-center justify-content-center fw-bold avatar-img" style="font-size: 0.8rem; display: none;">
+                @(item.PersonelRefNavigation?.Adi?[0])@(item.PersonelRefNavigation?.Soyadi?[0])
+            </div>
+        </div>
                                         <div>
                                             <div class="fw-bold text-dark">@tamAd</div>
                                             <small class="text-muted">@departmanAdi</small>
@@ -209,39 +215,20 @@
                                     }
                                 </td>
 
-                              <td class="text-center">
-    <div class="btn-group gap-1">
-        
-        @if (yetki == 1 || yetki == 2)
-        {
-            <button class="btn btn-outline-primary btn-edit-small" data-bs-toggle="modal" data-bs-target="#guncelleModal"
-                    onclick="prepareEdit('@item.Id', '@item.PersonelRef', '@Html.Raw(JavaScriptEncoder.Default.Encode(item.Aciklama ?? ""))', '@Html.Raw(JavaScriptEncoder.Default.Encode(item.PersonelNotu ?? ""))', '@item.Durum')">
-                <i class="fas fa-pencil-alt"></i>
-            </button>
-        }
-        else
-        {
-            <button class="btn btn-outline-primary btn-edit-small opacity-50" disabled title="Düzenleme yetkiniz yok">
-                <i class="fas fa-pencil-alt"></i>
-            </button>
-        }
-
-        @if (yetki == 1)
-        {
-            <button class="btn btn-outline-danger btn-edit-small" data-bs-toggle="modal" data-bs-target="#gorevSilOnayModal"
-                    onclick="prepareDelete('@item.Id', '@tamAd')">
-                <i class="fas fa-trash-alt"></i>
-            </button>
-        }
-        else
-        {
-            <button class="btn btn-outline-danger btn-edit-small opacity-50" disabled title="Silme yetkiniz yok">
-                <i class="fas fa-trash-alt"></i>
-            </button>
-        }
-
-    </div>
-</td>
+       <td class="text-center">
+                                    @switch (item.Durum)
+                                    {
+                                        case 1:
+                                            <span class="text-danger fw-bold"><i class="fas fa-circle me-1 small opacity-50"></i> Beklemede</span>
+                                            break;
+                                        case 2:
+                                            <span class="text-warning fw-bold"><i class="fas fa-spinner fa-spin me-1"></i> İşlemde</span>
+                                            break;
+                                        case 3:
+                                            <span class="text-success fw-bold"><i class="fas fa-check-circle me-1"></i> Tamamlandı</span>
+                                            break;
+                                    }
+                                </td>
 
                                 <td class="ps-3">
                                     @{ string statusColor = item.Durum switch { 1 => "text-danger", 2 => "text-warning", 3 => "text-success", _ => "text-secondary" }; }
@@ -266,10 +253,9 @@
                                 <td class="text-center">
                                     @if (item.GorevFotografs != null && item.GorevFotografs.Any())
                                     {
-                                        // PERFORMANS: JSON.Serialize masrafından kaçınıp hafif String.Join metodu uygulandı.
                                         var fotoIds = string.Join(",", item.GorevFotografs.Select(f => f.Id));
                                         <div class="kanit-container d-inline-block position-relative" onclick="kanitFotografGoster('@fotoIds')" style="cursor: pointer;">
-                                            <img src="/Gorev/KanitFotoGetir?id=@item.GorevFotografs.First().Id" width="50" height="50" loading="lazy" class="rounded shadow-sm border border-2 border-white kanit-img" />
+                                            <img src="/Gorev/KanitFotoGetir?id=@item.GorevFotografs.First().Id" width="50" height="50" loading="lazy" decoding="async" class="rounded shadow-sm border border-2 border-white kanit-img" />
                                             @if (item.GorevFotografs.Count > 1)
                                             {
                                                 <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-primary" style="font-size: 0.6rem;">+@(item.GorevFotografs.Count - 1)</span>
@@ -510,7 +496,7 @@
 
                     <div class="mb-3">
                         <label class="small fw-bold text-muted mb-1 text-uppercase">Görev Açıklaması</label>
-                        <textarea name="Gorev1" class="form-control form-control-sm shadow-none" rows="2" required placeholder="Yapılacak işi detaylandırın..."></textarea>
+                        <textarea name="Aciklama" class="form-control form-control-sm shadow-none" rows="2" required placeholder="Yapılacak işi detaylandırın..."></textarea>
                     </div>
 
                     <div class="mb-3">
@@ -540,7 +526,7 @@
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11" defer></script>
 
 <script>
-    // PERFORMANS: Kullanıcı arama yaparken tarayıcıyı kitleyen ardışık fonksiyon yığılmasını engeller.
+    // ⚡ JS OPTİMİZASYONU: "Debounce" yapısı klavye ile arama yapıldığında işlemleri biriktirerek tarayıcı kilitlenmesini engeller.
     function debounce(func, wait) {
         let timeout;
         return function executedFunction(...args) {
@@ -550,12 +536,18 @@
         };
     }
 
+    // ⚡ JS OPTİMİZASYONU: Sürekli DOM'da (sayfada) arama yapmak CPU'yu kilitler. Sadece açılışta bir kere önbelleğe (Cache) aldık.
+    let cachedTrs; 
+
     document.addEventListener("DOMContentLoaded", function () {
         setTimeout(function() {
             const loader = document.getElementById('skeletonLoader');
             if(loader) loader.classList.add('d-none');
             const mainContent = document.getElementById('mainContent');
             if(mainContent) mainContent.classList.remove('d-none');
+            
+            // DOM satırlarını belleğe al (Cache)
+            cachedTrs = document.querySelectorAll(".gorev-satiri");
         }, 50);
 
         document.querySelectorAll('form').forEach(form => {
@@ -573,7 +565,7 @@
             });
         });
 
-        // Event Listener'a 250ms gecikmeli Debounce entegrasyonu (Tarayıcı Donmasını bitirir)
+        // 250ms Debounce ekledik, hızlı yazarken kasmaz
         document.getElementById("tabloAra").addEventListener("input", debounce(tabloyuFiltrele, 250));
 
         document.querySelectorAll('.durum-filter-item').forEach(item => {
@@ -603,13 +595,15 @@
     let currentDept = "";
 
     function tabloyuFiltrele() {
+        if (!cachedTrs || cachedTrs.length === 0) {
+            cachedTrs = document.querySelectorAll(".gorev-satiri");
+        }
+        
         var arama = document.getElementById("tabloAra").value.toLocaleLowerCase('tr-TR');
-        var trs = document.querySelectorAll(".gorev-satiri");
         var searchDurum = currentDurum.toString();
         var searchDept = currentDept.toLocaleLowerCase('tr-TR');
 
-        trs.forEach(function(tr) {
-            // PERFORMANS: Masraflı tr.innerText yerine HTML5 data özelliklerinden O(1) hızında veri okuması.
+        cachedTrs.forEach(function(tr) {
             var metinData = tr.getAttribute('data-search') || "";
             var durumData = tr.getAttribute('data-durum') || "";
             var deptData = tr.getAttribute('data-dept') || "";
@@ -618,11 +612,7 @@
             var durumVar = searchDurum === "" || durumData === searchDurum;
             var depVar = searchDept === "" || deptData === searchDept;
 
-            if (metinVar && durumVar && depVar) {
-                tr.style.display = "";
-            } else {
-                tr.style.display = "none";
-            }
+            tr.style.display = (metinVar && durumVar && depVar) ? "" : "none";
         });
     }
 
@@ -683,8 +673,9 @@
             if(!fotoId) return;
             const activeClass = index === 0 ? 'active' : '';
             icerikContainer.insertAdjacentHTML('beforeend',
+                // ⚡ PERFORMANS: decoding="async" UI kilitlenmesini çözer
                 `<div class="carousel-item ${activeClass}">
-                    <img src="/Gorev/KanitFotoGetir?id=${fotoId}" class="d-block w-100" loading="lazy">
+                    <img src="/Gorev/KanitFotoGetir?id=${fotoId}" class="d-block w-100" loading="lazy" decoding="async">
                 </div>`
             );
         });

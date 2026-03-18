@@ -1,9 +1,9 @@
 ﻿using AxonInn.Models;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using Newtonsoft.Json;
 using System.Net.Mail;
-using System.Text.Json.Serialization;
+using System.Net;
+using System.Text.Json; // ⚡ Yüksek Hızlı Yeni Nesil JSON
 
 namespace AxonInn.Controllers
 {
@@ -25,7 +25,8 @@ namespace AxonInn.Controllers
                 if (string.IsNullOrEmpty(personelJson))
                     return RedirectToAction("Login", "Login");
 
-                var loginOlanPersonel = JsonConvert.DeserializeObject<Personel>(personelJson);
+                // ⚡ RAM OPTİMİZASYONU: Newtonsoft yerine System.Text.Json kullanıldı
+                var loginOlanPersonel = JsonSerializer.Deserialize<Personel>(personelJson);
 
                 // Sayfaya giriş logu
                 await LogKaydet(loginOlanPersonel, "İletişim Sayfasına Giriş Yapıldı", "Sayfa Görüntüleme");
@@ -39,7 +40,8 @@ namespace AxonInn.Controllers
         }
 
         [HttpPost]
-        public async Task<IActionResult> MailGonder(Iletisim model) // Iletisim class'ının Models klasöründe olduğunu varsayıyoruz
+        [ValidateAntiForgeryToken] // ⚡ GÜVENLİK: Kötü niyetli dış bot form gönderimlerini (CSRF) engeller
+        public async Task<IActionResult> MailGonder(Iletisim model)
         {
             try
             {
@@ -47,9 +49,10 @@ namespace AxonInn.Controllers
                 if (string.IsNullOrEmpty(personelJson))
                     return RedirectToAction("Login", "Login");
 
-                var loginOlanPersonel = JsonConvert.DeserializeObject<Personel>(personelJson);
+                var loginOlanPersonel = JsonSerializer.Deserialize<Personel>(personelJson);
 
-                MailMessage mail = new MailMessage();
+                // ⚡ RAM OPTİMİZASYONU (Memory Leak Önlemi): IDisposable nesneler "using var" ile anında bellekten temizlenir.
+                using var mail = new MailMessage();
                 mail.From = new MailAddress("no-reply@axoninn.com.tr", "AxonInn Web Form");
                 mail.To.Add("info@axoninn.com.tr");
                 mail.Subject = $"Yeni Mesaj: {model.Konu}";
@@ -65,12 +68,14 @@ namespace AxonInn.Controllers
                     </div>
                 ";
 
-                SmtpClient smtp = new SmtpClient("104.247.162.18", 587);
+                using var smtp = new SmtpClient("104.247.162.18", 587);
                 smtp.UseDefaultCredentials = false;
-                smtp.Credentials = new System.Net.NetworkCredential("info@axoninn.com.tr", "12345+pl");
-                System.Net.ServicePointManager.ServerCertificateValidationCallback = (sender, certificate, chain, sslPolicyErrors) => true;
+                smtp.Credentials = new NetworkCredential("info@axoninn.com.tr", "12345+pl");
+                ServicePointManager.ServerCertificateValidationCallback = (sender, certificate, chain, sslPolicyErrors) => true;
                 smtp.EnableSsl = true;
-                smtp.Send(mail);
+
+                // ⚡ THREAD (İŞLEMCİ) OPTİMİZASYONU: Asenkron SendMailAsync ile sunucunun kilitlenmesi önlendi.
+                await smtp.SendMailAsync(mail);
 
                 TempData["BasariMesaji"] = "Mesajınız başarıyla iletildi. En kısa sürede dönüş yapacağız.";
 
@@ -83,11 +88,9 @@ namespace AxonInn.Controllers
                 return View("~/Views/Error/Error.cshtml", new ErrorViewModel { RequestId = ex.Message });
             }
 
-            return RedirectToAction("Index");
+            return RedirectToAction("Iletisim"); // ⚡ HATA GİDERİLDİ: Doğru sayfaya yönlendirme düzeltildi (Index yerine Iletisim)
         }
 
-
-        // Local Loglama Metodu
         private async Task<bool> LogKaydet(Personel? personel, string islemTipi, string yeniDeger)
         {
             try
@@ -97,8 +100,9 @@ namespace AxonInn.Controllers
 
                 if (personel != null && personel.DepartmanRef != 0)
                 {
-                    // DEĞİŞİKLİK: 2 ayrı veritabanı turu yerine Navigation Property ile tek sorguya (JOIN) düşürüldü.
+                    // ⚡ DB OPTİMİZASYONU: Sadece okuma yapıldığı için AsNoTracking eklendi, RAM tasarrufu sağlandı.
                     hotelAdi = await _context.Departmen
+                        .AsNoTracking()
                         .Where(d => d.Id == personel.DepartmanRef)
                         .Select(d => d.HotelRefNavigation.Adi)
                         .FirstOrDefaultAsync() ?? "";

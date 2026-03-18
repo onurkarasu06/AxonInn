@@ -30,12 +30,30 @@ public partial class AxonInnContext : DbContext
 
     public virtual DbSet<PersonelFotograf> PersonelFotografs { get; set; }
 
-//    protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
-//#warning To protect potentially sensitive information in your connection string, you should move it out of source code. You can avoid scaffolding the connection string by using the Name= syntax to read it from configuration - see https://go.microsoft.com/fwlink/?linkid=2131148. For more guidance on storing connection strings, see https://go.microsoft.com/fwlink/?LinkId=723263.
-//        => optionsBuilder.UseSqlServer("Server=OnurLaptop;Database=axoninnc_db;User Id=sa;Password=12345+pl;TrustServerCertificate=True;");
-
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
+        // ⚡ KRİTİK HATA (NVARCHAR(MAX)) ÖNLEMİ: AuditLog tablosu kısıtlamaları eklendi
+        modelBuilder.Entity<AuditLog>(entity =>
+        {
+            entity.ToTable("AuditLog");
+            entity.HasKey(e => e.Id);
+
+            // Loglar sürekli tarihe göre sorgulanır, Table Scan'i (Tüm Tablo Tarama) önlemek için İndeks şarttır.
+            entity.HasIndex(e => e.IslemTarihi, "IX_AuditLog_IslemTarihi");
+            entity.HasIndex(e => e.KayitRefId, "IX_AuditLog_KayitRefId");
+            entity.HasIndex(e => e.IlgiliTablo, "IX_AuditLog_IlgiliTablo");
+
+            entity.Property(e => e.IslemTarihi).HasColumnType("datetime");
+
+            // Uzunluk (MaxLength) sınırları getirilerek EF Core'un bu alanları "nvarchar(max)" olarak açması ve RAM'i felç etmesi engellendi.
+            // İngilizce veya sayısal ifadeler içeren IlgiliTablo kolonuna IsUnicode(false) uygulandı.
+            entity.Property(e => e.IlgiliTablo).HasMaxLength(50).IsUnicode(false);
+            entity.Property(e => e.IslemTipi).HasMaxLength(150);
+            entity.Property(e => e.YapanAdSoyad).HasMaxLength(150);
+            entity.Property(e => e.YapanDepartmanAd).HasMaxLength(150);
+            entity.Property(e => e.YapanHotelAd).HasMaxLength(150);
+        });
+
         modelBuilder.Entity<Departman>(entity =>
         {
             entity.ToTable("Departman");
@@ -46,10 +64,10 @@ public partial class AxonInnContext : DbContext
             entity.Property(e => e.Adi).HasMaxLength(50);
 
             entity.HasOne(d => d.HotelRefNavigation)
-            .WithMany(p => p.Departmen)
-            .HasForeignKey(d => d.HotelRef)
-            .OnDelete(DeleteBehavior.ClientSetNull)
-            .HasConstraintName("FK_Departman_Hotel");
+                .WithMany(p => p.Departmen)
+                .HasForeignKey(d => d.HotelRef)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_Departman_Hotel");
         });
 
         modelBuilder.Entity<Gorev>(entity =>
@@ -58,13 +76,22 @@ public partial class AxonInnContext : DbContext
 
             entity.HasIndex(e => e.PersonelRef, "IX_Gorev_PersonelRef");
             entity.HasIndex(e => e.Durum, "IX_Gorev_Durum");
+
+            // ⚡ FULL TABLE SCAN KORUMASI: Görev listesinde tarihe göre "OrderByDescending" yapıldığından bu indeks eklendi.
+            entity.HasIndex(e => e.KayitTarihi, "IX_Gorev_KayitTarihi");
+
             entity.Property(e => e.Id).HasColumnName("ID");
             entity.Property(e => e.CozumBaslamaTarihi).HasColumnType("datetime");
             entity.Property(e => e.CozumBitisTarihi).HasColumnType("datetime");
-            entity.Property(e => e.Aciklama).HasColumnName("Aciklama");
+
+            // Açıklama ve Not alanlarının SQL'de NVarChar(Max) olup veritabanını şişirmemesi için kısıtlandı.
+            entity.Property(e => e.Aciklama).HasColumnName("Aciklama").HasMaxLength(2000);
+            entity.Property(e => e.PersonelNotu).HasMaxLength(2000);
+
             entity.Property(e => e.KayitTarihi).HasColumnType("datetime");
 
-            entity.HasOne(d => d.PersonelRefNavigation).WithMany(p => p.Gorevs)
+            entity.HasOne(d => d.PersonelRefNavigation)
+                .WithMany(p => p.Gorevs)
                 .HasForeignKey(d => d.PersonelRef)
                 .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("FK_Gorev_Personel");
@@ -76,7 +103,8 @@ public partial class AxonInnContext : DbContext
 
             entity.Property(e => e.Id).HasColumnName("ID");
 
-            entity.HasOne(d => d.GorevRefNavigation).WithMany(p => p.GorevFotografs)
+            entity.HasOne(d => d.GorevRefNavigation)
+                .WithMany(p => p.GorevFotografs)
                 .HasForeignKey(d => d.GorevRef)
                 .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("FK_GorevFotograf_Gorev");
@@ -95,19 +123,32 @@ public partial class AxonInnContext : DbContext
             entity.ToTable("Personel");
 
             entity.HasIndex(e => e.DepartmanRef, "IX_Personel_DepartmanRef");
-
             entity.HasIndex(e => e.MailAdresi, "IX_Personel_MailAdresi");
-
             entity.HasIndex(e => e.TelefonNumarasi, "IX_Personel_TelefonNumarasi");
+
+            // ⚡ VERİTABANI CPU OPTİMİZASYONU: "Login" sorgusunun maliyetini sıfıra indiren Bileşik İndeks (Composite Index)
+            entity.HasIndex(e => new { e.MailAdresi, e.Sifre, e.AktifMi }, "IX_Personel_Login");
+
+            // ⚡ GİZLİ SORGULARI HIZLANDIRMA: E-Posta Onay Linkini (VerificationToken) ve Aktif Personelleri ararken sistemi yormaması için İndeks
+            entity.HasIndex(e => e.VerificationToken, "IX_Personel_VerificationToken");
+            entity.HasIndex(e => e.AktifMi, "IX_Personel_AktifMi");
 
             entity.Property(e => e.Id).HasColumnName("ID");
             entity.Property(e => e.Adi).HasMaxLength(50);
-            entity.Property(e => e.DogumTarihi).HasColumnType("datetime");
-            entity.Property(e => e.MailAdresi).HasMaxLength(256);
             entity.Property(e => e.Soyadi).HasMaxLength(50);
-            entity.Property(e => e.TelefonNumarasi).HasMaxLength(20);
+            entity.Property(e => e.DogumTarihi).HasColumnType("datetime");
 
-            entity.HasOne(d => d.DepartmanRefNavigation).WithMany(p => p.Personels)
+            // ⚡ VERİ TABANI ALAN TASARRUFU: Bu kolonlar özel Unicode karakter barındırmaz. 
+            // IsUnicode(false) ile "VARCHAR" yapılarak Disk ve Bellek (RAM) boyutu yarı yarıya düşürüldü.
+            entity.Property(e => e.MailAdresi).HasMaxLength(256).IsUnicode(false);
+            entity.Property(e => e.TelefonNumarasi).HasMaxLength(20).IsUnicode(false);
+            entity.Property(e => e.Sifre).HasMaxLength(256).IsUnicode(false);
+
+            // GUID token formatı 36 karakterdir, 50 ile güvenli şekilde sınırlandırıldı.
+            entity.Property(e => e.VerificationToken).HasMaxLength(50).IsUnicode(false);
+
+            entity.HasOne(d => d.DepartmanRefNavigation)
+                .WithMany(p => p.Personels)
                 .HasForeignKey(d => d.DepartmanRef)
                 .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("FK_Personel_Departman");
@@ -119,7 +160,8 @@ public partial class AxonInnContext : DbContext
 
             entity.Property(e => e.Id).HasColumnName("ID");
 
-            entity.HasOne(d => d.PersonelRefNavigation).WithMany(p => p.PersonelFotografs)
+            entity.HasOne(d => d.PersonelRefNavigation)
+                .WithMany(p => p.PersonelFotografs)
                 .HasForeignKey(d => d.PersonelRef)
                 .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("FK_PersonelFotograf_Personel");

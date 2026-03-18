@@ -3,7 +3,8 @@
     Layout = "~/Views/Shared/_Layout.cshtml";
 }
 
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css" />
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css" media="print" onload="this.media='all'" />
+<noscript><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css" /></noscript>
 
 <style>
     /* --- 1. SKELETON LOADER ANİMASYONU --- */
@@ -42,7 +43,8 @@
     }
 
     .transition-hover {
-        transition: all 0.3s ease;
+        /* ⚡ GPU OPTİMİZASYONU: "all" yerine sadece değişen özellikleri izleyerek grafik işlemciyi rahatlatıyoruz */
+        transition: transform 0.3s ease, box-shadow 0.3s ease;
     }
 
         .transition-hover:hover {
@@ -137,7 +139,7 @@
 @section Scripts {
     <script>
         document.addEventListener("DOMContentLoaded", function () {
-            // 400 milisaniye iskelet görünümü (sayfalar arası akıcı geçiş hissi için)
+            // 150 milisaniye iskelet görünümü (sayfalar arası akıcı geçiş hissi için)
             setTimeout(function() {
                 const loader = document.getElementById('skeletonLoader');
                 if(loader) loader.classList.add('d-none');

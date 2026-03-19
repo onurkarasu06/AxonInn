@@ -5,11 +5,9 @@
 @{
     Layout = "~/Views/Shared/_Layout.cshtml";
     
-    // ⚡ CPU OPTİMİZASYONU: JsonSerializer.Deserialize yükü kaldırıldı. Zaten Controller'da çözümlenmiş nesne çekiliyor.
     var girisYapanPersonel = ViewData["GirisYapanPersonel"] as AxonInn.Models.Personel;
     int yetki = girisYapanPersonel?.Yetki ?? 0;
     
-    // ⚡ RAM OPTİMİZASYONU: Devasa listelerin her döngüde .ToList() ile RAM'de kopya (allocation) oluşturması engellendi. (Lazy Yükleme)
     var departmanlar = Model?.Departmen ?? Enumerable.Empty<AxonInn.Models.Departman>();
     var personelList = departmanlar.SelectMany(d => d.Personels);
     var gorevList = personelList.SelectMany(p => p.Gorevs).OrderByDescending(g => g.KayitTarihi);
@@ -23,30 +21,40 @@
     .table-responsive::-webkit-scrollbar-track { background: #f8fafc; }
     .table-responsive::-webkit-scrollbar-thumb { background: #bae6fd; border-radius: 10px; }
     .table-responsive { border-radius: 12px; -webkit-overflow-scrolling: touch; }
+    
     .avatar-container { position: relative; width: 35px; height: 35px; display: inline-block; }
     .avatar-img { width: 35px; height: 35px; object-fit: cover; object-position: top; transition: all 0.3s ease; background-color: #f8f9fa; }
     .avatar-container:hover .avatar-img { transform: scale(2.5); z-index: 100; position: relative; box-shadow: 0 10px 20px rgba(0,0,0,0.2) !important; }
+    
     .kanit-img { width: 50px; height: 50px; object-fit: cover; border-radius: 8px; transition: all 0.3s ease; cursor: zoom-in; }
     .kanit-container { transition: transform 0.3s ease; z-index: 1; }
     .kanit-container:hover { transform: scale(2.2); z-index: 999; position: relative; }
+    
     .personel-foto-tikla { cursor: pointer; transition: all 0.3s ease; }
     .personel-foto-tikla:hover { filter: brightness(0.8); }
+    
     .btn-edit-small { width: 32px; height: 32px; padding: 0; display: inline-flex; align-items: center; justify-content: center; border-radius: 50%; border: 1px solid; }
     .gorev-link { font-family: 'Inter', sans-serif; font-size: 0.8rem; cursor: pointer; color: #2c3e50; font-weight: 600; text-decoration: none; }
     .gorev-link:hover { color: #5c7cfa !important; }
+    
     button:disabled { cursor: not-allowed !important; opacity: 0.5; }
     .btn-loading { opacity: 0.8 !important; pointer-events: none !important; cursor: not-allowed !important; }
+    
     #merkeziPersonelFotoModal .modal-content { background: transparent; border: none; }
     .personel-modal-wrapper { position: relative; display: inline-flex; flex-direction: column; align-items: center; margin: auto; width: 280px; }
     .personel-büyük-foto { width: 280px; height: 280px; border: 8px solid white; border-radius: 30px; box-shadow: 0 20px 40px rgba(0,0,0,0.3); object-fit: cover; object-position: top; background-color: #f8f9fa; display: block; }
     .modal-isim-etiket { margin-top: -20px; z-index: 5; background: linear-gradient(135deg, #5c7cfa 0%, #3b5bdb 100%); color: white; padding: 8px 25px; border-radius: 15px; font-weight: 700; font-size: 0.85rem; border: 2px solid white; box-shadow: 0 8px 15px rgba(92, 124, 250, 0.4); text-transform: uppercase; }
     .delete-modal-avatar { width: 100% !important; height: 100% !important; border-radius: 50%; object-fit: cover !important; object-position: top !important; background-color: #f8f9fa; }
+    
     .kanit-modal-cerceve { border: 6px solid #ffffff; border-radius: 20px; background-color: #ffffff; position: relative; display: inline-block; max-width: 95vw; }
     .modal-kapat-cerceve-kanit, .modal-kapat-cerceve-yeni { position: absolute; top: -12px; right: -12px; z-index: 1100; background-color: #ef4444; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; border-radius: 50%; border: 3px solid #ffffff; box-shadow: 0 4px 12px rgba(0,0,0,0.3); cursor: pointer; transition: all 0.2s ease; }
     .modal-kapat-cerceve-kanit:hover, .modal-kapat-cerceve-yeni:hover { transform: scale(1.1); background-color: #dc2626; }
+    
     #carouselIcerik img { max-height: 75vh; max-width: 100%; border-radius: 12px; object-fit: contain; }
+    
     .skeleton-box { display: inline-block; height: 1em; position: relative; overflow: hidden; background-color: #e2e5ec; border-radius: 8px; }
     .skeleton-box::after { position: absolute; top: 0; right: 0; bottom: 0; left: 0; transform: translateX(-100%); background-image: linear-gradient(90deg, rgba(255, 255, 255, 0) 0, rgba(255, 255, 255, 0.4) 20%, rgba(255, 255, 255, 0.6) 60%, rgba(255, 255, 255, 0)); animation: shimmer 1.5s infinite; content: ''; }
+    
     @@keyframes shimmer { 100% { transform: translateX(100%); } }
     
     @@media (max-width: 768px) { 
@@ -70,13 +78,23 @@
 <div id="skeletonLoader" class="container-fluid mt-3">
     <div class="skeleton-box w-100 mb-4" style="height: 40px; border-radius: 12px;"></div>
     <div class="row mb-3 align-items-center">
-        <div class="col-6"><div class="skeleton-box w-50" style="height: 30px;"></div></div>
-        <div class="col-6 text-end"><div class="skeleton-box w-25 rounded-pill" style="height: 35px;"></div></div>
+        <div class="col-6">
+            <div class="skeleton-box w-50" style="height: 30px;"></div>
+        </div>
+        <div class="col-6 text-end">
+            <div class="skeleton-box w-25 rounded-pill" style="height: 35px;"></div>
+        </div>
     </div>
     <div class="row mb-4 g-3">
-        <div class="col-md-4"><div class="skeleton-box w-100" style="height: 42px; border-radius: 8px;"></div></div>
-        <div class="col-md-4"><div class="skeleton-box w-100" style="height: 42px; border-radius: 8px;"></div></div>
-        <div class="col-md-4"><div class="skeleton-box w-100" style="height: 42px; border-radius: 8px;"></div></div>
+        <div class="col-md-4">
+            <div class="skeleton-box w-100" style="height: 42px; border-radius: 8px;"></div>
+        </div>
+        <div class="col-md-4">
+            <div class="skeleton-box w-100" style="height: 42px; border-radius: 8px;"></div>
+        </div>
+        <div class="col-md-4">
+            <div class="skeleton-box w-100" style="height: 42px; border-radius: 8px;"></div>
+        </div>
     </div>
     <div class="card border-0 shadow-lg rounded-4 overflow-hidden">
         <div class="card-body p-0">
@@ -139,15 +157,20 @@
     <div class="row mb-4 g-3">
         <div class="col-md-4">
             <div class="input-group shadow-sm rounded-3 overflow-hidden border bg-white">
-                <span class="input-group-text bg-transparent border-0 ps-3"><i class="fas fa-search text-primary opacity-50"></i></span>
-                <input type="text" id="tabloAra" class="form-control border-0 shadow-none py-2" placeholder="Personel veya görev ara...">
+                <span class="input-group-text bg-transparent border-0 ps-3">
+                    <i class="fas fa-search text-primary opacity-50"></i>
+                </span>
+                <input type="text" id="tabloAra" class="form-control border-0 shadow-none py-2" placeholder="Personel veya görev ara..." />
             </div>
         </div>
 
         <div class="col-md-4">
             <div class="dropdown custom-filter-dropdown w-100">
                 <button class="btn custom-filter-btn shadow-sm rounded-3 w-100 py-2 px-3 d-flex align-items-center justify-content-between" type="button" id="durumFilterBtn" data-bs-toggle="dropdown" aria-expanded="false">
-                    <span><i class="fas fa-filter text-primary me-2 opacity-75"></i><span id="selectedDurumText">Tüm Durumlar</span></span>
+                    <span>
+                        <i class="fas fa-filter text-primary me-2 opacity-75"></i>
+                        <span id="selectedDurumText">Tüm Durumlar</span>
+                    </span>
                     <i class="fas fa-chevron-down small text-muted"></i>
                 </button>
                 <ul class="dropdown-menu custom-dropdown-menu border-0 shadow-lg p-2 animate-slide-in w-100" aria-labelledby="durumFilterBtn" style="border-radius: 12px;">
@@ -162,7 +185,10 @@
         <div class="col-md-4">
             <div class="dropdown custom-filter-dropdown w-100">
                 <button class="btn custom-filter-btn shadow-sm rounded-3 w-100 py-2 px-3 d-flex align-items-center justify-content-between" type="button" id="deptFilterBtn" data-bs-toggle="dropdown" aria-expanded="false">
-                    <span class="text-truncate pe-2"><i class="fas fa-building text-primary me-2 opacity-75"></i><span id="selectedDeptText">Tüm Departmanlar</span></span>
+                    <span class="text-truncate pe-2">
+                        <i class="fas fa-building text-primary me-2 opacity-75"></i>
+                        <span id="selectedDeptText">Tüm Departmanlar</span>
+                    </span>
                     <i class="fas fa-chevron-down small text-muted"></i>
                 </button>
                 <ul class="dropdown-menu custom-dropdown-menu border-0 shadow-lg p-2 animate-slide-in w-100" aria-labelledby="deptFilterBtn" style="border-radius: 12px; max-height: 250px; overflow-y: auto;">
@@ -322,16 +348,18 @@
     </div>
 </div>
 
-@* --- MODALLAR --- *@
-
 <div class="modal fade" id="merkeziPersonelFotoModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered" style="max-width: fit-content;">
         <div class="modal-content bg-transparent border-0">
             <div class="modal-body p-2 text-center">
                 <div class="personel-modal-wrapper">
-                    <div class="modal-kapat-cerceve-yeni" data-bs-dismiss="modal"><i class="fas fa-times text-white" style="font-size: 0.8rem;"></i></div>
-                    <img id="modalPersonelResim" src="" class="personel-büyük-foto">
-                    <div class="modal-isim-etiket"><span id="modalPersonelIsim"></span></div>
+                    <div class="modal-kapat-cerceve-yeni" data-bs-dismiss="modal">
+                        <i class="fas fa-times text-white" style="font-size: 0.8rem;"></i>
+                    </div>
+                    <img id="modalPersonelResim" src="" class="personel-büyük-foto" />
+                    <div class="modal-isim-etiket">
+                        <span id="modalPersonelIsim"></span>
+                    </div>
                 </div>
             </div>
         </div>
@@ -343,10 +371,16 @@
         <div class="modal-content bg-transparent border-0">
             <div class="modal-body p-3 text-center">
                 <div id="merkeziCarousel" class="carousel slide shadow-lg kanit-modal-cerceve" data-bs-ride="carousel">
-                    <div class="modal-kapat-cerceve-kanit" data-bs-dismiss="modal"><i class="fas fa-times text-white"></i></div>
+                    <div class="modal-kapat-cerceve-kanit" data-bs-dismiss="modal">
+                        <i class="fas fa-times text-white"></i>
+                    </div>
                     <div class="carousel-inner" id="carouselIcerik"></div>
-                    <button class="carousel-control-prev" type="button" data-bs-target="#merkeziCarousel" data-bs-slide="prev"><span class="carousel-control-prev-icon"></span></button>
-                    <button class="carousel-control-next" type="button" data-bs-target="#merkeziCarousel" data-bs-slide="next"><span class="carousel-control-next-icon"></span></button>
+                    <button class="carousel-control-prev" type="button" data-bs-target="#merkeziCarousel" data-bs-slide="prev">
+                        <span class="carousel-control-prev-icon"></span>
+                    </button>
+                    <button class="carousel-control-next" type="button" data-bs-target="#merkeziCarousel" data-bs-slide="next">
+                        <span class="carousel-control-next-icon"></span>
+                    </button>
                 </div>
             </div>
         </div>
@@ -358,18 +392,24 @@
         <div class="modal-content border-0 shadow-lg rounded-4 overflow-hidden">
             <div class="modal-header bg-light border-0 py-3 px-4 d-flex align-items-center justify-content-between">
                 <div class="d-flex align-items-center">
-                    <div class="bg-primary bg-opacity-10 text-primary rounded-circle d-flex align-items-center justify-content-center me-3 shadow-sm" style="width: 40px; height: 40px;"><i class="fas fa-info-circle fs-5"></i></div>
+                    <div class="bg-primary bg-opacity-10 text-primary rounded-circle d-flex align-items-center justify-content-center me-3 shadow-sm" style="width: 40px; height: 40px;">
+                        <i class="fas fa-info-circle fs-5"></i>
+                    </div>
                     <h6 class="fw-bolder mb-0 text-dark" style="letter-spacing: 0.5px;">Görev Detayları</h6>
                 </div>
                 <button type="button" class="btn-close shadow-none" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body p-4 pt-3">
                 <div class="mb-4">
-                    <label class="small fw-bold text-primary mb-2 text-uppercase d-flex align-items-center" style="letter-spacing: 1px;"><i class="fas fa-align-left me-2 opacity-75"></i> Açıklama</label>
+                    <label class="small fw-bold text-primary mb-2 text-uppercase d-flex align-items-center" style="letter-spacing: 1px;">
+                        <i class="fas fa-align-left me-2 opacity-75"></i> Açıklama
+                    </label>
                     <div id="detayGorevAciklama" class="p-3 bg-white rounded-3 shadow-sm border border-primary border-opacity-25 lh-lg" style="font-size: 0.9rem; color: #495057;"></div>
                 </div>
                 <div id="notBolumu">
-                    <label class="small fw-bold text-warning mb-2 text-uppercase d-flex align-items-center" style="letter-spacing: 1px; filter: brightness(0.85);"><i class="fas fa-sticky-note me-2 opacity-75"></i> Personel Notu</label>
+                    <label class="small fw-bold text-warning mb-2 text-uppercase d-flex align-items-center" style="letter-spacing: 1px; filter: brightness(0.85);">
+                        <i class="fas fa-sticky-note me-2 opacity-75"></i> Personel Notu
+                    </label>
                     <div id="detayGorevNotu" class="p-3 bg-warning bg-opacity-10 rounded-3 shadow-sm border border-warning border-opacity-50 fst-italic lh-lg" style="font-size: 0.9rem; color: #664d03;"></div>
                 </div>
             </div>
@@ -384,7 +424,9 @@
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content border-0 shadow-lg rounded-4">
             <div class="modal-header bg-warning bg-opacity-75 border-0 py-2">
-                <h6 class="modal-title fw-bold text-dark mb-0"><i class="fas fa-edit me-2"></i>Görevi Güncelle</h6>
+                <h6 class="modal-title fw-bold text-dark mb-0">
+                    <i class="fas fa-edit me-2"></i>Görevi Güncelle
+                </h6>
                 <button type="button" class="btn-close shadow-none" data-bs-dismiss="modal"></button>
             </div>
             <form asp-controller="Gorev" asp-action="Guncelle" method="post" enctype="multipart/form-data">
@@ -436,7 +478,7 @@
                         <label class="small fw-bold text-dark d-flex align-items-center mb-1 text-uppercase">
                             <i class="fas fa-camera me-2 text-warning"></i> Yeni Fotoğraflar
                         </label>
-                        <input type="file" name="YeniFotograflar" class="form-control form-control-sm bg-white border-0" multiple accept="image/*">
+                        <input type="file" name="YeniFotograflar" class="form-control form-control-sm bg-white border-0" multiple accept="image/*" />
                     </div>
                 </div>
                 <div class="modal-footer border-0 bg-light-subtle py-2 px-4">
@@ -457,7 +499,7 @@
             <div class="modal-header border-0 bg-danger bg-opacity-10 justify-content-center py-4 position-relative">
                 <div class="rounded-circle bg-white shadow-sm d-flex align-items-center justify-content-center position-relative overflow-hidden" style="width: 100px; height: 100px; border: 4px solid #f8d7da;">
                     <i id="gorevSilModalDefaultIcon" class="fas fa-trash-alt text-danger fs-2"></i>
-                    <img id="gorevSilModalFoto" src="" class="delete-modal-avatar" style="display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; object-position: top;">
+                    <img id="gorevSilModalFoto" src="" class="delete-modal-avatar" style="display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; object-position: top;" />
                 </div>
             </div>
             <div class="modal-body text-center px-4 pb-4">
@@ -528,7 +570,7 @@
 
                     <div class="p-2 rounded-3 mb-2" style="background-color: #f8f9fa; border: 1px dashed #dee2e6;">
                         <label class="small fw-bold text-muted mb-1 text-uppercase"><i class="fas fa-camera me-1"></i> Fotoğraf Ekle</label>
-                        <input type="file" name="Fotograf" class="form-control form-control-sm bg-white border-0 shadow-sm" multiple accept="image/*">
+                        <input type="file" name="Fotograf" class="form-control form-control-sm bg-white border-0 shadow-sm" multiple accept="image/*" />
                     </div>
                 </div>
                 <div class="modal-footer border-0 bg-light-subtle py-3 px-4">
@@ -548,7 +590,6 @@
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11" defer></script>
 
 <script>
-    // ⚡ JS OPTİMİZASYONU: "Debounce" yapısı klavye ile arama yapıldığında işlemleri biriktirerek tarayıcı kilitlenmesini engeller.
     function debounce(func, wait) {
         let timeout;
         return function executedFunction(...args) {
@@ -558,17 +599,16 @@
         };
     }
 
-    // ⚡ JS OPTİMİZASYONU: Sürekli DOM'da (sayfada) arama yapmak CPU'yu kilitler. Sadece açılışta bir kere önbelleğe (Cache) aldık.
     let cachedTrs; 
 
     document.addEventListener("DOMContentLoaded", function () {
         setTimeout(function() {
             const loader = document.getElementById('skeletonLoader');
             if(loader) loader.classList.add('d-none');
+            
             const mainContent = document.getElementById('mainContent');
             if(mainContent) mainContent.classList.remove('d-none');
             
-            // DOM satırlarını belleğe al (Cache)
             cachedTrs = document.querySelectorAll(".gorev-satiri");
         }, 50);
 
@@ -587,7 +627,6 @@
             });
         });
 
-        // 250ms Debounce ekledik, hızlı yazarken kasmaz
         document.getElementById("tabloAra").addEventListener("input", debounce(tabloyuFiltrele, 250));
 
         document.querySelectorAll('.durum-filter-item').forEach(item => {
@@ -696,9 +735,8 @@
             if(!fotoId) return;
             const activeClass = index === 0 ? 'active' : '';
             icerikContainer.insertAdjacentHTML('beforeend',
-                // ⚡ PERFORMANS: decoding="async" UI kilitlenmesini çözer
                 `<div class="carousel-item ${activeClass}">
-                    <img src="/Gorev/KanitFotoGetir?id=${fotoId}" class="d-block w-100" loading="lazy" decoding="async">
+                    <img src="/Gorev/KanitFotoGetir?id=${fotoId}" class="d-block w-100" loading="lazy" decoding="async" />
                 </div>`
             );
         });
@@ -755,7 +793,7 @@
             personelSelect.value = ilkUygun.value;
         }
     }
-  </script>
+</script>
 
 @if (TempData["Mesaj"] != null)
 {

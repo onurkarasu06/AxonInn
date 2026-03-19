@@ -8,12 +8,8 @@
     var currentAction = ViewContext.RouteData.Values["Action"]?.ToString();
     
     // ⚡ İŞLEMCİ (CPU) OPTİMİZASYONU: "Çifte Deserialization" Yükü Sıfırlandı!
-    // Her sayfa yenilendiğinde ağır JSON çözümlemesi yapmak yerine, Controller'da zaten
-    // çözülmüş olan hazır nesneyi ViewData üzerinden çekiyoruz. İşlemci aynı işi 2 kere yapmaz.
     var personel = ViewData["GirisYapanPersonel"] as Personel;
     
-    // Eğer ViewData boşsa (Gelecekte eklenecek bir Controller'da unutulursa diye)
-    // Güvenlik yedeği (Fallback) olarak çok daha hızlı olan System.Text.Json ile Session'dan alıyoruz.
     if (personel == null)
     {
         var personelJson = Context.Session.GetString("GirisYapanPersonel");
@@ -23,7 +19,6 @@
         }
     }
 
-    // String birleştirme işlemi daha performanslı interpolation yapısına geçirildi.
     string aktifKullanici = personel != null ? $"{personel.Adi} {personel.Soyadi}" : "Giriş Yapılmadı";
 }
 

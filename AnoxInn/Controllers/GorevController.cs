@@ -105,6 +105,13 @@ namespace AxonInn.Controllers
                 model.KayitTarihi = DateTime.Now;
                 model.Durum = 1;
 
+       
+                if (!string.IsNullOrWhiteSpace(model.Aciklama))
+                    model.Aciklama = $"{loginOlanPersonel.Adi}{loginOlanPersonel.Soyadi}:{Environment.NewLine}{model.Aciklama}.";
+
+                if (!string.IsNullOrWhiteSpace(model.PersonelNotu))
+                    model.PersonelNotu = $"{loginOlanPersonel.Adi}{loginOlanPersonel.Soyadi}:{Environment.NewLine}{model.PersonelNotu}.";
+
                 // ⚡ NETWORK OPTİMİZASYONU: Fotoğraflar baştan göreve bağlanıp veritabanına tek seferde gönderiliyor.
                 if (Fotograf != null && Fotograf.Count > 0)
                 {

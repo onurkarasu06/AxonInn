@@ -11,12 +11,23 @@ namespace AxonInn.Controllers
     {
         private readonly AxonInnContext _context;
 
-        // ⚡ PERFORMANS 1: Her HTTP isteğinde bellekte JSON ayarlarının tekrar oluşturulmasını (Allocation) engeller.
-        private static readonly JsonSerializerOptions _jsonOptions = new() { PropertyNamingPolicy = JsonNamingPolicy.CamelCase };
+        // ⚡ PERFORMANS: Her HTTP isteğinde bellekte JSON ayarlarının tekrar oluşturulmasını (GC yükünü) engeller.
+        private static readonly JsonSerializerOptions _jsonOptions = new()
+        {
+            PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+            PropertyNameCaseInsensitive = true
+        };
 
         public GorevController(AxonInnContext context)
         {
             _context = context;
+        }
+
+        // ⚡ PERFORMANS: Session okuma ve Deserialize işlemini merkezileştirerek bellek tüketimini azalttık.
+        private Personel? GetGirisYapanPersonel()
+        {
+            var personelJson = HttpContext.Session.GetString("GirisYapanPersonel");
+            return string.IsNullOrEmpty(personelJson) ? null : JsonSerializer.Deserialize<Personel>(personelJson, _jsonOptions);
         }
 
         [Route("Gorevler")]
@@ -24,95 +35,82 @@ namespace AxonInn.Controllers
         {
             try
             {
-                var personelJson = HttpContext.Session.GetString("GirisYapanPersonel");
-                if (string.IsNullOrEmpty(personelJson))
-                    return RedirectToAction("Login", "Login");
-                var loginOlanPersonel = JsonSerializer.Deserialize<Personel>(personelJson);
+                var loginOlanPersonel = GetGirisYapanPersonel();
+                if (loginOlanPersonel == null) return RedirectToAction("Login", "Login");
 
-                if (loginOlanPersonel == null) return RedirectToAction("Login", "Login"); // Null Crash Koruması
-
-                // ⚡ CPU OPTİMİZASYONU: View (HTML) tarafında tekrar JSON çözümlememek için veriyi aktarıyoruz.
                 ViewData["GirisYapanPersonel"] = loginOlanPersonel;
 
-                // ⚡ DB OPTİMİZASYONU: Hotel ve Departman adını LogKaydet metodunda tekrar DB'ye gidilmesin diye önceden alıyoruz.
                 var depBilgi = await _context.Departmen
                     .AsNoTracking()
                     .Where(d => d.Id == loginOlanPersonel.DepartmanRef)
                     .Select(d => new { d.HotelRef, HotelAdi = d.HotelRefNavigation.Adi, DepartmanAdi = d.Adi })
                     .FirstOrDefaultAsync();
 
-                if (depBilgi == null || depBilgi.HotelRef == null || depBilgi.HotelRef == 0)
+                if (depBilgi?.HotelRef == null || depBilgi.HotelRef == 0)
                     return RedirectToAction("Login", "Login");
 
-                // 🚀 DRY (Don't Repeat Yourself) PRENSİBİ: Tekrarlayan Include zincirlerini azaltıp sorgu iskeleti kurduk.
-                // ⚡ RAM OPTİMİZASYONU: AsSplitQuery korundu. Kartezyen patlamasını önler.
+                // ⚡ PERFORMANS: AsNoTrackingWithIdentityResolution eklendi.
+                // Include zincirlerinde aynı departman nesnesinin bellekte defalarca kopyalanmasını engelleyerek RAM tüketimini büyük ölçüde düşürür.
                 var query = _context.Hotels
-                    .AsNoTracking()
+                    .AsNoTrackingWithIdentityResolution()
                     .AsSplitQuery()
                     .Where(h => h.Id == depBilgi.HotelRef);
 
-                // --- YETKİ KONTROLÜ VE FİLTRELENMİŞ INCLUDE MANTIĞI ---
                 if (loginOlanPersonel.Yetki == 1)
                 {
                     query = query.Include(h => h.Departmen)
                                  .ThenInclude(d => d.Personels.Where(p => p.AktifMi == 1))
-                                 .ThenInclude(p => p.Gorevs);
+                                 .ThenInclude(p => p.Gorevs.OrderByDescending(g => g.Id));
                 }
                 else if (loginOlanPersonel.Yetki == 2)
                 {
                     query = query.Include(h => h.Departmen.Where(d => d.Id == loginOlanPersonel.DepartmanRef))
                                  .ThenInclude(d => d.Personels.Where(p => p.AktifMi == 1))
-                                 .ThenInclude(p => p.Gorevs);
+                                 .ThenInclude(p => p.Gorevs.OrderByDescending(g => g.Id));
                 }
                 else if (loginOlanPersonel.Yetki == 3)
                 {
                     query = query.Include(h => h.Departmen.Where(d => d.Id == loginOlanPersonel.DepartmanRef))
                                  .ThenInclude(d => d.Personels.Where(p => p.AktifMi == 1 && p.Id == loginOlanPersonel.Id))
-                                 .ThenInclude(p => p.Gorevs);
+                                 .ThenInclude(p => p.Gorevs.OrderByDescending(g => g.Id));
                 }
 
                 var hotel = await query.FirstOrDefaultAsync();
+                if (hotel == null) return RedirectToAction("Login", "Login");
 
-                if (hotel == null)
-                    return RedirectToAction("Login", "Login");
-
-                // ⚡ CPU OPTİMİZASYONU (FLAT-LOOP): İç içe 3 döngü kullanmak yerine, SelectMany ile görevleri düz (flat) bir listeye alıyoruz.
                 var tumGorevler = hotel.Departmen.SelectMany(d => d.Personels).SelectMany(p => p.Gorevs).ToList();
                 var gorevIds = tumGorevler.Select(g => g.Id).ToList();
 
                 if (gorevIds.Count > 0)
                 {
-                    // 🚨 SQL IN (2100) ÇÖKME ÖNLEMİ: Dev veri yığınlarında sistemin patlamaması için yazdığınız Chunk (Parçalama) korundu.
                     var fotoIdListesi = new List<GorevFotograf>(gorevIds.Count);
+
                     foreach (var chunk in gorevIds.Chunk(2000))
                     {
+                        // ⚡ PERFORMANS: Anonim tip çekerek Entity Tracking ve Materialization bellekteki yükünü hafifletiyoruz
                         var fotolar = await _context.GorevFotografs
-                            .AsNoTracking() // Sadece listeleme için Track yapmaya gerek yok.
+                            .AsNoTracking()
                             .Where(gf => chunk.Contains(gf.GorevRef))
-                            .Select(gf => new GorevFotograf { Id = gf.Id, GorevRef = gf.GorevRef })
+                            .Select(gf => new { gf.Id, gf.GorevRef })
                             .ToListAsync();
 
-                        fotoIdListesi.AddRange(fotolar);
+                        fotoIdListesi.AddRange(fotolar.Select(f => new GorevFotograf { Id = f.Id, GorevRef = f.GorevRef }));
                     }
 
-                    // ToLookup ile bellekte O(1) hızında eşleştirme
                     var fotoLookup = fotoIdListesi.ToLookup(f => f.GorevRef);
 
-                    // Düzleştirdiğimiz görev listesi üzerinde tek bir döngü ile İşlemciyi (CPU) rahatlatıyoruz.
                     foreach (var gorev in tumGorevler)
                     {
                         gorev.GorevFotografs = fotoLookup[gorev.Id].ToList();
                     }
                 }
 
-                // ⚡ HIZ OPTİMİZASYONU: Veritabanına INSERT atan Log metodunu, Dashboard render hızını kesmemesi için Sona aldık.
                 await LogKaydetAsync(loginOlanPersonel, "Görev Sayfasına Giriş Yapıldı", "Görev Listesi Görüntüleme", null, depBilgi.HotelAdi ?? "", depBilgi.DepartmanAdi ?? "");
 
                 return View("Gorev", hotel);
             }
             catch (Exception)
             {
-                // 🛡️ GÜVENLİK 1: ex.Message sızdırılması (Information Disclosure Zafiyeti) engellendi.
                 return View("~/Views/Error/Error.cshtml", new ErrorViewModel { RequestId = Activity.Current?.Id ?? HttpContext.TraceIdentifier });
             }
         }
@@ -122,23 +120,20 @@ namespace AxonInn.Controllers
         {
             try
             {
-                var personelJson = HttpContext.Session.GetString("GirisYapanPersonel");
-                if (string.IsNullOrEmpty(personelJson)) return RedirectToAction("Login", "Login");
-
-                var loginOlanPersonel = JsonSerializer.Deserialize<Personel>(personelJson);
+                var loginOlanPersonel = GetGirisYapanPersonel();
                 if (loginOlanPersonel == null) return RedirectToAction("Login", "Login");
 
                 model.KayitTarihi = DateTime.Now;
                 model.Durum = 1;
 
-                // ✏️ HATA DÜZELTMESİ: İsim ve soyisim birleştirilirken araya boşluk eklendi.
+                string logPrefix = $"{loginOlanPersonel.Adi} {loginOlanPersonel.Soyadi} ({model.KayitTarihi:dd.MM.yyyy HH:mm}):{Environment.NewLine}";
+
                 if (!string.IsNullOrWhiteSpace(model.Aciklama))
-                    model.Aciklama = $"{loginOlanPersonel.Adi} {loginOlanPersonel.Soyadi}:{Environment.NewLine}{model.Aciklama.Trim()}.";
+                    model.Aciklama = $"{logPrefix}{model.Aciklama.Trim()}.";
 
                 if (!string.IsNullOrWhiteSpace(model.PersonelNotu))
-                    model.PersonelNotu = $"{loginOlanPersonel.Adi} {loginOlanPersonel.Soyadi}:{Environment.NewLine}{model.PersonelNotu.Trim()}.";
+                    model.PersonelNotu = $"{logPrefix}{model.PersonelNotu.Trim()}.";
 
-                // 🛡️ GÜVENLİK 2: RAM Bombası kalkanı. Sadece resim formatında ve max 5 MB dosyalara izin verilir.
                 if (Fotograf != null && Fotograf.Count > 0)
                 {
                     model.GorevFotografs = new List<GorevFotograf>(Fotograf.Count);
@@ -146,8 +141,7 @@ namespace AxonInn.Controllers
                     {
                         if (dosya.Length > 0 && dosya.Length <= 5 * 1024 * 1024 && dosya.ContentType.StartsWith("image/"))
                         {
-                            // ⚡ CLEAN CODE: C# 8 using deklarasyonu ile gereksiz süslü parantez (scope) karmaşası engellendi
-                            using var ms = new MemoryStream((int)dosya.Length);
+                            using var ms = new MemoryStream((int)dosya.Length); // ⚡ PERFORMANS: Başlangıç kapasitesi belirtilerek RAM korundu
                             await dosya.CopyToAsync(ms);
 
                             model.GorevFotografs.Add(new GorevFotograf { Fotograf = ms.ToArray() });
@@ -155,8 +149,6 @@ namespace AxonInn.Controllers
                     }
                 }
 
-                // Entity Framework, Gorev modelini kaydederken içindeki GorevFotografs listesini de 
-                // otomatik "Tek Bir Transaction" içerisinde (Bütünlük bozulmadan) kaydeder.
                 _context.Gorevs.Add(model);
                 await _context.SaveChangesAsync();
 
@@ -174,12 +166,9 @@ namespace AxonInn.Controllers
         {
             try
             {
-                var personelJson = HttpContext.Session.GetString("GirisYapanPersonel");
-                if (string.IsNullOrEmpty(personelJson)) return RedirectToAction("Login", "Login");
+                var loginOlanPersonel = GetGirisYapanPersonel();
+                if (loginOlanPersonel == null) return RedirectToAction("Login", "Login");
 
-                var loginOlanPersonel = JsonSerializer.Deserialize<Personel>(personelJson);
-
-                // ⚡ SIFIR RAM TÜKETİMİ (Zero-Memory Delete): Sizin yazdığınız harika yöntem korundu.
                 await _context.GorevFotografs.Where(f => f.GorevRef == id).ExecuteDeleteAsync();
                 int silinenAdet = await _context.Gorevs.Where(g => g.Id == id).ExecuteDeleteAsync();
 
@@ -196,38 +185,90 @@ namespace AxonInn.Controllers
             }
         }
 
+        // ⚡ YARDIMCI METOT: String temizleme işlemlerini hızlandırmak için
+        private string NormalizeText(string? input) => (input ?? "").Replace("\r\n", "\n").Replace("\r", "\n").Trim();
+
         [HttpPost]
         public async Task<IActionResult> Guncelle(Gorev model, List<IFormFile>? YeniFotograflar)
         {
             try
             {
-                var personelJson = HttpContext.Session.GetString("GirisYapanPersonel");
-                if (string.IsNullOrEmpty(personelJson)) return RedirectToAction("Login", "Login");
-
-                var loginOlanPersonel = JsonSerializer.Deserialize<Personel>(personelJson);
+                var loginOlanPersonel = GetGirisYapanPersonel();
+                if (loginOlanPersonel == null) return RedirectToAction("Login", "Login");
 
                 var dbGorev = await _context.Gorevs.FindAsync(model.Id);
                 if (dbGorev != null)
                 {
-                    dbGorev.PersonelRef = model.PersonelRef;
-                    dbGorev.Aciklama = model.Aciklama;
-                    dbGorev.PersonelNotu = model.PersonelNotu;
+                    if (model.PersonelRef > 0)
+                    {
+                        dbGorev.PersonelRef = model.PersonelRef;
+                    }
 
-                    if (dbGorev.Durum != model.Durum)
+                    string logPrefix = $"{loginOlanPersonel.Adi} {loginOlanPersonel.Soyadi} ({DateTime.Now:dd.MM.yyyy HH:mm}):{Environment.NewLine}";
+
+                    if (dbGorev.Aciklama != model.Aciklama)
+                    {
+                        string eskiMetin = NormalizeText(dbGorev.Aciklama);
+                        string yeniMetin = NormalizeText(model.Aciklama);
+
+                        if (yeniMetin != eskiMetin)
+                        {
+                            if (eskiMetin.Length > 0 && yeniMetin.StartsWith(eskiMetin))
+                            {
+                                string sadeceYeniYazi = yeniMetin.Substring(eskiMetin.Length).Trim();
+                                if (!string.IsNullOrEmpty(sadeceYeniYazi))
+                                {
+                                    dbGorev.Aciklama = $"{dbGorev.Aciklama}{Environment.NewLine}{logPrefix}{sadeceYeniYazi}.";
+                                }
+                            }
+                            else
+                            {
+                                dbGorev.Aciklama = model.Aciklama;
+                            }
+                        }
+                    }
+
+                    if (dbGorev.PersonelNotu != model.PersonelNotu)
+                    {
+                        string eskiNot = NormalizeText(dbGorev.PersonelNotu);
+                        string yeniNot = NormalizeText(model.PersonelNotu);
+
+                        if (yeniNot != eskiNot)
+                        {
+                            if (eskiNot.Length > 0 && yeniNot.StartsWith(eskiNot))
+                            {
+                                string sadeceYeniNot = yeniNot.Substring(eskiNot.Length).Trim();
+                                if (!string.IsNullOrEmpty(sadeceYeniNot))
+                                {
+                                    string ayirici = string.IsNullOrEmpty(dbGorev.PersonelNotu) ? "" : Environment.NewLine;
+                                    dbGorev.PersonelNotu = $"{dbGorev.PersonelNotu}{ayirici}{logPrefix}{sadeceYeniNot}.";
+                                }
+                            }
+                            else if (eskiNot.Length == 0 && yeniNot.Length > 0)
+                            {
+                                dbGorev.PersonelNotu = $"{logPrefix}{yeniNot.Trim()}.";
+                            }
+                            else
+                            {
+                                dbGorev.PersonelNotu = model.PersonelNotu;
+                            }
+                        }
+                    }
+
+                    if (dbGorev.Durum != model.Durum && model.Durum > 0)
                     {
                         if (model.Durum == 2 && dbGorev.CozumBaslamaTarihi == null)
                             dbGorev.CozumBaslamaTarihi = DateTime.Now;
                         else if (model.Durum == 3 && dbGorev.CozumBitisTarihi == null)
                             dbGorev.CozumBitisTarihi = DateTime.Now;
-                    }
 
-                    dbGorev.Durum = model.Durum;
+                        dbGorev.Durum = model.Durum;
+                    }
 
                     if (YeniFotograflar != null && YeniFotograflar.Count > 0)
                     {
                         foreach (var dosya in YeniFotograflar)
                         {
-                            // 🛡️ Aynı 5MB ve Güvenlik (Image) bariyeri güncelleme için de sağlandı.
                             if (dosya.Length > 0 && dosya.Length <= 5 * 1024 * 1024 && dosya.ContentType.StartsWith("image/"))
                             {
                                 using var ms = new MemoryStream((int)dosya.Length);
@@ -263,7 +304,6 @@ namespace AxonInn.Controllers
                 .Select(f => f.Fotograf)
                 .FirstOrDefaultAsync();
 
-            // C# 9.0+ Pattern Matching ile şık null ve boyut kontrolü
             if (fotoBytes is { Length: > 0 })
                 return File(fotoBytes, "image/jpeg");
 
@@ -286,7 +326,6 @@ namespace AxonInn.Controllers
             return NotFound();
         }
 
-        // Asenkron olduğu için Standartlara uygun olarak sonuna Async eklendi.
         private async Task<bool> LogKaydetAsync(Personel? personel, string islemTipi, string yeniDeger, Gorev? gorev, string preHotelAdi = "", string preDeptAdi = "")
         {
             try

@@ -261,8 +261,8 @@
                                             </div>
                                         </div>
                                         <div>
-                                            <div class="fw-bold text-dark mb-1" style="font-size: 0.9rem;">@tamAd</div>
-                                            <small class="text-muted fw-medium bg-light px-2 py-1 rounded" style="font-size: 0.75rem;">@departmanAdi</small>
+                                     <div class="fw-bold text-dark text-start mb-1" style="font-size: 0.9rem;">@tamAd</div>
+<small class="text-muted fw-medium text-start bg-light px-2 py-1 rounded d-inline-block" style="font-size: 0.75rem;">@departmanAdi</small>
                                         </div>
                                     </div>
                                 </td>
@@ -419,9 +419,11 @@
 </div>
 
 <div class="modal fade" id="detayModal" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
-        <div class="modal-content border-0 shadow-lg rounded-4 overflow-hidden">
-            <div class="modal-header bg-light border-0 py-4 px-4 align-items-center">
+    <div class="modal-dialog modal-dialog-centered">
+        
+        <div class="modal-content border-0 shadow-lg rounded-4" style="height: 80vh;">
+            
+            <div class="modal-header bg-light border-0 py-3 px-4 align-items-center">
                 <div class="d-flex align-items-center">
                     <div class="bg-primary bg-opacity-10 text-primary rounded-circle d-flex align-items-center justify-content-center me-3" style="width: 45px; height: 45px;">
                         <i class="fas fa-info-circle fs-5"></i>
@@ -430,20 +432,25 @@
                 </div>
                 <button type="button" class="btn-close shadow-none" data-bs-dismiss="modal"></button>
             </div>
-            <div class="modal-body p-4 pt-2">
-                <div class="mb-4">
+            
+            <div class="modal-body p-4 pt-2 d-flex flex-column overflow-hidden">
+                
+                <div class="mb-3 d-flex flex-column" style="flex: 1 1 0; min-height: 0;">
                     <label class="small fw-bold text-secondary mb-2 text-uppercase d-flex align-items-center" style="letter-spacing: 1px;">
                         <i class="fas fa-align-left me-2 opacity-50"></i> Açıklama
                     </label>
-                    <div id="detayGorevAciklama" class="p-4 bg-white rounded-4 shadow-sm border border-light lh-lg text-dark" style="font-size: 0.95rem; max-height: 200px; overflow-y: auto;"></div>
+                    <div id="detayGorevAciklama" class="p-3 bg-white rounded-4 shadow-sm border border-light lh-lg text-dark flex-grow-1 overflow-auto" style="font-size: 0.95rem;"></div>
                 </div>
-                <div id="notBolumu">
+                
+                <div id="notBolumu" class="d-flex flex-column" style="flex: 1 1 0; min-height: 0;">
                     <label class="small fw-bold text-warning mb-2 text-uppercase d-flex align-items-center" style="letter-spacing: 1px;">
                         <i class="fas fa-sticky-note me-2 opacity-75"></i> Personel Notu
                     </label>
-                    <div id="detayGorevNotu" class="p-4 bg-warning bg-opacity-10 rounded-4 border border-warning border-opacity-25 fst-italic lh-lg text-dark" style="font-size: 0.95rem; max-height: 200px; overflow-y: auto;"></div>
+                    <div id="detayGorevNotu" class="p-3 bg-warning bg-opacity-10 rounded-4 border border-warning border-opacity-25 fst-italic lh-lg text-dark flex-grow-1 overflow-auto" style="font-size: 0.95rem;"></div>
                 </div>
+                
             </div>
+            
             <div class="modal-footer border-0 bg-light-subtle py-3 px-4">
                 <button type="button" class="btn btn-secondary rounded-pill px-5 fw-bold shadow-sm" data-bs-dismiss="modal">Kapat</button>
             </div>
@@ -451,21 +458,25 @@
     </div>
 </div>
 
+
 <div class="modal fade" id="guncelleModal" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content border-0 shadow-lg rounded-4">
+    <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
+        <div class="modal-content border-0 shadow-lg rounded-4" style="min-height: 80vh; max-height: 90vh;">
+            
             <div class="modal-header bg-warning bg-opacity-10 border-bottom border-warning border-opacity-25 py-3 px-4">
-                <h5 class="modal-title fw-bold text-dark mb-0 d-flex align-items-center">
+                <h5 class="modal-title fw-bold text-dark mb-0 d-flex align-items-center fs-5">
                     <i class="fas fa-edit text-warning me-2"></i>Görevi Güncelle
                 </h5>
                 <button type="button" class="btn-close shadow-none" data-bs-dismiss="modal"></button>
             </div>
-            <form asp-controller="Gorev" asp-action="Guncelle" method="post" enctype="multipart/form-data">
-                <div class="modal-body p-4">
+            
+            <form asp-controller="Gorev" asp-action="Guncelle" method="post" enctype="multipart/form-data" class="d-flex flex-column h-100">
+                
+                <div class="modal-body p-3 p-md-4">
                     <input type="hidden" name="Id" id="editGorevID" />
 
-                    <div class="mb-4">
-                        <label class="small fw-bold text-secondary mb-2 text-uppercase">Departman Filtresi</label>
+                    <div class="mb-3">
+                        <label class="small fw-bold text-secondary mb-1 text-uppercase">Departman Filtresi</label>
                         <select class="form-select shadow-none py-2 rounded-3" onchange="guncellePersonelFiltrele(this)">
                             <option value="all">Tüm Departmanlar</option>
                             @foreach (var d in departmanlar)
@@ -475,9 +486,9 @@
                         </select>
                     </div>
 
-                    <div class="row g-3 mb-4">
-                        <div class="col-md-7">
-                            <label class="small fw-bold text-secondary mb-2 text-uppercase">Personel</label>
+                    <div class="row g-2 mb-3">
+                        <div class="col-7">
+                            <label class="small fw-bold text-secondary mb-1 text-uppercase">Personel</label>
                             <select name="PersonelRef" id="editPersonelID" class="form-select shadow-none py-2 rounded-3 edit-pers-select">
                                 @foreach (var p in personelList)
                                 {
@@ -485,8 +496,8 @@
                                 }
                             </select>
                         </div>
-                        <div class="col-md-5">
-                            <label class="small fw-bold text-secondary mb-2 text-uppercase">Durum</label>
+                        <div class="col-5">
+                            <label class="small fw-bold text-secondary mb-1 text-uppercase">Durum</label>
                             <select name="Durum" id="editGorevDurumu" class="form-select shadow-none py-2 rounded-3">
                                 <option value="1">Beklemede</option>
                                 <option value="2">İşlemde</option>
@@ -495,34 +506,37 @@
                         </div>
                     </div>
 
-                    <div class="mb-4">
-                        <label class="small fw-bold text-secondary mb-2 text-uppercase">Görev Açıklaması</label>
+                    <div class="mb-3">
+                        <label class="small fw-bold text-secondary mb-1 text-uppercase">Görev Açıklaması</label>
                         <textarea name="Aciklama" id="editGorevAciklama" class="form-control shadow-none rounded-3 py-2" rows="3" required></textarea>
                     </div>
 
-                    <div class="mb-4">
-                        <label class="small fw-bold text-secondary mb-2 text-uppercase">Personel Notu</label>
+                    <div class="mb-3">
+                        <label class="small fw-bold text-secondary mb-1 text-uppercase">Personel Notu</label>
                         <textarea name="PersonelNotu" id="editGorevNotu" class="form-control shadow-none rounded-3 py-2" rows="2" style="background-color: #fffdf5; border-color: #fde68a;"></textarea>
                     </div>
 
-                    <div class="p-3 rounded-4 bg-light border border-dashed border-secondary border-opacity-25">
+                    <div class="p-3 rounded-4 bg-light border border-dashed border-secondary border-opacity-25 mt-auto">
                         <label class="small fw-bold text-dark d-flex align-items-center mb-2 text-uppercase">
-                            <i class="fas fa-camera me-2 text-warning"></i> Yeni Fotoğraflar Ekle
+                            <i class="fas fa-camera me-2 text-warning"></i> Yeni Fotoğraflar
                         </label>
                         <input type="file" name="YeniFotograflar" class="form-control bg-white border-0 py-2 shadow-sm rounded-3" multiple accept="image/*" />
                     </div>
                 </div>
-                <div class="modal-footer border-top bg-light-subtle py-3 px-4">
+                
+                <div class="modal-footer border-top bg-light-subtle py-3 px-4 mt-auto">
                     <button type="button" class="btn btn-link text-secondary fw-bold me-auto text-decoration-none" data-bs-dismiss="modal">İptal</button>
-                    <button type="submit" class="btn btn-warning px-5 py-2 rounded-pill fw-bold shadow-sm d-flex align-items-center justify-content-center text-dark">
+                    <button type="submit" class="btn btn-warning px-4 py-2 rounded-pill fw-bold shadow-sm d-flex align-items-center justify-content-center text-dark">
                         <span class="btn-text">Kaydet</span>
                         <div class="spinner-border spinner-border-sm ms-2 d-none btn-spinner text-dark" role="status" aria-hidden="true"></div>
                     </button>
                 </div>
             </form>
+            
         </div>
     </div>
 </div>
+
 
 <div class="modal fade" id="gorevSilOnayModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered" style="max-width: 400px;">

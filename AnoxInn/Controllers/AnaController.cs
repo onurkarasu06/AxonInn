@@ -61,6 +61,7 @@ namespace AxonInn.Controllers
 
                 IQueryable<Personel> personelQuery = _context.Personels.AsNoTracking().Where(p => p.AktifMi == 1);
                 IQueryable<Gorev> gorevQuery = _context.Gorevs.AsNoTracking();
+                gorevQuery = gorevQuery.Where(g => g.PersonelRefNavigation.AktifMi == 1);
                 IQueryable<Departman> departmanQuery = _context.Departmen.AsNoTracking();
 
                 if (loginOlanPersonel.Yetki == 3)
@@ -87,11 +88,12 @@ namespace AxonInn.Controllers
 
                 // Grup Sorgusu 1: Departman Personel Sayıları
                 var departmanPersonelSayilari = await personelQuery
-                    .GroupBy(p => p.DepartmanRefNavigation.Adi)
-                    .Select(g => new {
-                        departmanAd = g.Key ?? "Belirtilmemiş",
-                        adet = g.Count()
-                    }).ToListAsync();
+                                                .Where(p => p.AktifMi == 1) // Sadece aktif personelleri filtreliyoruz
+                                                .GroupBy(p => p.DepartmanRefNavigation.Adi)
+                                                .Select(g => new {
+                                                    departmanAd = g.Key ?? "Belirtilmemiş",
+                                                    adet = g.Count()
+                                                }).ToListAsync();
 
                 // ⚡ PERFORMANS 4: Metin(String) birleştirme işlemlerini SQL CPU'su yerine C# RAM'ine taşıyoruz.
                 // Veritabanı CPU'sunu gereksiz yormamak için SQL'den sadece ham alanları çekiyoruz.

@@ -36,7 +36,7 @@ namespace AxonInn.Controllers
                     return RedirectToAction("Login", "Login");
                 var loginOlanPersonel = JsonSerializer.Deserialize<Personel>(personelJson);
 
-                if (loginOlanPersonel == null) 
+                if (loginOlanPersonel == null)
                     return RedirectToAction("Login", "Login"); // Null Crash Koruması
 
                 ViewData["GirisYapanPersonel"] = loginOlanPersonel;
@@ -156,14 +156,14 @@ namespace AxonInn.Controllers
 
                 if (mailBasariliMi)
                 {
-                    await LogKaydetAsync(loginOlanPersonel, "Yeni Personel Eklendi", "Başarıyla Kaydedildi ve Mail Gönderildi", yeniPersonel);
-                    TempData["Mesaj"] = "Kullanıcı kayıt edildi, kendi mailinden aktive etmesi gerekmektedir.";
+                    await LogKaydetAsync(loginOlanPersonel, "Yeni Personel Eklendi", "Yeni Personel Eklendi ve Aktivasyon Maili Gönderildi", yeniPersonel);
+                    TempData["Mesaj"] = $"Kullanıcı kayıt edildi, {yeniPersonel.MailAdresi} adresine aktivasyon maili gönderildi.";
                     TempData["MesajTipi"] = "success";
                 }
                 else
                 {
-                    await LogKaydetAsync(loginOlanPersonel, "Yeni Personel Eklendi (Mail Hatası)", "Kaydedildi fakat mail gönderilemedi.", yeniPersonel);
-                    TempData["Mesaj"] = "Kullanıcı kayıt edildi ancak doğrulama maili gönderilemedi. Lütfen sistem yöneticisiyle iletişime geçin.";
+                    await LogKaydetAsync(loginOlanPersonel, "Yeni Personel Eklendi Fakat Aktivasyon Maili Gönderilemedi.", "Kaydedildi fakat aktivasyon maili gönderilemedi.", yeniPersonel);
+                    TempData["Mesaj"] = "Kullanıcı kayıt edildi ancak aktivasyon maili gönderilemedi. Lütfen sistem yöneticisiyle iletişime geçin.";
                     TempData["MesajTipi"] = "warning";
                 }
 
@@ -191,9 +191,12 @@ namespace AxonInn.Controllers
 
                 if (gorevVarMi)
                 {
-                    await LogKaydetAsync(loginOlanPersonel, "Personel Silme Hatası", "Görev atandığı için silinemez.", null);
-                    TempData["Mesaj"] = "Personele kayıtlı görev bulunduğu için silinemez.";
+                    await _context.Personels
+                                           .Where(p => p.Id == id)
+                                           .ExecuteUpdateAsync(s => s.SetProperty(p => p.AktifMi, 2));
+                    TempData["Mesaj"] = "Personele kayıtlı görev bulunduğu için silinemez. (Personel Pasife Alındı.)";
                     TempData["MesajTipi"] = "warning";
+                    await LogKaydetAsync(loginOlanPersonel, "Personele kayıtlı görev olduğu için silinemez,personel pasife alındı", "Görev atandığı için silinemez.", null);
                     return RedirectToAction("Departman", "Departman");
                 }
 

@@ -50,17 +50,17 @@ namespace AxonInn.Controllers
                 if (loginOlanPersonel.Yetki == 1)
                 {
                     query = query.Include(h => h.Departmen)
-                                 .ThenInclude(d => d.Personels.Where(p => p.AktifMi == 1));
+                                 .ThenInclude(d => d.Personels);
                 }
                 else if (loginOlanPersonel.Yetki == 2)
                 {
                     query = query.Include(h => h.Departmen.Where(d => d.Id == loginOlanPersonel.DepartmanRef))
-                                 .ThenInclude(d => d.Personels.Where(p => p.AktifMi == 1));
+                                 .ThenInclude(d => d.Personels);
                 }
                 else if (loginOlanPersonel.Yetki == 3)
                 {
                     query = query.Include(h => h.Departmen.Where(d => d.Id == loginOlanPersonel.DepartmanRef))
-                                 .ThenInclude(d => d.Personels.Where(p => p.AktifMi == 1 && p.Id == loginOlanPersonel.Id));
+                                 .ThenInclude(d => d.Personels.Where(p => p.Id == loginOlanPersonel.Id));
                 }
 
                 var hotel = await query.FirstOrDefaultAsync();
@@ -236,6 +236,7 @@ namespace AxonInn.Controllers
                     dbPersonel.MailAdresi = p.MailAdresi;
                     dbPersonel.MedenHali = p.MedenHali;
                     dbPersonel.Yetki = p.Yetki;
+                    dbPersonel.AktifMi = p.AktifMi;
 
                     if (!string.IsNullOrWhiteSpace(p.Sifre))
                         dbPersonel.Sifre = p.Sifre;

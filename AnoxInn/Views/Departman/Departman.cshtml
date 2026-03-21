@@ -335,7 +335,9 @@
                                             string fotoVersiyon = DepartmanController.PersonelFotoVersiyonlari.TryGetValue(personel.Id, out var v) ? v : DepartmanController.AppStartVersion;
                                             
                                             <tr style="font-size: 0.85rem;">
-                                                <td data-label="SIRA" class="text-muted">@s</td>
+                                           <td data-label="SIRA" class="text-muted">
+                                                <span>@s @Html.Raw(personel.AktifMi == 2 ? "<span class='text-danger fw-bold ms-1'>(Pasif)</span>" : "")</span>
+                                            </td>
                                                 <td data-label="AD SOYAD" class="fw-bold text-dark">@personel.Adi @personel.Soyadi</td>
                                                 <td data-label="İLETİŞİM">
                                                     <div class="d-flex flex-column lh-sm">
@@ -375,7 +377,7 @@
                                                 </td>
                                                 <td data-label="İŞLEM">
                                                     <div class="btn-group shadow-none @(girisYapanPersonel?.Yetki != 1 ? "opacity-50" : null)">
-                                                        <button class="btn btn-outline-primary btn-sm border-0" onclick="openPersonelEditModal(@personel.Id, '@personel.Adi', '@personel.Soyadi', @departman.Id, '@personel.TelefonNumarasi', '@personel.MailAdresi', @(personel.MedenHali ?? 2), @(personel.Yetki))" data-bs-toggle="modal" data-bs-target="#personelGuncelleModal" disabled="@(girisYapanPersonel?.Yetki != 1 ? "disabled" : null)" title="Düzenle">
+                                                        <button class="btn btn-outline-primary btn-sm border-0" onclick="openPersonelEditModal(@personel.Id, '@personel.Adi', '@personel.Soyadi', @departman.Id, '@personel.TelefonNumarasi', '@personel.MailAdresi', @(personel.MedenHali ?? 2), @(personel.Yetki), @(personel.AktifMi))" data-bs-toggle="modal" data-bs-target="#personelGuncelleModal" disabled="@(girisYapanPersonel?.Yetki != 1 ? "disabled" : null)" title="Düzenle">
                                                             <i class="fas fa-edit"></i>
                                                         </button>
                                                         <button class="btn btn-outline-danger btn-sm border-0" onclick="setSilId(@personel.Id, '@personel.Adi @personel.Soyadi', '@uniqueRowId')" data-bs-toggle="modal" data-bs-target="#silOnayModal" disabled="@(girisYapanPersonel?.Yetki != 1 ? "disabled" : null)" title="Sil">
@@ -524,9 +526,18 @@
                         </div>
                     </div>
 
-                    <div class="mb-3">
-                        <label class="small fw-bold text-muted mb-1 text-uppercase">E-Posta</label>
-                        <input type="email" name="MailAdresi" id="editPersonelMail" class="form-control form-control-sm rounded-3 shadow-none" />
+                    <div class="row g-2 mb-3">
+                        <div class="col-8">
+                            <label class="small fw-bold text-muted mb-1 text-uppercase">E-Posta</label>
+                            <input type="email" name="MailAdresi" id="editPersonelMail" class="form-control form-control-sm rounded-3 shadow-none" />
+                        </div>
+                        <div class="col-4">
+                            <label class="small fw-bold text-muted mb-1 text-uppercase">Durum</label>
+                            <select name="AktifMi" id="editPersonelAktiflik" class="form-select form-select-sm rounded-3 shadow-none">
+                                <option value="1">Aktif</option>
+                                <option value="2">Pasif</option>
+                            </select>
+                        </div>
                     </div>
 
                     <div class="p-3 bg-light rounded-4 border mt-2">
@@ -658,7 +669,7 @@
             }
         }
 
-        function openPersonelEditModal(id, adi, soyadi, depRef, tel, mail, medeni, yetki) {
+        function openPersonelEditModal(id, adi, soyadi, depRef, tel, mail, medeni, yetki, aktifMi) {
             const fields = {
                 'editPersonelID': id,
                 'editPersonelAdi': adi,
@@ -668,6 +679,7 @@
                 'editPersonelTel': tel,
                 'editPersonelMail': mail,
                 'editPersonelMedeni': medeni,
+                'editPersonelAktiflik': aktifMi,
                 'editPersonelSifre': ""
             };
             for (const [fieldId, value] of Object.entries(fields)) {

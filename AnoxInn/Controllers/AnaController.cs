@@ -126,6 +126,28 @@ namespace AxonInn.Controllers
                     .Select(d => new Departman { Id = d.Id, Adi = d.Adi })
                     .ToListAsync();
 
+                //GEMİNİ AI KATEGORİ DAĞILIMI HESAPLAMASI////////////////////////////////////////////
+                var aiKategoriDb = await gorevQuery
+                    .Where(g => !string.IsNullOrEmpty(g.AiKategori))
+                    .GroupBy(g => g.AiKategori)
+                    .Select(g => new {
+                        kategori = g.Key,
+                        adet = g.Count()
+                    }).ToListAsync();
+
+                int toplamKategorizeGorev = aiKategoriDb.Sum(x => x.adet);
+
+                // Yüzde hesaplamasını RAM'de yapıyoruz (⚡ PERFORMANS)
+                var aiChartData = aiKategoriDb.Select(x => new {
+                    kategori = x.kategori,
+                    adet = x.adet,
+                    yuzde = toplamKategorizeGorev > 0 ? Math.Round(((double)x.adet / toplamKategorizeGorev) * 100, 1) : 0
+                }).OrderByDescending(x => x.yuzde).ToList();
+
+                // Grafiğe veriyi gönderiyoruz!
+                ViewBag.AiKategoriJson = JsonSerializer.Serialize(aiChartData, _jsonOptions);
+                //GEMİNİ AI KATEGORİ DAĞILIMI HESAPLAMASI BITTI////////////////////////////////////////////
+
                 // (Değişmedi - Zaten Kusursuzdu) Çekilen özet veriler üzerinden RAM'de toplam sayacı buluyoruz.
                 ViewBag.HotelAdi = hotelAdi;
                 ViewBag.AktifPersonelAdet = departmanPersonelSayilari.Sum(x => x.adet);

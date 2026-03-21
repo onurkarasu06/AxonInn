@@ -27,4 +27,7 @@ public partial class Gorev
     public virtual ICollection<GorevFotograf> GorevFotografs { get; set; } = new List<GorevFotograf>();
 
     public virtual Personel PersonelRefNavigation { get; set; } = null!;
+
+    [MaxLength(50)]
+    public string? AiKategori { get; set; } = null!;
 }

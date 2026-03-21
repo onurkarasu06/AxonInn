@@ -57,6 +57,7 @@
     <div class="row mb-4 mt-2">
         <div class="col-12"><div class="skeleton-box w-100" style="height: 40px; border-radius: 12px;"></div></div>
     </div>
+    
     <div class="row g-4 mb-4">
         <div class="col-lg-5">
             <div class="card border-0 shadow-sm rounded-4 p-3 h-100 bg-white">
@@ -71,6 +72,15 @@
                     <div class="skeleton-box" style="height: 30px; width: 30%; border-radius: 15px;"></div>
                 </div>
                 <div class="skeleton-box w-100" style="height: 160px; border-radius: 15px;"></div>
+            </div>
+        </div>
+    </div>
+
+   <div class="row g-4 mb-4">
+        <div class="col-12 col-lg-8 mx-auto">
+            <div class="card border-0 shadow-sm rounded-4 p-3 h-100 bg-white">
+                <div class="skeleton-box w-50 mb-4" style="height: 20px;"></div>
+                <div class="skeleton-box w-100" style="height: 250px; border-radius: 15px;"></div>
             </div>
         </div>
     </div>
@@ -165,16 +175,13 @@
                         <div class="bg-danger bg-opacity-10 p-2 rounded-3 me-2"><i class="fas fa-tasks text-danger small"></i></div>
                         <h6 class="fw-bold text-dark mb-0 small">Personel İş Yükü (Görev Analizi)</h6>
                     </div>
-
                     <div class="dropdown custom-filter-dropdown" style="min-width: 180px;">
                         <button class="btn btn-light bg-white border shadow-sm rounded-pill w-100 py-1 px-3 d-flex align-items-center justify-content-between" type="button" id="chartDeptFilterBtn" data-bs-toggle="dropdown" aria-expanded="false" style="font-size: 0.75rem;">
                             <span><i class="fas fa-filter text-muted me-2 small"></i><span id="selectedDeptText">Tüm Departmanlar</span></span>
                             <i class="fas fa-chevron-down ms-2 small text-muted"></i>
                         </button>
-
                         <ul class="dropdown-menu custom-dropdown-menu border-0 shadow-lg p-2 animate-slide-in w-100" aria-labelledby="chartDeptFilterBtn" style="font-size: 0.8rem; border-radius: 12px;">
                             <li><a class="dropdown-item active dept-filter-item" href="#" data-value="all">Tüm Departmanlar</a></li>
-
                             @foreach (var dept in departmanlar)
                             {
                                 <li><a class="dropdown-item dept-filter-item" href="#" data-value="@dept.Adi">@dept.Adi</a></li>
@@ -188,6 +195,26 @@
             </div>
         </div>
     </div>
+
+   <div class="row g-4 mb-4">
+        <div class="col-12 col-lg-8 mx-auto">
+            <div class="card border-0 shadow-sm rounded-4 p-3 h-100 bg-white border-top border-info border-4">
+                <div class="d-flex align-items-center justify-content-between mb-3">
+                    <div class="d-flex align-items-center">
+                        <div class="bg-info bg-opacity-10 p-2 rounded-3 me-2">
+                            <i class="fas fa-robot text-info small"></i> 
+                        </div>
+                        <h6 class="fw-bold text-dark mb-0 small">AI İle Görev İçeriklerinin Ekiplere Dağılımı Analizi</h6>
+                    </div>
+                    <span class="badge bg-light text-muted border border-info border-opacity-25" style="font-size: 0.65rem;">AI</span>
+                </div>
+                <div class="chart-container" style="height: 280px; position: relative;">
+                    <canvas id="aiKategoriChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
 </div>
 
 @section Scripts {
@@ -204,21 +231,21 @@
                 // SQL tarafından zaten gruplanmış, ufacık ve saf nesneleri alıyoruz.
                 const preGroupedPersonel = @Html.Raw(ViewBag.PersonelJson ?? "[]");
                 const preGroupedGorev = @Html.Raw(ViewBag.GorevJson ?? "[]");
+                const aiKategoriData = @Html.Raw(ViewBag.AiKategoriJson ?? "[]"); // 🤖 YENİ AI VERİSİ
 
                 const colors = ['#4e73df', '#1cc88a', '#36b9cc', '#f6c23e', '#e74a3b', '#858796'];
+                
+                // 1. DEPARTMAN GRAFİĞİ
                 const deptCtx = document.getElementById('departmanChart');
                 let departmanChartInstance = null;
 
                 function ekranıGuncelle() {
                     if (!preGroupedPersonel || preGroupedPersonel.length === 0) return;
-                    
-                    // JS CPU OPTİMİZASYONU: Eski hantal array reduce döngüsü tamamen çöpe atıldı!
                     const labels = preGroupedPersonel.map(p => p.departmanAd);
                     const dataCounts = preGroupedPersonel.map(p => p.adet);
                     
                     if (deptCtx) {
-                        if (departmanChartInstance) { departmanChartInstance.destroy(); }
-
+                        if (departmanChartInstance) departmanChartInstance.destroy();
                         departmanChartInstance = new Chart(deptCtx, {
                             type: 'bar',
                             data: {
@@ -242,11 +269,11 @@
                 }
 
                 ekranıGuncelle();
-                
+
+                // 2. PERSONEL İŞ YÜKÜ GRAFİĞİ
                 const perCtx = document.getElementById('personelIsYukuChart');
                 let perChart;
 
-                // JS CPU OPTİMİZASYONU: Karmaşık İç içe Map-Filter O(N*M) döngüleri yerine, SQL'den hazır gelmiş diziyi basitçe dağıtıyoruz.
                 function getFilteredData(deptName) {
                     const labels = [];
                     const beklemedeData = [];
@@ -254,9 +281,7 @@
                     const tamamlandiData = [];
 
                     preGroupedGorev.forEach(p => {
-                        // Seçili filtreye uymuyorsa atla
                         if (deptName !== 'all' && p.dept !== deptName) return;
-                        
                         labels.push(p.ad);
                         beklemedeData.push(p.beklemede);
                         islemdeData.push(p.islemde);
@@ -305,7 +330,51 @@
                     }
                 }
 
-                // Sayı saydırma animasyonunu da sayfa yüklendikten sonraya aldık
+                // 3. 🤖 GEMİNİ AI GRAFİĞİ (YENİ EKLENEN KISIM)
+                const aiCtx = document.getElementById('aiKategoriChart');
+                if (aiCtx && aiKategoriData.length > 0) {
+                    // Gemini tarzı fütüristik teknoloji renkleri
+                    const aiColors = ['#8b5cf6', '#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#64748b'];
+                    
+                    new Chart(aiCtx, {
+                        type: 'doughnut', 
+                        data: {
+                            labels: aiKategoriData.map(d => `${d.kategori} (%${d.yuzde})`),
+                            datasets: [{
+                                data: aiKategoriData.map(d => d.yuzde),
+                                backgroundColor: aiColors,
+                                borderWidth: 2,
+                                borderColor: '#ffffff',
+                                hoverOffset: 6
+                            }]
+                        },
+                        options: {
+                            maintainAspectRatio: false,
+                            cutout: '65%', 
+                            plugins: {
+                                legend: { 
+                                    position: 'right', 
+                                    labels: { 
+                                        boxWidth: 12, 
+                                        usePointStyle: true, 
+                                        font: { size: 11, family: "'Plus Jakarta Sans', sans-serif" } 
+                                    } 
+                                },
+                                tooltip: {
+                                    callbacks: {
+                                        label: function(context) {
+                                            let label = context.label || '';
+                                            let adet = aiKategoriData[context.dataIndex].adet;
+                                            return ` ${label.split('(')[0].trim()} : ${adet} Görev`;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    });
+                }
+
+                // SAYI SAYDIRMA ANİMASYONU
                 const counters = document.querySelectorAll('.counter-value');
                 const speed = 15;
 

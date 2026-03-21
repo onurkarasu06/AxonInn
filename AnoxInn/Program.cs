@@ -9,6 +9,8 @@ builder.Services.AddDbContext<AxonInnContext>(options =>
 // Add services to the container.
 builder.Services.AddControllersWithViews();
 
+builder.Services.AddHttpClient<AxonInn.Models.GeminiApiService>();
+
 // --- 1. SESSION (OTURUM) SERVİSLERİ EKLENİYOR ---
 builder.Services.AddDistributedMemoryCache(); // Oturum verilerini bellekte tutmak için gerekli
 builder.Services.AddSession(options =>

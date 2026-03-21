@@ -10,6 +10,7 @@ namespace AxonInn.Controllers
     public class GorevController : Controller
     {
         private readonly AxonInnContext _context;
+        private readonly GeminiApiService _geminiService;
 
         // ⚡ PERFORMANS: Her HTTP isteğinde bellekte JSON ayarlarının tekrar oluşturulmasını (GC yükünü) engeller.
         private static readonly JsonSerializerOptions _jsonOptions = new()
@@ -18,10 +19,14 @@ namespace AxonInn.Controllers
             PropertyNameCaseInsensitive = true
         };
 
-        public GorevController(AxonInnContext context)
+        // 👈 YENİ: GeminiApiService'i parametre olarak içeri alıyoruz
+        public GorevController(AxonInnContext context, GeminiApiService geminiService)
         {
             _context = context;
+            _geminiService = geminiService; // 👈 YENİ: Atamasını yapıyoruz
         }
+
+      
 
         // ⚡ PERFORMANS: Session okuma ve Deserialize işlemini merkezileştirerek bellek tüketimini azalttık.
         private Personel? GetGirisYapanPersonel()
@@ -149,6 +154,9 @@ namespace AxonInn.Controllers
                     }
                 }
 
+                // 🤖 YENİ: Veritabanına kaydetmeden SADECE BİR SATIR ÖNCE Gemini'ye soruyoruz
+                model.AiKategori = await _geminiService.KategorizeEtAsync(model.Aciklama, model.PersonelNotu);
+
                 _context.Gorevs.Add(model);
                 await _context.SaveChangesAsync();
 
@@ -199,6 +207,8 @@ namespace AxonInn.Controllers
                 var dbGorev = await _context.Gorevs.FindAsync(model.Id);
                 if (dbGorev != null)
                 {
+                    bool metinDegisti = false;
+
                     if (model.PersonelRef > 0)
                     {
                         dbGorev.PersonelRef = model.PersonelRef;
@@ -208,6 +218,7 @@ namespace AxonInn.Controllers
 
                     if (dbGorev.Aciklama != model.Aciklama)
                     {
+                        metinDegisti = true;
                         string eskiMetin = NormalizeText(dbGorev.Aciklama);
                         string yeniMetin = NormalizeText(model.Aciklama);
 
@@ -230,6 +241,7 @@ namespace AxonInn.Controllers
 
                     if (dbGorev.PersonelNotu != model.PersonelNotu)
                     {
+                        metinDegisti = true;
                         string eskiNot = NormalizeText(dbGorev.PersonelNotu);
                         string yeniNot = NormalizeText(model.PersonelNotu);
 
@@ -280,6 +292,11 @@ namespace AxonInn.Controllers
                                 });
                             }
                         }
+                    }
+
+                    if (metinDegisti)
+                    {
+                        dbGorev.AiKategori = await _geminiService.KategorizeEtAsync(dbGorev.Aciklama, dbGorev.PersonelNotu);
                     }
 
                     await _context.SaveChangesAsync();

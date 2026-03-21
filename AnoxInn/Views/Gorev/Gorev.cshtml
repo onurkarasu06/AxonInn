@@ -571,15 +571,18 @@
 </div>
 
 <div class="modal fade" id="yeniGorevModal" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content border-0 shadow-lg rounded-4">
-            <div class="modal-header bg-primary text-white border-0 py-2">
+    <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
+        <div class="modal-content border-0 shadow-lg rounded-4" style="min-height: 80vh;">
+            
+            <div class="modal-header bg-primary text-white border-0 py-3">
                 <h6 class="modal-title fw-bold"><i class="fas fa-plus-circle me-2"></i>Yeni Görev Tanımla</h6>
                 <button type="button" class="btn-close btn-close-white shadow-none" data-bs-dismiss="modal"></button>
             </div>
-            <form asp-controller="Gorev" asp-action="Ekle" method="post" enctype="multipart/form-data">
-                <div class="modal-body p-4 pb-1">
-                    <div class="mb-3">
+
+            <form asp-controller="Gorev" asp-action="Ekle" method="post" enctype="multipart/form-data" class="d-flex flex-column w-100" style="flex: 1;">
+                
+                <div class="modal-body p-4 flex-grow-1 d-flex flex-column">
+                    <div class="mb-4">
                         <label class="small fw-bold text-muted mb-1 text-uppercase">Departman Seçin</label>
                         <select class="form-select form-select-sm shadow-none" onchange="yeniGorevPersonelFiltrele(this)">
                             <option value="all">Tüm Departmanlar</option>
@@ -590,7 +593,7 @@
                         </select>
                     </div>
 
-                    <div class="mb-3">
+                    <div class="mb-4">
                         <label class="small fw-bold text-muted mb-1 text-uppercase">Personel Seçin</label>
                         <select name="PersonelRef" class="form-select form-select-sm shadow-none modal-pers-select" required>
                             <option value="" selected disabled>Personel Seçiniz...</option>
@@ -603,22 +606,23 @@
                         </select>
                     </div>
 
-                    <div class="mb-3">
+                    <div class="mb-4">
                         <label class="small fw-bold text-muted mb-1 text-uppercase">Görev Açıklaması</label>
-                        <textarea name="Aciklama" class="form-control form-control-sm shadow-none" rows="2" required placeholder="Yapılacak işi detaylandırın..."></textarea>
+                        <textarea name="Aciklama" class="form-control form-control-sm shadow-none" rows="3" required placeholder="Yapılacak işi detaylandırın..."></textarea>
                     </div>
 
-                    <div class="mb-3">
+                    <div class="mb-4">
                         <label class="small fw-bold text-primary mb-1 text-uppercase">Personel Notu (Opsiyonel)</label>
-                        <textarea name="PersonelNotu" class="form-control form-control-sm shadow-none border-primary border-opacity-25" rows="2" style="background-color: #f8f9ff;"></textarea>
+                        <textarea name="PersonelNotu" class="form-control form-control-sm shadow-none border-primary border-opacity-25" rows="3" style="background-color: #f8f9ff;"></textarea>
                     </div>
 
-                    <div class="p-2 rounded-3 mb-2" style="background-color: #f8f9fa; border: 1px dashed #dee2e6;">
-                        <label class="small fw-bold text-muted mb-1 text-uppercase"><i class="fas fa-camera me-1"></i> Fotoğraf Ekle</label>
+                    <div class="p-3 rounded-3 mt-auto" style="background-color: #f8f9fa; border: 1px dashed #dee2e6;">
+                        <label class="small fw-bold text-muted mb-2 text-uppercase"><i class="fas fa-camera me-1"></i> Fotoğraf Ekle</label>
                         <input type="file" name="Fotograf" class="form-control form-control-sm bg-white border-0 shadow-sm" multiple accept="image/*" />
                     </div>
                 </div>
-                <div class="modal-footer border-0 bg-light-subtle py-3 px-4">
+
+                <div class="modal-footer border-0 bg-light-subtle py-3 px-4 mt-auto">
                     <div class="d-flex w-100 align-items-center">
                         <button type="button" class="btn btn-sm btn-link text-secondary text-decoration-none fw-bold p-0 shadow-none me-auto" data-bs-dismiss="modal" style="font-size: 0.8rem;">Vazgeç</button>
                         <button type="submit" class="btn btn-sm btn-primary px-3 rounded-pill shadow-sm fw-bold py-2 d-flex align-items-center justify-content-center" style="font-size: 0.8rem; width: auto; min-width: 120px;">

@@ -348,29 +348,30 @@
                                 hoverOffset: 6
                             }]
                         },
-                        options: {
-                            maintainAspectRatio: false,
-                            cutout: '65%', 
-                            plugins: {
-                                legend: { 
-                                    position: 'right', 
-                                    labels: { 
-                                        boxWidth: 12, 
-                                        usePointStyle: true, 
-                                        font: { size: 11, family: "'Plus Jakarta Sans', sans-serif" } 
-                                    } 
-                                },
-                                tooltip: {
-                                    callbacks: {
-                                        label: function(context) {
-                                            let label = context.label || '';
-                                            let adet = aiKategoriData[context.dataIndex].adet;
-                                            return ` ${label.split('(')[0].trim()} : ${adet} Görev`;
-                                        }
-                                    }
-                                }
-                            }
-                        }
+                    options: {
+    maintainAspectRatio: false, // [cite: 95]
+    cutout: '65%', // [cite: 96]
+    plugins: {
+        legend: { 
+            // Ekran genişliği 768px'den küçükse (mobil) 'bottom', büyükse 'right' yap
+            position: window.innerWidth < 768 ? 'bottom' : 'right', 
+            labels: { 
+                boxWidth: 12, // 
+                usePointStyle: true, // [cite: 98]
+                font: { size: 11, family: "'Plus Jakarta Sans', sans-serif" } // [cite: 98]
+            } 
+        },
+        tooltip: {
+            callbacks: {
+                label: function(context) {
+                    let label = context.label || ''; // [cite: 101, 102]
+                    let adet = aiKategoriData[context.dataIndex].adet; // [cite: 102]
+                    return ` ${label.split('(')[0].trim()} : ${adet} Görev`; // [cite: 102]
+                }
+            }
+        }
+    }
+}
                     });
                 }
 

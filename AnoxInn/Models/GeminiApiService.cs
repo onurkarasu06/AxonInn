@@ -9,11 +9,13 @@ namespace AxonInn.Models
     public class GeminiApiService
     {
         private readonly HttpClient _httpClient;
-        private readonly string _apiKey = "AIzaSyCCUcgnqu5DYl7fGH3Yn5HdChafi1IDuWQ";
+        private readonly string _apiKey;
 
-        public GeminiApiService(HttpClient httpClient)
+        public GeminiApiService(HttpClient httpClient, IConfiguration configuration)
         {
             _httpClient = httpClient;
+            // Şifreyi doğrudan yazmak yerine appsettings.json'dan çekiyoruz
+            _apiKey = configuration["GeminiApi:ApiKey"] ?? throw new ArgumentNullException("Gemini API Key bulunamadı!");
         }
 
         public async Task<string> KategorizeEtAsync(string aciklama, string? personelNotu)
@@ -24,7 +26,7 @@ namespace AxonInn.Models
 
             string prompt = $@"
 Sen bir otel yönetim sistemi asistanısın. Aşağıdaki görev açıklaması ve personel notunu okuyarak bu görevi şu 10 kategoriden SADECE BİRİNE ata: 
-[Teknik Arıza, Kat Hizmetleri, Müşteri Talebi, Güvenlik, Ön Büro, Yiyecek/İçecek, Bilgi İşlem, Satın Alma, Depo, Peyzaj, Havuz, Diğer]
+[Teknik Arıza, Temizlik Ve Kat Hizmetleri, Müşteri Talebi, Güvenlik, Ön Büro, Yiyecek Ve İçecek, Bilgi İşlem, Satın Alma, Depo, Peyzaj, Havuz, İnsan Kaynakları, Diğer]
 
 Görev Açıklaması: {aciklama}
 Personel Notu: {personelNotu ?? "Not girilmemiş"}
@@ -61,20 +63,20 @@ Lütfen SADECE kategori adını yaz. Nokta, tırnak işareti, açıklama veya ek
                         string gercekHata = errDoc.RootElement.GetProperty("error").GetProperty("message").GetString() ?? "Bilinmeyen 404 Hatası";
 
                         // DB'deki AiKategori NVARCHAR(50) olduğu için hata mesajının ilk 45 harfini alıyoruz (yoksa sistem çöker)
-                        //return gercekHata.Length > 45 ? gercekHata.Substring(0, 45) : gercekHata;
-                        return "Değerlendirilemeyen";
+                        return gercekHata.Length > 45 ? gercekHata.Substring(0, 45) : gercekHata;
                     }
                     catch
                     {
                         return $"API Red: {response.StatusCode}";
                     }
+                    //return "Tanımsız";
                 }
             }
             catch (Exception ex)
             {
-                //string hata = ex.Message;
-                //return hata.Length > 45 ? hata.Substring(0, 45) : hata;
-                return "Değerlendirilemeyen";
+                string hata = ex.Message;
+                return hata.Length > 45 ? hata.Substring(0, 45) : hata;
+                //return "Tanımsız";
             }
         }
     }

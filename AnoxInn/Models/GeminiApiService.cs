@@ -24,7 +24,7 @@ namespace AxonInn.Models
 
             string prompt = $@"
 Sen bir otel yönetim sistemi asistanısın. Aşağıdaki görev açıklaması ve personel notunu okuyarak bu görevi şu 10 kategoriden SADECE BİRİNE ata: 
-[Teknik Arıza, Temizlik ve Kat Hizmetleri, Müşteri Talebi, Güvenlik, Resepsiyon ve Ön Büro, Yiyecek ve İçecek (F&B), Bilgi İşlem (IT), Satın Alma ve Depo, Peyzaj ve Çevre, Diğer]
+[Teknik Arıza, Kat Hizmetleri, Müşteri Talebi, Güvenlik, Ön Büro, Yiyecek/İçecek, Bilgi İşlem, Satın Alma, Depo, Peyzaj, Havuz, Diğer]
 
 Görev Açıklaması: {aciklama}
 Personel Notu: {personelNotu ?? "Not girilmemiş"}
@@ -61,7 +61,8 @@ Lütfen SADECE kategori adını yaz. Nokta, tırnak işareti, açıklama veya ek
                         string gercekHata = errDoc.RootElement.GetProperty("error").GetProperty("message").GetString() ?? "Bilinmeyen 404 Hatası";
 
                         // DB'deki AiKategori NVARCHAR(50) olduğu için hata mesajının ilk 45 harfini alıyoruz (yoksa sistem çöker)
-                        return gercekHata.Length > 45 ? gercekHata.Substring(0, 45) : gercekHata;
+                        //return gercekHata.Length > 45 ? gercekHata.Substring(0, 45) : gercekHata;
+                        return "Değerlendirilemeyen";
                     }
                     catch
                     {
@@ -71,8 +72,9 @@ Lütfen SADECE kategori adını yaz. Nokta, tırnak işareti, açıklama veya ek
             }
             catch (Exception ex)
             {
-                string hata = ex.Message;
-                return hata.Length > 45 ? hata.Substring(0, 45) : hata;
+                //string hata = ex.Message;
+                //return hata.Length > 45 ? hata.Substring(0, 45) : hata;
+                return "Değerlendirilemeyen";
             }
         }
     }

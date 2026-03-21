@@ -108,6 +108,7 @@ namespace AxonInn.Controllers
                 yeniPersonel.AktifMi = 1;
                 yeniPersonel.MailOnayliMi = 0;
                 yeniPersonel.VerificationToken = Guid.NewGuid().ToString();
+                yeniPersonel.Sifre = BCrypt.Net.BCrypt.HashPassword(yeniPersonel.Sifre); ;
 
                 // 🛡️ GÜVENLİK 2: RAM Bombası kalkanı. Sadece resim formatında ve max 5 MB dosyalara izin verilir.
                 if (yuklenenFoto != null && yuklenenFoto.Length > 0)
@@ -239,7 +240,7 @@ namespace AxonInn.Controllers
                     dbPersonel.AktifMi = p.AktifMi;
 
                     if (!string.IsNullOrWhiteSpace(p.Sifre))
-                        dbPersonel.Sifre = p.Sifre;
+                        dbPersonel.Sifre = BCrypt.Net.BCrypt.HashPassword(p.Sifre); 
 
                     await _context.SaveChangesAsync();
 

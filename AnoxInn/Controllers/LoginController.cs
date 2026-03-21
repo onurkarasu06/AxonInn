@@ -1,8 +1,9 @@
 ﻿using AxonInn.Models;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
-using System.Text.Json;
 using System.Net.Mail; // YENİ: Yüksek hızlı mail format kontrolü için
+using System.Text.Json;
 
 namespace AxonInn.Controllers
 {
@@ -36,6 +37,9 @@ namespace AxonInn.Controllers
 
         [HttpPost]
         [ValidateAntiForgeryToken]
+        // 🛡️ GÜVENLİK 1: Brute-Force ve DDoS saldırılarına karşı hız sınırlayıcı (Rate Limiting).
+        // Hacker'ların saniyede yüzlerce şifre deneyerek sunucu CPU'sunu (BCrypt yüzünden) kilitlemesini önler.
+        [EnableRateLimiting("LoginLimit")]
         public async Task<ActionResult> Login(string email, string password)
         {
             try
@@ -55,28 +59,30 @@ namespace AxonInn.Controllers
                     // ⚡ VERİTABANI AĞ (NETWORK) OPTİMİZASYONU:
                     // Log atarken ikinci bir SQL sorgusu oluşmasın diye Departman ve Hotel isimlerini aynı anda çekiyoruz. (Sıfır N+1 Problemi)
                     var dbSonuc = await _context.Personels
-                        .AsNoTracking()
-                        .Where(p => p.MailAdresi == email && p.Sifre == password && p.AktifMi == 1)
-                        .Select(p => new
-                        {
-                            Personel = new Personel
-                            {
-                                Id = p.Id,
-                                Adi = p.Adi,
-                                Soyadi = p.Soyadi,
-                                Yetki = p.Yetki,
-                                DepartmanRef = p.DepartmanRef,
-                                MailAdresi = p.MailAdresi,
-                                TelefonNumarasi = p.TelefonNumarasi,
-                                MailOnayliMi = p.MailOnayliMi
-                            },
-                            DepartmanAdi = p.DepartmanRefNavigation != null ? p.DepartmanRefNavigation.Adi : "",
-                            HotelAdi = (p.DepartmanRefNavigation != null && p.DepartmanRefNavigation.HotelRefNavigation != null) ? p.DepartmanRefNavigation.HotelRefNavigation.Adi : ""
-                        })
-                        .FirstOrDefaultAsync();
+                                          .AsNoTracking()
+                                          .Where(p => p.MailAdresi == email && p.AktifMi == 1)
+                                          .Select(p => new
+                                          {
+                                              Personel = new Personel
+                                              {
+                                                  Id = p.Id,
+                                                  Adi = p.Adi,
+                                                  Soyadi = p.Soyadi,
+                                                  Yetki = p.Yetki,
+                                                  DepartmanRef = p.DepartmanRef,
+                                                  MailAdresi = p.MailAdresi,
+                                                  TelefonNumarasi = p.TelefonNumarasi,
+                                                  MailOnayliMi = p.MailOnayliMi,
+                                                  Sifre = p.Sifre
+                                              },
+                                              DepartmanAdi = p.DepartmanRefNavigation != null ? p.DepartmanRefNavigation.Adi : "",
+                                              HotelAdi = (p.DepartmanRefNavigation != null && p.DepartmanRefNavigation.HotelRefNavigation != null) ? p.DepartmanRefNavigation.HotelRefNavigation.Adi : ""
+                                          })
+                                          .FirstOrDefaultAsync();
 
-                    if (dbSonuc != null && dbSonuc.Personel != null)
+                    if (dbSonuc != null && dbSonuc.Personel != null && BCrypt.Net.BCrypt.Verify(password, dbSonuc.Personel.Sifre))
                     {
+                        dbSonuc.Personel.Sifre = null;
                         var personel = dbSonuc.Personel;
 
                         if (personel.MailOnayliMi == 0)

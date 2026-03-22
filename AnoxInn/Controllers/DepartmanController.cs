@@ -411,5 +411,54 @@ namespace AxonInn.Controllers
 
             return telefon.Trim();
         }
+
+        [HttpPost]
+        public async Task<IActionResult> AktivasyonMailiGonder(Personel p)
+        {
+            try
+            {
+                var personelJson = HttpContext.Session.GetString("GirisYapanPersonel");
+                if (string.IsNullOrEmpty(personelJson))
+                    return RedirectToAction("Login", "Login");
+
+                var loginOlanPersonel = JsonSerializer.Deserialize<Personel>(personelJson);
+                var dbPersonel = await _context.Personels.FindAsync(p.Id);
+
+                if (dbPersonel != null)
+                {
+                    if (dbPersonel.AktifMi==1 && dbPersonel.MailOnayliMi==0 & dbPersonel.VerificationToken!=null)
+                    {
+                        bool mailBasariliMi = await SendVerificationEmailAsync(dbPersonel.MailAdresi, dbPersonel.VerificationToken);
+
+                        if (mailBasariliMi)
+                        {
+                            await LogKaydetAsync(loginOlanPersonel, "Personel Aktivasyon Maili Gönderildi.", "Aktivasyon Maili Gönderildi", dbPersonel);
+                            TempData["Mesaj"] = $"{dbPersonel.MailAdresi} adresine aktivasyon maili gönderildi.";
+                            TempData["MesajTipi"] = "success";
+                        }
+                        else
+                        {
+                            await LogKaydetAsync(loginOlanPersonel, "Personel Aktivasyon Maili Gönderilemedi.", "Aktivasyon Maili Gönderilemedi.", dbPersonel);
+                            TempData["Mesaj"] = "Aktivasyon maili gönderilemedi. Lütfen sistem yöneticisiyle iletişime geçin.";
+                            TempData["MesajTipi"] = "warning";
+                        }
+                    }
+                    else
+                    {
+                        await LogKaydetAsync(loginOlanPersonel, "Personel Aktivasyon Maili Gönderilmedi.", "Aktivasyon maili gönderilmedi! Kullanıcı Pasif Durumda Yada Daha Önce Mail Adresi Aktivasyonu Yapıldı.", dbPersonel);
+                        TempData["Mesaj"] = "Aktivasyon maili gönderilmedi! Kullanıcı Pasif Durumda Yada Daha Önce Mail Adresi Aktivasyonu Yapıldı.";
+                        TempData["MesajTipi"] = "warning";
+                    }
+
+                }
+
+
+                return RedirectToAction("Departman", "Departman");
+            }
+            catch (Exception)
+            {
+                return View("~/Views/Error/Error.cshtml", new ErrorViewModel { RequestId = Activity.Current?.Id ?? HttpContext.TraceIdentifier });
+            }
+        }
     }
 }

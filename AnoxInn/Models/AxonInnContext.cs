@@ -35,7 +35,7 @@ public partial class AxonInnContext : DbContext
         // ⚡ KRİTİK HATA (NVARCHAR(MAX)) ÖNLEMİ: AuditLog tablosu kısıtlamaları eklendi
         modelBuilder.Entity<AuditLog>(entity =>
         {
-            entity.ToTable("AuditLog");
+            entity.ToTable("AuditLog", "axoninnc_user");
             entity.HasKey(e => e.Id);
 
             // Loglar sürekli tarihe göre sorgulanır, Table Scan'i (Tüm Tablo Tarama) önlemek için İndeks şarttır.
@@ -50,15 +50,17 @@ public partial class AxonInnContext : DbContext
             entity.Property(e => e.IlgiliTablo).HasMaxLength(50).IsUnicode(false);
             entity.Property(e => e.IslemTipi).HasMaxLength(150);
             entity.Property(e => e.YapanAdSoyad).HasMaxLength(150);
-            entity.Property(e => e.YapanDepartmanAd).HasMaxLength(150);
-            entity.Property(e => e.YapanHotelAd).HasMaxLength(150);
+            entity.Property(e => e.YapanDepartmanAd).HasMaxLength(100);
+            entity.Property(e => e.YapanHotelAd).HasMaxLength(100);
+            entity.Property(e => e.IslemTarihi).HasDefaultValueSql("getdate()");
         });
 
         modelBuilder.Entity<Departman>(entity =>
         {
             entity.ToTable("Departman");
 
-            entity.HasIndex(e => e.HotelRef, "IX_Departman_HotelRef");
+            entity.HasIndex(e => e.HotelRef, "IX_Departman_HotelRef_Covering")
+       .IncludeProperties(e => e.Adi);
 
             entity.Property(e => e.Id).HasColumnName("ID");
             entity.Property(e => e.Adi).HasMaxLength(50);
@@ -74,22 +76,32 @@ public partial class AxonInnContext : DbContext
         {
             entity.ToTable("Gorev");
 
-            entity.HasIndex(e => e.PersonelRef, "IX_Gorev_PersonelRef");
-            entity.HasIndex(e => e.Durum, "IX_Gorev_Durum");
+            // ⚡ DASHBOARD KOMBİNE İNDEKS: PersonelRef ve Durum ayrı ayrı değil, SQL'deki gibi tek bir kompozit indeks olarak tanımlandı.
+            // Dashboard'daki COUNT ve GROUP BY sorgularının yükünü doğrudan bu indeks çeker.
+            entity.HasIndex(e => new { e.PersonelRef, e.Durum }, "IX_Gorev_PersonelRef_Durum");
 
-            // ⚡ FULL TABLE SCAN KORUMASI: Görev listesinde tarihe göre "OrderByDescending" yapıldığından bu indeks eklendi.
-            entity.HasIndex(e => e.KayitTarihi, "IX_Gorev_KayitTarihi");
+            // ⚡ FULL TABLE SCAN KORUMASI: Görev listesinde tarihe göre "OrderByDescending" yapıldığından bu indeks korundu.
+            entity.HasIndex(e => e.KayitTarihi, "IX_Gorev_KayitTarihi").IsDescending();
 
+            // ⚡ YAPAY ZEKA FİLTRELİ İNDEKS: Sadece AiKategori dolu olan kayıtları belleğe alan performanslı indeks eklendi.
+            entity.HasIndex(e => e.AiKategori, "IX_Gorev_AiKategori")
+                  .IncludeProperties(e => e.PersonelRef)
+                  .HasFilter("([AiKategori] IS NOT NULL)");
+
+            // --- KOLON YAPILANDIRMALARI ---
             entity.Property(e => e.Id).HasColumnName("ID");
             entity.Property(e => e.CozumBaslamaTarihi).HasColumnType("datetime");
             entity.Property(e => e.CozumBitisTarihi).HasColumnType("datetime");
+            entity.Property(e => e.KayitTarihi).HasColumnType("datetime");
 
             // Açıklama ve Not alanlarının SQL'de NVarChar(Max) olup veritabanını şişirmemesi için kısıtlandı.
             entity.Property(e => e.Aciklama).HasColumnName("Aciklama").HasMaxLength(2000);
             entity.Property(e => e.PersonelNotu).HasMaxLength(2000);
 
-            entity.Property(e => e.KayitTarihi).HasColumnType("datetime");
+            // Veritabanındaki AiKategori uzunluğu (50) ile eşitlendi (NVARCHAR(MAX) olmasını engeller).
+            entity.Property(e => e.AiKategori).HasMaxLength(50);
 
+            // --- İLİŞKİLER (FOREIGN KEYS) ---
             entity.HasOne(d => d.PersonelRefNavigation)
                 .WithMany(p => p.Gorevs)
                 .HasForeignKey(d => d.PersonelRef)
@@ -122,17 +134,24 @@ public partial class AxonInnContext : DbContext
         {
             entity.ToTable("Personel");
 
+            // --- STANDART İNDEKSLER ---
             entity.HasIndex(e => e.DepartmanRef, "IX_Personel_DepartmanRef");
-            entity.HasIndex(e => e.MailAdresi, "IX_Personel_MailAdresi");
             entity.HasIndex(e => e.TelefonNumarasi, "IX_Personel_TelefonNumarasi");
 
-            // ⚡ VERİTABANI CPU OPTİMİZASYONU: "Login" sorgusunun maliyetini sıfıra indiren Bileşik İndeks (Composite Index)
-            entity.HasIndex(e => new { e.MailAdresi, e.Sifre, e.AktifMi }, "IX_Personel_Login");
+            // ⚡ GÖREV DASHBOARD OPTİMİZASYONU: Beklemede/işlemde olan görevleri departmana göre sayarken tabloya (Key Lookup) gitmeyi engeller.
+            entity.HasIndex(e => new { e.AktifMi, e.DepartmanRef }, "IX_Personel_Aktif_Departman")
+                  .IncludeProperties(e => new { e.Adi, e.Soyadi });
 
-            // ⚡ GİZLİ SORGULARI HIZLANDIRMA: E-Posta Onay Linkini (VerificationToken) ve Aktif Personelleri ararken sistemi yormaması için İndeks
-            entity.HasIndex(e => e.VerificationToken, "IX_Personel_VerificationToken");
-            entity.HasIndex(e => e.AktifMi, "IX_Personel_AktifMi");
+            // ⚡ GİRİŞ (LOGIN) OPTİMİZASYONU: Login sorgusunun ihtiyaç duyduğu tüm kolonları kapsayan (Covering Index) devasa optimizasyon.
+            entity.HasIndex(e => new { e.MailAdresi, e.AktifMi }, "IX_Personel_MailAdresi_Aktif_v2")
+                  .IncludeProperties(e => new { e.DepartmanRef, e.Yetki, e.Sifre, e.Adi, e.Soyadi, e.MedenHali, e.TelefonNumarasi, e.MailOnayliMi });
 
+            // ⚡ ŞİFRE SIFIRLAMA & MAİL ONAY: Tüm tabloyu taramak yerine SADECE token'ı dolu olanları bellekte tutan filtrelenmiş (Filtered) indeks.
+            entity.HasIndex(e => new { e.VerificationToken, e.AktifMi }, "IX_Personel_VerificationToken_Aktif")
+                  .IncludeProperties(e => new { e.MailAdresi, e.MailOnayliMi })
+                  .HasFilter("[VerificationToken] IS NOT NULL");
+
+            // --- KOLON YAPILANDIRMALARI ---
             entity.Property(e => e.Id).HasColumnName("ID");
             entity.Property(e => e.Adi).HasMaxLength(50);
             entity.Property(e => e.Soyadi).HasMaxLength(50);
@@ -144,9 +163,12 @@ public partial class AxonInnContext : DbContext
             entity.Property(e => e.TelefonNumarasi).HasMaxLength(20).IsUnicode(false);
             entity.Property(e => e.Sifre).HasMaxLength(256).IsUnicode(false);
 
+            entity.Property(e => e.MailOnayliMi).HasDefaultValue((byte)0);
+
             // GUID token formatı 36 karakterdir, 50 ile güvenli şekilde sınırlandırıldı.
             entity.Property(e => e.VerificationToken).HasMaxLength(50).IsUnicode(false);
 
+            // --- İLİŞKİLER (FOREIGN KEYS) ---
             entity.HasOne(d => d.DepartmanRefNavigation)
                 .WithMany(p => p.Personels)
                 .HasForeignKey(d => d.DepartmanRef)

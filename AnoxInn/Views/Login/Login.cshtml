@@ -99,44 +99,57 @@
             box-shadow: 0 10px 20px rgba(13, 110, 253, 0.3) !important;
         }
 
+        /* ======================================================== */
+        /* MOBİL DÜZEN - Tam Ekran Dengesi ve Orantılı Boşluklar    */
+        /* ======================================================== */
         @@media (max-width: 767px) {
             body {
-                align-items: flex-start;
-                padding-top: env(safe-area-inset-top, 20px);
-                padding-bottom: 20px;
+                align-items: stretch; /* Formun tüm ekrana yayılabilmesi için tavan hizalamasını iptal eder */
+                padding: 0;
                 overflow-y: auto;
             }
             .login-card-container {
-                padding: 10px;
+                padding: max(20px, env(safe-area-inset-top)) 20px max(20px, env(safe-area-inset-bottom)) 20px;
+                display: flex;
+                flex-direction: column;
+                min-height: 100dvh; /* Ekran yüksekliğini tam doldurur */
             }
             .card {
                 border-radius: 1.5rem;
+                margin: auto 0; /* Kartı dikeyde KUSURSUZ merkeze iter */
+            }
+            .card-body {
+                padding: 2.5rem 1.5rem !important; /* Objelerin kenarlara sıkışmasını önler, ferahlatır */
             }
             .brand-logo {
-                width: 60px !important;
-                height: 60px !important;
-                margin-bottom: 10px !important;
+                width: 70px !important;
+                height: 70px !important;
+                margin-bottom: 15px !important;
                 display: block !important;
                 visibility: visible !important;
                 opacity: 1 !important;
             }
             h1 {
-                font-size: 1.8rem !important;
+                font-size: 2.2rem !important;
                 margin-bottom: 5px !important;
             }
             .login-divider {
-                border-bottom: 1px solid #e9ecef;
-                padding-bottom: 1rem;
-                margin-bottom: 0.5rem;
+                border-bottom: 1px solid rgba(0,0,0,0.06);
+                padding-bottom: 1.5rem; /* Logo ile form arasına ferah boşluk */
+                margin-bottom: 1.5rem; 
             }
-            .card-body {
-                padding: 1.5rem 1rem !important;
-            }
+            /* Inputlar arasındaki sıkışık mesafeyi orantılı hale getirdik */
             .mb-3 {
-                margin-bottom: 0.8rem !important;
+                margin-bottom: 1.25rem !important; 
             }
             .mb-4 {
-                margin-bottom: 1rem !important;
+                margin-bottom: 1.75rem !important;
+            }
+            /* Alt kısımdaki boşluğu silen ve footer'ı en alta yapıştıran sihirli alan */
+            .mobile-footer {
+                margin-top: auto !important; /* Formu ortada bırakıp kendini dibe iter */
+                padding-top: 1.5rem;
+                padding-bottom: 10px;
             }
         }
 
@@ -150,7 +163,7 @@
 
 <body>
     <div class="login-card-container">
-        <div class="card shadow-lg border-0 overflow-hidden" style="border-radius: 2rem;">
+        <div class="card shadow-lg border-0 overflow-hidden">
             <div class="card-body p-4 p-md-5">
                 <div class="row align-items-center">
 
@@ -227,13 +240,13 @@
                     </div>
 
                     <div class="text-end mb-4">
-                        <a href="#" data-bs-toggle="modal" data-bs-target="#forgotPasswordModal" class="text-decoration-none small fw-bold brand-gradient transition-hover d-inline-block" style="font-size: 0.75rem;">Şifremi mi Unuttum?</a>
+                        <a href="#" data-bs-toggle="modal" data-bs-target="#forgotPasswordModal" class="text-decoration-none small fw-bold brand-gradient transition-hover d-inline-block" style="font-size: 0.75rem;">Şifremi Unuttum?</a>
                     </div>
                 </div>
             </div>
         </div>
 
-        <div class="text-center mt-4">
+        <div class="text-center mt-4 mobile-footer">
             <div style="font-size: 0.65rem; color: #adb5bd; letter-spacing: 1.5px; font-weight: 700;">
                 &copy; @DateTime.Now.Year <span class="brand-gradient fw-black" style="font-size: 0.75rem;">AxonINN</span>
                 

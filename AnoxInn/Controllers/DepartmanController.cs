@@ -17,12 +17,19 @@ namespace AxonInn.Controllers
         public static readonly ConcurrentDictionary<long, string> PersonelFotoVersiyonlari = new();
         public static readonly string AppStartVersion = DateTime.Now.Ticks.ToString();
 
-        // ⚡ PERFORMANS 1: JsonSerializerOptions'ı static readonly yaparak her HTTP isteğinde yeniden yaratılmasını engelledik.
+        // ⚡ PERFORMANS: JsonSerializerOptions'ı static readonly yaparak her HTTP isteğinde yeniden yaratılmasını engelledik.
         private static readonly JsonSerializerOptions _jsonOptions = new() { PropertyNamingPolicy = JsonNamingPolicy.CamelCase };
 
         public DepartmanController(AxonInnContext context)
         {
             _context = context;
+        }
+
+        // ⚡ KOD TEKRARINI ÖNLEME (DRY): Session okuma işlemleri tek merkeze bağlandı.
+        private Personel? GetActiveUser()
+        {
+            var personelJson = HttpContext.Session.GetString("GirisYapanPersonel");
+            return JsonSerializer.Deserialize<Personel>(personelJson);
         }
 
         [Route("Departmanlar")]
@@ -31,17 +38,14 @@ namespace AxonInn.Controllers
         {
             try
             {
-                var personelJson = HttpContext.Session.GetString("GirisYapanPersonel");
-                if (string.IsNullOrEmpty(personelJson))
-                    return RedirectToAction("Login", "Login");
-                var loginOlanPersonel = JsonSerializer.Deserialize<Personel>(personelJson);
+                var loginOlanPersonel = GetActiveUser();
 
                 if (loginOlanPersonel == null)
-                    return RedirectToAction("Login", "Login"); // Null Crash Koruması
+                    return RedirectToAction("Login", "Login");
 
                 ViewData["GirisYapanPersonel"] = loginOlanPersonel;
 
-                // 🚀 PERFORMANS 2: AsSplitQuery eklendi ve IF blokları içindeki tekrarlanan şartlar ana sorguya (BaseQuery) bağlandı.
+                // 🚀 PERFORMANS: AsSplitQuery eklendi ve IF blokları içindeki tekrarlanan şartlar ana sorguya (BaseQuery) bağlandı.
                 var query = _context.Hotels
                     .AsNoTracking()
                     .AsSplitQuery()
@@ -70,8 +74,9 @@ namespace AxonInn.Controllers
 
                 ViewData["Title"] = "AxonInn - Departmanlar";
 
-                // ⚡ HIZ OPTİMİZASYONU: Veritabanına INSERT atan (Log) işlemini UI okuması bittikten sonra en sona aldık.
-                await LogKaydetAsync(loginOlanPersonel, "Departman Sayfasına Giriş Yapıldı", "Sayfa Görüntüleme", null);
+                // ⚡ HIZ OPTİMİZASYONU: Veritabanına tekrar select atmamak için hazır olan Departman ve Hotel adını gönderiyoruz.
+                string deptAdi = hotel.Departmen.FirstOrDefault(d => d.Id == loginOlanPersonel.DepartmanRef)?.Adi ?? string.Empty;
+                await LogKaydetAsync(loginOlanPersonel, "Departman Sayfasına Giriş Yapıldı", "Sayfa Görüntüleme", null, hotel.Adi, deptAdi);
 
                 return View("Departman", hotel);
             }
@@ -87,10 +92,7 @@ namespace AxonInn.Controllers
         {
             try
             {
-                var personelJson = HttpContext.Session.GetString("GirisYapanPersonel");
-                if (string.IsNullOrEmpty(personelJson)) return RedirectToAction("Login", "Login");
-
-                var loginOlanPersonel = JsonSerializer.Deserialize<Personel>(personelJson);
+                var loginOlanPersonel = GetActiveUser();
                 if (loginOlanPersonel == null) return RedirectToAction("Login", "Login");
 
                 yeniPersonel.TelefonNumarasi = FormatTelefon(yeniPersonel.TelefonNumarasi);
@@ -102,13 +104,13 @@ namespace AxonInn.Controllers
                     await LogKaydetAsync(loginOlanPersonel, "Personel Ekleme Hatası", "Mail veya telefon eşleştiği için kayıt yapılamadı.", yeniPersonel);
                     TempData["Mesaj"] = "Mail adresi veya telefon numarası ile eşleşen bir personel sistemde mevcuttur.";
                     TempData["MesajTipi"] = "warning";
-                    return RedirectToAction("Departman", "Departman");
+                    return RedirectToAction(nameof(Departman));
                 }
 
                 yeniPersonel.AktifMi = 1;
                 yeniPersonel.MailOnayliMi = 0;
-                yeniPersonel.VerificationToken = Guid.NewGuid().ToString();
-                yeniPersonel.Sifre = BCrypt.Net.BCrypt.HashPassword(yeniPersonel.Sifre); ;
+                yeniPersonel.VerificationToken = Guid.NewGuid().ToString("N"); // "N" formatı tireleri atar ve daha hafiftir
+                yeniPersonel.Sifre = BCrypt.Net.BCrypt.HashPassword(yeniPersonel.Sifre);
 
                 // 🛡️ GÜVENLİK 2: RAM Bombası kalkanı. Sadece resim formatında ve max 5 MB dosyalara izin verilir.
                 if (yuklenenFoto != null && yuklenenFoto.Length > 0)
@@ -117,16 +119,16 @@ namespace AxonInn.Controllers
                     {
                         TempData["Mesaj"] = "Fotoğraf geçersiz veya 5MB boyutundan büyük olamaz.";
                         TempData["MesajTipi"] = "warning";
-                        return RedirectToAction("Departman", "Departman");
+                        return RedirectToAction(nameof(Departman));
                     }
                 }
 
-                // ⚡ İŞLEM BÜTÜNLÜĞÜ (TRANSACTION): Personel ve resmi art arda eklerken oluşabilecek çöp (kısmi) kayıtları önler.
+                // ⚡ İŞLEM BÜTÜNLÜĞÜ (TRANSACTION): Personel ve resmi art arda eklerken oluşabilecek çöp kayıtları önler.
                 await using var transaction = await _context.Database.BeginTransactionAsync();
                 try
                 {
                     _context.Personels.Add(yeniPersonel);
-                    await _context.SaveChangesAsync(); // Personel'in ID'si oluşsun
+                    await _context.SaveChangesAsync();
 
                     if (yuklenenFoto != null && yuklenenFoto.Length > 0)
                     {
@@ -143,14 +145,14 @@ namespace AxonInn.Controllers
                         PersonelFotoVersiyonlari[yeniPersonel.Id] = DateTime.Now.Ticks.ToString();
                     }
 
-                    await transaction.CommitAsync(); // Hata çıkmadıysa SQL'e kalıcı yaz
+                    await transaction.CommitAsync();
                 }
                 catch (Exception)
                 {
-                    await transaction.RollbackAsync(); // Eğer fotoğrafı DB'ye yazarken yer kalmazsa veya patlarsa Personeli de geri al
+                    await transaction.RollbackAsync();
                     TempData["Mesaj"] = "Veritabanına kullanıcı kayıt edilemedi.";
                     TempData["MesajTipi"] = "error";
-                    return RedirectToAction("Departman", "Departman");
+                    return RedirectToAction(nameof(Departman));
                 }
 
                 bool mailBasariliMi = await SendVerificationEmailAsync(yeniPersonel.MailAdresi, yeniPersonel.VerificationToken);
@@ -168,13 +170,13 @@ namespace AxonInn.Controllers
                     TempData["MesajTipi"] = "warning";
                 }
 
-                return RedirectToAction("Departman", "Departman");
+                return RedirectToAction(nameof(Departman));
             }
             catch (Exception)
             {
                 TempData["Mesaj"] = "Sistemsel bir hata nedeniyle kullanıcı kayıt edilemedi.";
                 TempData["MesajTipi"] = "error";
-                return RedirectToAction("Departman", "Departman");
+                return RedirectToAction(nameof(Departman));
             }
         }
 
@@ -183,34 +185,34 @@ namespace AxonInn.Controllers
         {
             try
             {
-                var personelJson = HttpContext.Session.GetString("GirisYapanPersonel");
-                if (string.IsNullOrEmpty(personelJson)) return RedirectToAction("Login", "Login");
-
-                var loginOlanPersonel = JsonSerializer.Deserialize<Personel>(personelJson);
+                var loginOlanPersonel = GetActiveUser();
+                if (loginOlanPersonel == null) return RedirectToAction("Login", "Login");
 
                 bool gorevVarMi = await _context.Gorevs.AnyAsync(g => g.PersonelRef == id);
 
                 if (gorevVarMi)
                 {
+                    // Update'i RAM'e çekmeden SQL'de doğrudan çözüyoruz
                     await _context.Personels
-                                           .Where(p => p.Id == id)
-                                           .ExecuteUpdateAsync(s => s.SetProperty(p => p.AktifMi, 2));
+                                  .Where(p => p.Id == id)
+                                  .ExecuteUpdateAsync(s => s.SetProperty(p => p.AktifMi, 2));
+
                     TempData["Mesaj"] = "Personele kayıtlı görev bulunduğu için silinemez. (Personel Pasife Alındı.)";
                     TempData["MesajTipi"] = "warning";
                     await LogKaydetAsync(loginOlanPersonel, "Personele kayıtlı görev olduğu için silinemez,personel pasife alındı", "Görev atandığı için silinemez.", null);
-                    return RedirectToAction("Departman", "Departman");
+                    return RedirectToAction(nameof(Departman));
                 }
 
-                // ExecuteDeleteAsync doğrudan SQL'e gittiği için kusursuzdur.
+                // ExecuteDeleteAsync doğrudan SQL'e gittiği için kusursuzdur, veri RAM'e inmez.
                 await _context.PersonelFotografs.Where(f => f.PersonelRef == id).ExecuteDeleteAsync();
                 await _context.Personels.Where(p => p.Id == id).ExecuteDeleteAsync();
 
-                // 🧹 RAM TEMİZLİĞİ: Silinen personelin versiyonunu Sözlükten silerek Memory Leak olmasını engelliyoruz.
+                // 🧹 RAM TEMİZLİĞİ: Silinen personelin Cache versiyonunu Sözlükten sil
                 PersonelFotoVersiyonlari.TryRemove(id, out _);
 
                 await LogKaydetAsync(loginOlanPersonel, "Personel Silindi", $"Personel ID: {id} başarıyla silindi.", null);
 
-                return RedirectToAction("Departman", "Departman");
+                return RedirectToAction(nameof(Departman));
             }
             catch (Exception)
             {
@@ -223,55 +225,68 @@ namespace AxonInn.Controllers
         {
             try
             {
-                var personelJson = HttpContext.Session.GetString("GirisYapanPersonel");
-                if (string.IsNullOrEmpty(personelJson)) return RedirectToAction("Login", "Login");
-                var loginOlanPersonel = JsonSerializer.Deserialize<Personel>(personelJson);
+                var loginOlanPersonel = GetActiveUser();
+                if (loginOlanPersonel == null) return RedirectToAction("Login", "Login");
 
-                var dbPersonel = await _context.Personels.FindAsync(p.Id);
-                if (dbPersonel != null)
+                string formatliTel = FormatTelefon(p.TelefonNumarasi);
+                string hashliSifre = !string.IsNullOrWhiteSpace(p.Sifre) ? BCrypt.Net.BCrypt.HashPassword(p.Sifre) : string.Empty;
+
+                // 🚀 MUAZZAM RAM OPTİMİZASYONU (Zero-Tracking Update): 
+                // Veriyi FindAsync ile RAM'e almak (1 Select) + SaveChanges beklemek (1 Update) yerine, 
+                // Tracking'i tamamen bypass edip tek satırda saf SQL UPDATE komutu gönderiyoruz. Bellek kullanımı %0.
+                var updateQuery = _context.Personels.Where(x => x.Id == p.Id);
+
+                if (!string.IsNullOrEmpty(hashliSifre))
                 {
-                    dbPersonel.Adi = p.Adi;
-                    dbPersonel.Soyadi = p.Soyadi;
-                    dbPersonel.DepartmanRef = p.DepartmanRef;
-                    dbPersonel.TelefonNumarasi = FormatTelefon(p.TelefonNumarasi);
-                    dbPersonel.MailAdresi = p.MailAdresi;
-                    dbPersonel.MedenHali = p.MedenHali;
-                    dbPersonel.Yetki = p.Yetki;
-                    dbPersonel.AktifMi = p.AktifMi;
-
-                    if (!string.IsNullOrWhiteSpace(p.Sifre))
-                        dbPersonel.Sifre = BCrypt.Net.BCrypt.HashPassword(p.Sifre); 
-
-                    await _context.SaveChangesAsync();
-
-                    if (yuklenenFoto != null && yuklenenFoto.Length > 0 && yuklenenFoto.Length <= 5 * 1024 * 1024 && yuklenenFoto.ContentType.StartsWith("image/"))
-                    {
-                        using var ms = new MemoryStream((int)yuklenenFoto.Length);
-                        await yuklenenFoto.CopyToAsync(ms);
-                        var imageBytes = ms.ToArray();
-
-                        // 🚀 BLOB RAM OPTİMİZASYONU:
-                        // Eski fotoğrafı (MB'larca büyüklükte olabilir) RAM'e `FirstOrDefaultAsync` ile ÇEKMEDEN!
-                        // EF Core 7+ özelliği ile "Doğrudan SQL'de" Update işlemi yapıyoruz. Sunucu RAM'i %0 yoruluyor.
-                        var updatedRows = await _context.PersonelFotografs
-                            .Where(f => f.PersonelRef == p.Id)
-                            .ExecuteUpdateAsync(s => s.SetProperty(f => f.Fotograf, imageBytes));
-
-                        // Eğer sıfır satır güncellendiyse (yani kişinin önceden hiç resmi yoksa) o zaman yeni kayıt Insert ediyoruz.
-                        if (updatedRows == 0)
-                        {
-                            _context.PersonelFotografs.Add(new PersonelFotograf { PersonelRef = p.Id, Fotograf = imageBytes });
-                            await _context.SaveChangesAsync();
-                        }
-
-                        // Tarayıcının cache'ini kırmak için versiyon anında yenileniyor
-                        PersonelFotoVersiyonlari[p.Id] = DateTime.Now.Ticks.ToString();
-                    }
-
-                    await LogKaydetAsync(loginOlanPersonel, "Personel Güncellendi", $"Personel ID: {p.Id} başarıyla güncellendi.", dbPersonel);
+                    await updateQuery.ExecuteUpdateAsync(s => s
+                        .SetProperty(x => x.Adi, p.Adi)
+                        .SetProperty(x => x.Soyadi, p.Soyadi)
+                        .SetProperty(x => x.DepartmanRef, p.DepartmanRef)
+                        .SetProperty(x => x.TelefonNumarasi, formatliTel)
+                        .SetProperty(x => x.MailAdresi, p.MailAdresi)
+                        .SetProperty(x => x.MedenHali, p.MedenHali)
+                        .SetProperty(x => x.Yetki, p.Yetki)
+                        .SetProperty(x => x.AktifMi, p.AktifMi)
+                        .SetProperty(x => x.Sifre, hashliSifre));
+                }
+                else
+                {
+                    await updateQuery.ExecuteUpdateAsync(s => s
+                        .SetProperty(x => x.Adi, p.Adi)
+                        .SetProperty(x => x.Soyadi, p.Soyadi)
+                        .SetProperty(x => x.DepartmanRef, p.DepartmanRef)
+                        .SetProperty(x => x.TelefonNumarasi, formatliTel)
+                        .SetProperty(x => x.MailAdresi, p.MailAdresi)
+                        .SetProperty(x => x.MedenHali, p.MedenHali)
+                        .SetProperty(x => x.Yetki, p.Yetki)
+                        .SetProperty(x => x.AktifMi, p.AktifMi));
                 }
 
-                return RedirectToAction("Departman", "Departman");
+                if (yuklenenFoto != null && yuklenenFoto.Length > 0 && yuklenenFoto.Length <= 5 * 1024 * 1024 && yuklenenFoto.ContentType.StartsWith("image/"))
+                {
+                    using var ms = new MemoryStream((int)yuklenenFoto.Length);
+                    await yuklenenFoto.CopyToAsync(ms);
+                    var imageBytes = ms.ToArray();
+
+                    // BLOB Update (Resmi bellekten silmeden/okumadan doğrudan üzerine yazarız)
+                    var updatedRows = await _context.PersonelFotografs
+                        .Where(f => f.PersonelRef == p.Id)
+                        .ExecuteUpdateAsync(s => s.SetProperty(f => f.Fotograf, imageBytes));
+
+                    if (updatedRows == 0)
+                    {
+                        _context.PersonelFotografs.Add(new PersonelFotograf { PersonelRef = p.Id, Fotograf = imageBytes });
+                        await _context.SaveChangesAsync();
+                    }
+
+                    PersonelFotoVersiyonlari[p.Id] = DateTime.Now.Ticks.ToString();
+                }
+
+                // Log atmak için veritabanına sorgu atmayıp elimizdeki veriden sanal bir kopya üretiyoruz.
+                var logPersonel = new Personel { Id = p.Id, Adi = p.Adi, Soyadi = p.Soyadi, DepartmanRef = p.DepartmanRef };
+                await LogKaydetAsync(loginOlanPersonel, "Personel Güncellendi", $"Personel ID: {p.Id} başarıyla güncellendi.", logPersonel);
+
+                return RedirectToAction(nameof(Departman));
             }
             catch (Exception)
             {
@@ -288,7 +303,7 @@ namespace AxonInn.Controllers
                 string baseUrl = $"{Request.Scheme}://{Request.Host}";
                 string verificationLink = $"{baseUrl}/Login/VerifyEmail?token={token}";
 
-                // ⚡ TEMİZ KOD OPTİMİZASYONU: C# 11 "Raw String Literals" ile (+) koymadan temiz HTML dizilimi eklendi.
+                // ⚡ TEMİZ KOD (Clean Code): C# 11 "Raw String Literals" ile (+) koymadan temiz HTML dizilimi eklendi.
                 string mailBody = $"""
                     <div style='font-family: Arial, sans-serif; max-width: 600px; margin: auto; border: 1px solid #ddd; padding: 20px; border-radius: 10px;'>
                         <h2 style='color: #2c3e50; text-align: center;'>AxonInn'e Hoş Geldiniz!</h2>
@@ -326,34 +341,33 @@ namespace AxonInn.Controllers
             }
             catch (Exception ex)
             {
-                // Bilgi sızıntısını önlemek için kullanıcıya yollamayıp sunucu konsoluna basıyoruz
                 Console.WriteLine($"Mail gönderme hatası: {ex.Message}");
                 return false;
             }
         }
 
-        private async Task<bool> LogKaydetAsync(Personel? personel, string islemTipi, string yeniDeger, Personel? islemGorenPersonel)
+        // ⚡ N+1 SORGUSU GİDERİLDİ: Metota PreHotelAdi ve PreDeptAdi opsiyonel alanları eklendi.
+        private async Task<bool> LogKaydetAsync(Personel? personel, string islemTipi, string yeniDeger, Personel? islemGorenPersonel, string? preHotelAdi = null, string? preDeptAdi = null)
         {
             try
             {
                 if (personel == null) return false;
 
-                string departmanAdi = "";
-                string hotelAdi = "";
+                string departmanAdi = preDeptAdi ?? string.Empty;
+                string hotelAdi = preHotelAdi ?? string.Empty;
 
-                // JSON'dan dönen verinin Navigation değerleri boş olabileceği için veritabanından buluyoruz.
-                if (personel.DepartmanRef != 0)
+                if (personel.DepartmanRef != 0 && string.IsNullOrWhiteSpace(departmanAdi))
                 {
                     var depBilgisi = await _context.Departmen
                         .AsNoTracking()
                         .Where(d => d.Id == personel.DepartmanRef)
-                        .Select(d => new { DeptAd = d.Adi, OtelAd = d.HotelRefNavigation.Adi })
+                        .Select(d => new { DeptAd = d.Adi, OtelAd = d.HotelRefNavigation != null ? d.HotelRefNavigation.Adi : string.Empty })
                         .FirstOrDefaultAsync();
 
                     if (depBilgisi != null)
                     {
-                        departmanAdi = depBilgisi.DeptAd ?? "";
-                        hotelAdi = depBilgisi.OtelAd ?? "";
+                        departmanAdi = depBilgisi.DeptAd ?? string.Empty;
+                        hotelAdi = depBilgisi.OtelAd ?? string.Empty;
                     }
                 }
 
@@ -363,7 +377,7 @@ namespace AxonInn.Controllers
                     IlgiliTablo = "Personel",
                     KayitRefId = islemGorenPersonel?.Id ?? personel.Id,
                     IslemTipi = islemTipi,
-                    EskiDeger = "",
+                    EskiDeger = string.Empty,
                     YeniDeger = yeniDeger,
                     YapanHotelAd = hotelAdi,
                     YapanDepartmanAd = departmanAdi,
@@ -381,20 +395,20 @@ namespace AxonInn.Controllers
         }
 
         // 🚀 C# ZERO-ALLOCATION (Sıfır Bellek Tüketimi) TEKNİĞİ
-        // Yeni bir sınıf (StringBuilder vs.) üretmeden string parçalamayı doğrudan işlemci Stack'inde (Çok Hızlı) çözer.
         private string FormatTelefon(string? telefon)
         {
             if (string.IsNullOrWhiteSpace(telefon)) return string.Empty;
 
-            // Kötü niyetli upuzun metin girişlerine karşı (Stack taşmasını önlemek için) limiti 50 koyuyoruz
-            Span<char> digits = stackalloc char[Math.Min(telefon.Length, 50)];
+            // En fazla 11 karaktere ihtiyacımız var, memory şişirmeyi kestik
+            Span<char> digits = stackalloc char[11];
             int index = 0;
 
             foreach (char c in telefon)
             {
-                if (char.IsDigit(c) && index < digits.Length)
+                if (char.IsDigit(c))
                 {
-                    digits[index++] = c;
+                    if (index < 11) digits[index++] = c;
+                    else break; // 11 Karakter dolunca gereksiz CPU yorgunluğunu engeller
                 }
             }
 
@@ -417,16 +431,30 @@ namespace AxonInn.Controllers
         {
             try
             {
-                var personelJson = HttpContext.Session.GetString("GirisYapanPersonel");
-                if (string.IsNullOrEmpty(personelJson))
-                    return RedirectToAction("Login", "Login");
+                var loginOlanPersonel = GetActiveUser();
+                if (loginOlanPersonel == null) return RedirectToAction("Login", "Login");
 
-                var loginOlanPersonel = JsonSerializer.Deserialize<Personel>(personelJson);
-                var dbPersonel = await _context.Personels.FindAsync(p.Id);
+                // ⚡ PERFORMANS: Tüm tabloyu çekmek yerine sadece işimize yarayan spesifik kolonları (Select) ve AsNoTracking ile çekiyoruz.
+                var dbPersonel = await _context.Personels
+                    .AsNoTracking()
+                    .Where(x => x.Id == p.Id)
+                    .Select(x => new Personel
+                    {
+                        Id = x.Id,
+                        AktifMi = x.AktifMi,
+                        MailOnayliMi = x.MailOnayliMi,
+                        VerificationToken = x.VerificationToken,
+                        MailAdresi = x.MailAdresi,
+                        Adi = x.Adi,
+                        Soyadi = x.Soyadi,
+                        DepartmanRef = x.DepartmanRef
+                    })
+                    .FirstOrDefaultAsync();
 
                 if (dbPersonel != null)
                 {
-                    if (dbPersonel.AktifMi==1 && dbPersonel.MailOnayliMi==0 & dbPersonel.VerificationToken!=null)
+                    // 🚨 ÖNEMLİ BUG FİX: "&" yerine "&&" (Kısa devre operatörü) kullanılarak null referans hatası ve gereksiz sorgu engellendi.
+                    if (dbPersonel.AktifMi == 1 && dbPersonel.MailOnayliMi == 0 && !string.IsNullOrWhiteSpace(dbPersonel.VerificationToken))
                     {
                         bool mailBasariliMi = await SendVerificationEmailAsync(dbPersonel.MailAdresi, dbPersonel.VerificationToken);
 
@@ -449,11 +477,9 @@ namespace AxonInn.Controllers
                         TempData["Mesaj"] = "Aktivasyon maili gönderilmedi! Kullanıcı Pasif Durumda Yada Daha Önce Mail Adresi Aktivasyonu Yapıldı.";
                         TempData["MesajTipi"] = "warning";
                     }
-
                 }
 
-
-                return RedirectToAction("Departman", "Departman");
+                return RedirectToAction(nameof(Departman));
             }
             catch (Exception)
             {

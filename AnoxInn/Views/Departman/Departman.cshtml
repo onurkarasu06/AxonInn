@@ -54,6 +54,8 @@
         object-position: top;
         background-color: #f8f9fa;
         padding: 2px;
+        /* 🚀 GPU HIZLANDIRMA (Donanım İvmesi): Büyüme efektinin tarayıcıda kasmasını önler */
+        will-change: transform;
     }
     
     .avatar-container:hover {
@@ -554,26 +556,27 @@
                     </div>
                 </div>
                 
-               <div class="modal-footer border-0 p-4 pt-2 d-flex justify-content-between align-items-center">
+                <div class="modal-footer border-0 p-4 pt-2 d-flex justify-content-between align-items-center">
                     
-                                                <div class="d-flex align-items-center gap-2">
-                                                    <button type="button" class="btn btn-secondary btn-sm rounded-pill shadow-sm py-2 px-3 fw-bold" data-bs-dismiss="modal">İptal</button>
-        
-                                                    <button type="submit" 
-                                                            formaction="@Url.Action("AktivasyonMailiGonder", "Departman")" 
-                                                            formnovalidate
-                                                            class="btn btn-link btn-sm text-decoration-none fw-bold text-primary" 
-                                                            id="btnAktivasyonGonder">
-                                                        Aktivasyon Maili Gönder
-                                                    </button>
-                                                </div>
-        
-                                                <button type="submit" class="btn btn-warning btn-sm rounded-pill fw-bold shadow-sm py-2 px-4 d-flex align-items-center justify-content-center">
-                                                    <span class="btn-text">KAYDET</span>
-                                                    <div class="spinner-border spinner-border-sm ms-2 d-none btn-spinner" role="status" aria-hidden="true"></div>
-                                                </button>
+                    <div class="d-flex align-items-center gap-2">
+                        <button type="button" class="btn btn-secondary btn-sm rounded-pill shadow-sm py-2 px-3 fw-bold" data-bs-dismiss="modal">İptal</button>
 
-                                            </div>
+                        <button type="submit" 
+                                formaction="@Url.Action("AktivasyonMailiGonder", "Departman")" 
+                                formnovalidate
+                                class="btn btn-link btn-sm text-decoration-none fw-bold text-primary d-flex align-items-center" 
+                                id="btnAktivasyonGonder">
+                            <span class="btn-text">Aktivasyon Maili Gönder</span>
+                            <div class="spinner-border spinner-border-sm ms-2 d-none btn-spinner" role="status" aria-hidden="true"></div>
+                        </button>
+                    </div>
+
+                    <button type="submit" class="btn btn-warning btn-sm rounded-pill fw-bold shadow-sm py-2 px-4 d-flex align-items-center justify-content-center">
+                        <span class="btn-text">KAYDET</span>
+                        <div class="spinner-border spinner-border-sm ms-2 d-none btn-spinner" role="status" aria-hidden="true"></div>
+                    </button>
+
+                </div>
             </form>
         </div>
     </div>
@@ -639,20 +642,69 @@
             const mainContent = document.getElementById('mainContent');
             if(mainContent) mainContent.classList.remove('d-none');
             
+            // 🚀 PERFORMANS & GÜVENLİK (Çoklu Buton Zekası): Formun içinde hangi submit butonuna basıldığını (e.submitter) yakalayıp SADECE onu kilitler.
             document.querySelectorAll('form').forEach(form => {
-                form.addEventListener('submit', function () {
-                    const submitBtn = this.querySelector('button[type="submit"]');
+                form.addEventListener('submit', function (e) {
+                    
+                    const submitBtn = e.submitter || this.querySelector('button[type="submit"]');
+                    
                     if (submitBtn) {
+                        // Eğer buton hali hazırda kilitliyse (Çift tıklama, Enter spam vb.) işlemi reddet
+                        if (submitBtn.disabled || submitBtn.classList.contains('btn-loading')) {
+                            e.preventDefault();
+                            return;
+                        }
+
+                        // Form kurallarına uygun mu veya "formnovalidate" attribute'u (Örn: Mail gönder) var mı kontrol et
+                        if (!this.checkValidity() && !submitBtn.hasAttribute('formnovalidate')) {
+                            return; 
+                        }
+
+                        submitBtn.classList.add('btn-loading');
+                        
+                        // Tarayıcının, butonu disable edince form action'ı iptal etmemesi için asenkron (0ms gecikme) veriyoruz
+                        setTimeout(() => submitBtn.disabled = true, 0);
+
                         const textSpan = submitBtn.querySelector('.btn-text');
                         const spinner = submitBtn.querySelector('.btn-spinner');
-                        submitBtn.classList.add('btn-loading');
-                        if(textSpan && spinner) {
-                            textSpan.innerText = 'İşleniyor...';
+                        
+                        if(textSpan) {
+                            submitBtn.setAttribute('data-original-text', textSpan.innerText);
+                            
+                            if (submitBtn.id === 'btnAktivasyonGonder') {
+                                textSpan.innerText = 'Gönderiliyor...';
+                            } else {
+                                textSpan.innerText = 'İşleniyor...';
+                            }
+                        }
+                        
+                        if(spinner) {
                             spinner.classList.remove('d-none');
                         }
                     }
                 });
             });
+        });
+
+        // 🚀 BFCache (Geri Tuşu) Kurtarıcı: Kullanıcı tarayıcıda geri tuşu ile sayfaya gelirse kilitli ve "işleniyor" kalan butonları açar
+        window.addEventListener('pageshow', function (event) {
+            if (event.persisted) {
+                document.querySelectorAll('.btn-loading').forEach(btn => {
+                    btn.classList.remove('btn-loading');
+                    btn.disabled = false;
+                    
+                    const textSpan = btn.querySelector('.btn-text');
+                    const spinner = btn.querySelector('.btn-spinner');
+                    
+                    if (textSpan && btn.hasAttribute('data-original-text')) {
+                        textSpan.innerText = btn.getAttribute('data-original-text');
+                    }
+                    
+                    if (spinner) {
+                        spinner.classList.add('d-none');
+                    }
+                });
+            }
         });
 
         function setDepartmanId(id, adi) {
@@ -703,6 +755,7 @@
             }
         }
 
+        // 🚀 MEMORY LEAK (Bellek Sızıntısı) FİXLENDİ: Her tıklandığında "new bootstrap.Modal" yaratarak RAM'in dolup tarayıcının çökmesi engellendi.
         function personelFotoGoster(src, ad) {
             const resimElem = document.getElementById('modalPersonelResim');
             const isimElem = document.getElementById('modalPersonelIsim');
@@ -712,7 +765,8 @@
             if (isimElem) isimElem.innerText = ad;
             
             if (modalElem) {
-                const myModal = new bootstrap.Modal(modalElem);
+                // Eğer daha önce açılmış bir modal bellekte varsa onu getirir, yoksa 1 kez yaratır.
+                const myModal = bootstrap.Modal.getOrCreateInstance(modalElem);
                 myModal.show();
             }
         }

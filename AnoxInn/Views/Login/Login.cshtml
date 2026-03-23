@@ -10,8 +10,10 @@
     <meta name="description" content="AxonInn - Akıllı Otel Yönetim Sistemi Giriş Ekranı" />
     <title>Axoninn - Giriş Yap</title>
 
+    <link rel="preload" href="/AxonInn.png" as="image" fetchpriority="high" />
+
     <link rel="preconnect" href="https://cdn.jsdelivr.net" />
-    <link rel="preconnect" href="https://cdnjs.cloudflare.com" />
+    <link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin="anonymous" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link rel="dns-prefetch" href="https://cdn.jsdelivr.net" />
@@ -19,10 +21,11 @@
 
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&display=swap" rel="stylesheet" />
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet" />
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" />
     
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" media="print" onload="this.media='all'" />
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css" media="print" onload="this.media='all'" />
     <noscript>
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" />
         <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css" />
     </noscript>
 
@@ -180,7 +183,7 @@
                                         <i class="fas fa-envelope text-primary opacity-50 small"></i>
                                     </span>
                                     <input type="email" class="form-control border-0 py-3 shadow-none"
-                                           id="Email" name="email" placeholder="EmailAdresiniz"
+                                           id="Email" name="email" placeholder="Email Adresiniz"
                                            required autocomplete="username" style="font-size: 0.9rem;" />
                                 </div>
                             </div>
@@ -217,12 +220,15 @@
 
                             <button class="btn btn-primary w-100 py-3 fw-bold text-uppercase shadow-lg transition-hover border-0 d-flex align-items-center justify-content-center"
                                     type="submit" id="loginBtn" style="border-radius: 15px; font-size: 0.9rem; letter-spacing: 1px; background: linear-gradient(45deg, #0d6efd, #0dcaf0);">
-                                <span id="btnText">Sisteme Giriş</span>
-                                <div id="btnSpinner" class="spinner-border spinner-border-sm ms-2 d-none" role="status" aria-hidden="true"></div>
+                                <span id="loginBtnText">Sisteme Giriş</span>
+                                <div id="loginBtnSpinner" class="spinner-border spinner-border-sm ms-2 d-none" role="status" aria-hidden="true"></div>
                             </button>
                         </form>
                     </div>
 
+                    <div class="text-end mb-4">
+                        <a href="#" data-bs-toggle="modal" data-bs-target="#forgotPasswordModal" class="text-decoration-none small fw-bold brand-gradient transition-hover d-inline-block" style="font-size: 0.75rem;">Şifremi mi Unuttum?</a>
+                    </div>
                 </div>
             </div>
         </div>
@@ -239,36 +245,146 @@
 
     </div>
 
+    <div class="modal fade" id="forgotPasswordModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content border-0 shadow-lg rounded-4">
+                <div class="modal-header border-0 pb-0">
+                    <h5 class="modal-title fw-black brand-gradient">Şifre Sıfırlama Talebi</h5>
+                    <button type="button" class="btn-close shadow-none" data-bs-dismiss="modal" aria-label="Kapat"></button>
+                </div>
+                <form id="forgotPasswordForm" method="post" asp-controller="Login" asp-action="ForgotPassword">
+                    @Html.AntiForgeryToken()
+                    <div class="modal-body pt-3 pb-2">
+                        <p class="text-secondary small mb-3">Sisteme kayıtlı e-posta adresinizi girin. Size şifrenizi sıfırlayabilmeniz için bir bağlantı göndereceğiz.</p>
+                        <div class="mb-3">
+                            <div class="input-group rounded-4 overflow-hidden shadow-sm transition-focus">
+                                <span class="input-group-text border-0 bg-light ps-3">
+                                    <i class="fas fa-envelope text-primary opacity-50 small"></i>
+                                </span>
+                                <input type="email" class="form-control border-0 py-2 bg-light shadow-none" name="email" placeholder="E-posta adresiniz" required autocomplete="email" />
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer border-0 pt-0 pb-4 px-4">
+                        <button type="submit" id="forgotBtn" class="btn btn-primary w-100 py-2 fw-bold text-uppercase shadow-sm rounded-pill d-flex align-items-center justify-content-center" style="font-size: 0.85rem; letter-spacing: 1px; background: linear-gradient(45deg, #0d6efd, #0dcaf0);">
+                            <span id="forgotBtnText">Sıfırlama Linki Gönder</span>
+                            <div id="forgotBtnSpinner" class="spinner-border spinner-border-sm ms-2 d-none" role="status" aria-hidden="true"></div>
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="resetPasswordModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content border-0 shadow-lg rounded-4">
+                <div class="modal-header border-0 pb-0">
+                    <h5 class="modal-title fw-black brand-gradient">Yeni Şifre Belirle</h5>
+                    <button type="button" class="btn-close shadow-none" data-bs-dismiss="modal" aria-label="Kapat"></button>
+                </div>
+               <form id="resetPasswordForm" method="post" asp-controller="Login" asp-action="ResetPassword">
+                    @Html.AntiForgeryToken()
+                    
+                    <input type="hidden" name="token" value="@TempData["ValidResetToken"]" />
+                    
+                    <div class="modal-body pt-3 pb-2">
+                        <p class="text-secondary small mb-3">Lütfen hesabınız için güvenli, yeni bir şifre giriniz.</p>
+                        <div class="mb-3">
+                            <div class="input-group rounded-4 overflow-hidden shadow-sm transition-focus">
+                                <span class="input-group-text border-0 bg-light ps-3">
+                                    <i class="fas fa-lock text-primary opacity-50 small"></i>
+                                </span>
+                                <input type="password" class="form-control border-0 py-2 bg-light shadow-none" name="newPassword" placeholder="Yeni Şifreniz" required minlength="6" autocomplete="new-password" />
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <div class="input-group rounded-4 overflow-hidden shadow-sm transition-focus">
+                                <span class="input-group-text border-0 bg-light ps-3">
+                                    <i class="fas fa-check-double text-primary opacity-50 small"></i>
+                                </span>
+                                <input type="password" class="form-control border-0 py-2 bg-light shadow-none" name="confirmPassword" placeholder="Şifrenizi Tekrar Girin" required minlength="6" autocomplete="new-password" />
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer border-0 pt-0 pb-4 px-4">
+                        <button type="submit" id="resetBtn" class="btn btn-primary w-100 py-2 fw-bold text-uppercase shadow-sm rounded-pill d-flex align-items-center justify-content-center" style="font-size: 0.85rem; letter-spacing: 1px; background: linear-gradient(45deg, #0d6efd, #0dcaf0);">
+                            <span id="resetBtnText">ŞİFREMİ GÜNCELLE</span>
+                            <div id="resetBtnSpinner" class="spinner-border spinner-border-sm ms-2 d-none" role="status" aria-hidden="true"></div>
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js" defer></script>
     
     <script>
-        document.getElementById('loginForm').addEventListener('submit', function (e) {
-            const btn = document.getElementById('loginBtn');
+        document.addEventListener("DOMContentLoaded", function() {
             
-            if (btn.classList.contains('btn-loading')) {
-                e.preventDefault();
-                return;
+            // Eğer C#'dan onaylı bir token geldiyse, Modalı otomatik göster.
+            @if (TempData["ValidResetToken"] != null)
+            {
+                <text>
+                const resetModalEl = document.getElementById('resetPasswordModal');
+                if (resetModalEl) {
+                    new bootstrap.Modal(resetModalEl).show();
+                }
+                </text>
             }
 
-            if (this.checkValidity()) {
-                const text = document.getElementById('btnText');
-                const spinner = document.getElementById('btnSpinner');
+            // Javascript Performans ve DRY Prensibi: Kod tekrarını önleyen dinamik form işlemcisi
+            function setupFormListener(formId, btnId, btnTextId, spinnerId, loadingText) {
+                const form = document.getElementById(formId);
+                const btn = document.getElementById(btnId);
+                const textEl = document.getElementById(btnTextId);
+                const spinner = document.getElementById(spinnerId);
 
-                btn.classList.add('btn-loading');
-                text.innerText = 'Giriş Yapılıyor...';
-                spinner.classList.remove('d-none');
+                if (form && btn) {
+                    form.addEventListener('submit', function (e) {
+                        // Buton zaten yükleniyor veya kapalıysa ikinci isteği (Çift tıklamayı) kesinlikle engelle
+                        if (btn.classList.contains('btn-loading') || btn.disabled) {
+                            e.preventDefault();
+                            return;
+                        }
+
+                        if (this.checkValidity()) {
+                            btn.classList.add('btn-loading');
+                            btn.disabled = true; // Sadece class değil, butonu komple fiziksel kilitler
+                            
+                            if (textEl) textEl.innerText = loadingText;
+                            if (spinner) spinner.classList.remove('d-none');
+                        }
+                    });
+                }
             }
+
+            // Metot çağrıları (Kodu uzatmadan 3 form bağlanır)
+            setupFormListener('loginForm', 'loginBtn', 'loginBtnText', 'loginBtnSpinner', 'GİRİŞ YAPILIYOR...');
+            setupFormListener('forgotPasswordForm', 'forgotBtn', 'forgotBtnText', 'forgotBtnSpinner', 'GÖNDERİLİYOR...');
+            setupFormListener('resetPasswordForm', 'resetBtn', 'resetBtnText', 'resetBtnSpinner', 'GÜNCELLENİYOR...');
         });
 
+        // Tarayıcıda Geri/İleri (BFCache) Yapıldığında Butonları Eski Haline Getirme
         window.addEventListener('pageshow', function (event) {
             if (event.persisted) {
-                const btn = document.getElementById('loginBtn');
-                const text = document.getElementById('btnText');
-                const spinner = document.getElementById('btnSpinner');
-                
-                if (btn) btn.classList.remove('btn-loading');
-                if (text) text.innerText = 'Sisteme Giriş';
-                if (spinner) spinner.classList.add('d-none');
+                function resetState(btnId, btnTextId, spinnerId, originalText) {
+                    const btn = document.getElementById(btnId);
+                    const textEl = document.getElementById(btnTextId);
+                    const spinner = document.getElementById(spinnerId);
+
+                    if (btn) {
+                        btn.classList.remove('btn-loading');
+                        btn.disabled = false;
+                    }
+                    if (textEl) textEl.innerText = originalText;
+                    if (spinner) spinner.classList.add('d-none');
+                }
+
+                resetState('loginBtn', 'loginBtnText', 'loginBtnSpinner', 'Sisteme Giriş');
+                resetState('forgotBtn', 'forgotBtnText', 'forgotBtnSpinner', 'Sıfırlama Linki Gönder');
+                resetState('resetBtn', 'resetBtnText', 'resetBtnSpinner', 'ŞİFREMİ GÜNCELLE');
             }
         });
     </script>

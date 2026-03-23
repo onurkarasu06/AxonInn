@@ -242,7 +242,6 @@
                             var tamAd = $"{item.PersonelRefNavigation?.Adi} {item.PersonelRefNavigation?.Soyadi}";
                             var departmanAdi = item.PersonelRefNavigation?.DepartmanRefNavigation?.Adi;
 
-                            // ⚡ DÜZELTME: Arama için Türkçe metin verisi geri eklendi
                             var aramaData = $"{tamAd} {item.Aciklama} {departmanAdi}".ToLowerInvariant();
 
                             <tr class="gorev-satiri bg-white border-bottom" data-search="@aramaData" data-durum="@item.Durum" data-dept="@(departmanAdi?.ToLowerInvariant() ?? "")">
@@ -325,7 +324,8 @@
                                     @if (item.GorevFotografs != null && item.GorevFotografs.Any())
                                     {
                                         var fotoIds = string.Join(",", item.GorevFotografs.Select(f => f.Id));
-                                        <div class="kanit-container position-relative btn-kanit-goster" data-fotolar="@fotoIds" style="cursor: pointer;">
+                                        
+                                        <div class="kanit-container position-relative btn-kanit-goster d-inline-block" data-fotolar="@fotoIds" style="cursor: pointer;">
                                             <img src="/Gorev/KanitFotoGetir?id=@item.GorevFotografs.First().Id" loading="lazy" decoding="async" class="shadow-sm border border-2 border-white kanit-img bg-light" />
                                             @if (item.GorevFotografs.Count > 1)
                                             {
@@ -458,10 +458,10 @@
     </div>
 </div>
 
-
 <div class="modal fade" id="guncelleModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
-        <div class="modal-content border-0 shadow-lg rounded-4" style="min-height: 80vh; max-height: 90vh;">
+        
+        <div class="modal-content border-0 shadow-lg rounded-4">
             
             <div class="modal-header bg-warning bg-opacity-10 border-bottom border-warning border-opacity-25 py-3 px-4">
                 <h5 class="modal-title fw-bold text-dark mb-0 d-flex align-items-center fs-5">
@@ -470,7 +470,7 @@
                 <button type="button" class="btn-close shadow-none" data-bs-dismiss="modal"></button>
             </div>
             
-            <form asp-controller="Gorev" asp-action="Guncelle" method="post" enctype="multipart/form-data" class="d-flex flex-column h-100">
+            <form asp-controller="Gorev" asp-action="Guncelle" method="post" enctype="multipart/form-data">
                 
                 <div class="modal-body p-3 p-md-4">
                     <input type="hidden" name="Id" id="editGorevID" />
@@ -486,8 +486,8 @@
                         </select>
                     </div>
 
-                    <div class="row g-2 mb-3">
-                        <div class="col-7">
+                    <div class="row g-3 mb-3">
+                        <div class="col-12 col-md-7">
                             <label class="small fw-bold text-secondary mb-1 text-uppercase">Personel</label>
                             <select name="PersonelRef" id="editPersonelID" class="form-select shadow-none py-2 rounded-3 edit-pers-select">
                                 @foreach (var p in personelList)
@@ -496,7 +496,7 @@
                                 }
                             </select>
                         </div>
-                        <div class="col-5">
+                        <div class="col-12 col-md-5">
                             <label class="small fw-bold text-secondary mb-1 text-uppercase">Durum</label>
                             <select name="Durum" id="editGorevDurumu" class="form-select shadow-none py-2 rounded-3">
                                 <option value="1">Beklemede</option>
@@ -516,7 +516,7 @@
                         <textarea name="PersonelNotu" id="editGorevNotu" class="form-control shadow-none rounded-3 py-2" rows="2" style="background-color: #fffdf5; border-color: #fde68a;"></textarea>
                     </div>
 
-                    <div class="p-3 rounded-4 bg-light border border-dashed border-secondary border-opacity-25 mt-auto">
+                    <div class="p-3 rounded-4 bg-light border border-dashed border-secondary border-opacity-25 mb-2">
                         <label class="small fw-bold text-dark d-flex align-items-center mb-2 text-uppercase">
                             <i class="fas fa-camera me-2 text-warning"></i> Yeni Fotoğraflar
                         </label>
@@ -524,19 +524,19 @@
                     </div>
                 </div>
                 
-                <div class="modal-footer border-top bg-light-subtle py-3 px-4 mt-auto">
-                    <button type="button" class="btn btn-link text-secondary fw-bold me-auto text-decoration-none" data-bs-dismiss="modal">İptal</button>
-                    <button type="submit" class="btn btn-warning px-4 py-2 rounded-pill fw-bold shadow-sm d-flex align-items-center justify-content-center text-dark">
+                <div class="modal-footer border-top bg-light-subtle py-3 px-4 rounded-bottom-4 align-items-center">
+                    <button type="button" class="btn btn-link text-secondary fw-bold me-auto text-decoration-none m-0 px-0" data-bs-dismiss="modal">İptal</button>
+                    <button type="submit" class="btn btn-warning px-4 py-2 rounded-pill fw-bold shadow-sm d-flex align-items-center justify-content-center text-dark m-0">
                         <span class="btn-text">Kaydet</span>
                         <div class="spinner-border spinner-border-sm ms-2 d-none btn-spinner text-dark" role="status" aria-hidden="true"></div>
                     </button>
                 </div>
+                
             </form>
             
         </div>
     </div>
 </div>
-
 
 <div class="modal fade" id="gorevSilOnayModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered" style="max-width: 400px;">
@@ -662,7 +662,6 @@
         }, 50);
     });
 
-    // ⚡ PERFORMANS: Filtre ve Arama metinlerini DOM yerine doğrudan global RAM değişkenlerinde tutuyoruz.
     let currentDurum = "";
     let currentDept = "";
     let currentArama = ""; 
@@ -689,7 +688,6 @@
             });
         });
 
-        // ⚡ DÜZELTİLDİ: DataTables çekirdeğinden bağımsız, Türkçe Uyumlu Özel Arama Algoritması
         $.fn.dataTable.ext.search.push(function (settings, data, dataIndex) {
             if (settings.nTable.id !== 'gorevTablosu') return true;
             
@@ -700,7 +698,6 @@
             var durumData = tr.getAttribute('data-durum') || "";
             var deptData = tr.getAttribute('data-dept') || "";
 
-            // Arama metnini ve filtreyi anında kontrol et
             var metinVar = currentArama === "" || metinData.includes(currentArama);
             var durumVar = currentDurum === "" || durumData === currentDurum;
             var depVar = currentDept === "" || deptData === currentDept;
@@ -717,7 +714,7 @@
             "ordering": true,
             "order": [],
             "info": true,
-            "deferRender": false, // Özel aramamızın HTML etiketlerini başarıyla bulması için false olmalı (Zaten yeterince hafiflettik)
+            "deferRender": false, 
             "language": {
                 "url": "//cdn.datatables.net/plug-ins/1.13.6/i18n/tr.json",
                 "info": "_TOTAL_ kayıttan _START_ - _END_ arasındaki kayıtlar gösteriliyor",
@@ -746,7 +743,6 @@
             'overflow-y': 'auto'
         });
 
-        // ⚡ DÜZELTİLDİ: JavaScript'teki "This" bağlamı kaybolduğu için arama bozuluyordu, event objesi "e" üzerinden değer okumaya ayarlandı.
         function debounce(func, wait) {
             let timeout;
             return function (e) {
@@ -758,7 +754,6 @@
         var aramaKutusuEl = document.getElementById("tabloAra");
         if(aramaKutusuEl) {
             aramaKutusuEl.addEventListener("input", debounce(function(e) {
-                // Sadece kelime yazımı durunca devreye girer. Tarayıcıyı dondurmaz.
                 currentArama = e.target.value.toLocaleLowerCase('tr-TR').trim();
                 if (gorevTablosu) gorevTablosu.draw();
             }, 250));

@@ -7,9 +7,15 @@
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+<link rel="preload" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;800&display=swap" as="style" onload="this.onload=null;this.rel='stylesheet'">
+<link rel="preload" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css" as="style" onload="this.onload=null;this.rel='stylesheet'">
+<link rel="preload" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" as="style" onload="this.onload=null;this.rel='stylesheet'">
+
+<noscript>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;800&display=swap">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+</noscript>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css" />
 
 <style>
@@ -17,16 +23,28 @@
     .fw-900 { font-weight: 900; }
     .rounded-20 { border-radius: 20px; }
     .shadow-soft { box-shadow: 0 10px 30px rgba(0, 0, 0, 0.04) !important; }
-    .card-hover { transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
-    .card-hover:hover { transform: translateY(-5px); box-shadow: 0 15px 35px rgba(0, 0, 0, 0.08) !important; }
+    
+    /* 🚀 GPU HIZLANDIRMA: Sadece ilgili objeler tetiklenerek CPU kasması (Layout Thrashing) önlendi */
+    .card-hover { 
+        transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        will-change: transform, box-shadow; 
+    }
+    .card-hover:hover { 
+        transform: translateY(-5px); 
+        box-shadow: 0 15px 35px rgba(0, 0, 0, 0.08) !important; 
+    }
+    
     .chart-container canvas { border-radius: 0 0 15px 15px; }
     @@media (max-width: 768px) { .card-hover:hover { transform: none; } .h3 { font-size: 1.5rem !important; } }
+    
     .skeleton-box { display: inline-block; height: 1em; position: relative; overflow: hidden; background-color: #e2e5ec; border-radius: 8px; }
     .skeleton-box::after { position: absolute; top: 0; right: 0; bottom: 0; left: 0; transform: translateX(-100%); background-image: linear-gradient( 90deg, rgba(255, 255, 255, 0) 0, rgba(255, 255, 255, 0.4) 20%, rgba(255, 255, 255, 0.6) 60%, rgba(255, 255, 255, 0) ); animation: shimmer 1.5s infinite; content: ''; }
     @@keyframes shimmer { 100% { transform: translateX(100%); } }
+    
     .animate-slide-in { animation: slideInDropdown 0.25s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards; transform-origin: top center; }
     @@keyframes slideInDropdown { 0% { opacity: 0; transform: translateY(-10px) scaleY(0.9); } 100% { opacity: 1; transform: translateY(0) scaleY(1); } }
-    .custom-dropdown-menu .dropdown-item { padding: 8px 16px; transition: all 0.2s ease; font-weight: 500; color: #495057; }
+    
+    .custom-dropdown-menu .dropdown-item { padding: 8px 16px; transition: background-color 0.2s ease, color 0.2s ease, transform 0.2s ease; font-weight: 500; color: #495057; }
     .custom-dropdown-menu .dropdown-item:hover { background-color: #f0f4ff; color: #0d6efd; border-radius: 6px; transform: translateX(4px); }
     .custom-dropdown-menu .dropdown-item.active { background-color: #0d6efd; color: #fff; border-radius: 6px; }
 </style>
@@ -223,36 +241,38 @@
     <script>
         document.addEventListener("DOMContentLoaded", function () {
             
-            // FCP Hızlandırma: İskeleti gizleyip ana içeriği gösteriyoruz
-            document.getElementById('skeletonLoader').classList.add('d-none');
-            document.getElementById('mainContent').classList.remove('d-none');
+            // FCP Hızlandırma: CSS Repaint uyumunu beklemek için requestAnimationFrame kullanılır.
+            requestAnimationFrame(() => {
+                document.getElementById('skeletonLoader').classList.add('d-none');
+                document.getElementById('mainContent').classList.remove('d-none');
+            });
             
             setTimeout(() => {
-                // SQL tarafından zaten gruplanmış, ufacık ve saf nesneleri alıyoruz.
                 const preGroupedPersonel = @Html.Raw(ViewBag.PersonelJson ?? "[]");
                 const preGroupedGorev = @Html.Raw(ViewBag.GorevJson ?? "[]");
-                const aiKategoriData = @Html.Raw(ViewBag.AiKategoriJson ?? "[]"); // 🤖 YENİ AI VERİSİ
+                const aiKategoriData = @Html.Raw(ViewBag.AiKategoriJson ?? "[]"); 
 
                 const colors = ['#4e73df', '#1cc88a', '#36b9cc', '#f6c23e', '#e74a3b', '#858796'];
+                const isMobile = window.innerWidth < 768;
                 
-                // 1. DEPARTMAN GRAFİĞİ
+                // --- 1. DEPARTMAN GRAFİĞİ ---
                 const deptCtx = document.getElementById('departmanChart');
                 let departmanChartInstance = null;
 
                 function ekranıGuncelle() {
                     if (!preGroupedPersonel || preGroupedPersonel.length === 0) return;
-                    const labels = preGroupedPersonel.map(p => p.departmanAd);
-                    const dataCounts = preGroupedPersonel.map(p => p.adet);
                     
                     if (deptCtx) {
+                        // 🚀 MEMORY LEAK (BELLEK SIZINTISI) KORUMASI
                         if (departmanChartInstance) departmanChartInstance.destroy();
+                        
                         departmanChartInstance = new Chart(deptCtx, {
                             type: 'bar',
                             data: {
-                                labels: labels,
+                                labels: preGroupedPersonel.map(p => p.departmanAd),
                                 datasets: [{
                                     label: 'Personel Sayısı',
-                                    data: dataCounts,
+                                    data: preGroupedPersonel.map(p => p.adet),
                                     backgroundColor: colors,
                                     borderRadius: 8,
                                     barThickness: 18
@@ -270,9 +290,9 @@
 
                 ekranıGuncelle();
 
-                // 2. PERSONEL İŞ YÜKÜ GRAFİĞİ
+                // --- 2. PERSONEL İŞ YÜKÜ GRAFİĞİ ---
                 const perCtx = document.getElementById('personelIsYukuChart');
-                let perChart;
+                let perChartInstance = null;
 
                 function getFilteredData(deptName) {
                     const labels = [];
@@ -299,7 +319,9 @@
                 }
 
                 if (perCtx && preGroupedGorev.length > 0) {
-                    perChart = new Chart(perCtx, {
+                    if (perChartInstance) perChartInstance.destroy();
+
+                    perChartInstance = new Chart(perCtx, {
                         type: 'bar',
                         data: getFilteredData('all'),
                         options: {
@@ -321,22 +343,25 @@
                                 this.classList.add('active');
                                 
                                 const value = this.getAttribute('data-value');
-                                selectedText.innerText = this.innerText;
+                                selectedText.textContent = this.textContent;
                                 
-                                perChart.data = getFilteredData(value);
-                                perChart.update();
+                                perChartInstance.data = getFilteredData(value);
+                                perChartInstance.update();
                             });
                         });
                     }
                 }
 
-                // 3. 🤖 GEMİNİ AI GRAFİĞİ (YENİ EKLENEN KISIM)
+                // --- 3. 🤖 GEMİNİ AI GRAFİĞİ ---
                 const aiCtx = document.getElementById('aiKategoriChart');
+                let aiChartInstance = null;
+
                 if (aiCtx && aiKategoriData.length > 0) {
-                    // Gemini tarzı fütüristik teknoloji renkleri
+                    if (aiChartInstance) aiChartInstance.destroy();
+
                     const aiColors = ['#8b5cf6', '#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#64748b'];
                     
-                    new Chart(aiCtx, {
+                    aiChartInstance = new Chart(aiCtx, {
                         type: 'doughnut', 
                         data: {
                             labels: aiKategoriData.map(d => `${d.kategori} (%${d.yuzde})`),
@@ -348,59 +373,64 @@
                                 hoverOffset: 6
                             }]
                         },
-                    options: {
-    maintainAspectRatio: false, // [cite: 95]
-    cutout: '65%', // [cite: 96]
-    plugins: {
-        legend: { 
-            // Ekran genişliği 768px'den küçükse (mobil) 'bottom', büyükse 'right' yap
-            position: window.innerWidth < 768 ? 'bottom' : 'right', 
-            labels: { 
-                boxWidth: 12, // 
-                usePointStyle: true, // [cite: 98]
-                font: { size: 11, family: "'Plus Jakarta Sans', sans-serif" } // [cite: 98]
-            } 
-        },
-        tooltip: {
-            callbacks: {
-                label: function(context) {
-                    let label = context.label || ''; // [cite: 101, 102]
-                    let adet = aiKategoriData[context.dataIndex].adet; // [cite: 102]
-                    return ` ${label.split('(')[0].trim()} : ${adet} Görev`; // [cite: 102]
-                }
-            }
-        }
-    }
-}
+                        options: {
+                            maintainAspectRatio: false, 
+                            cutout: '65%', 
+                            plugins: {
+                                legend: { 
+                                    position: isMobile ? 'bottom' : 'right', 
+                                    labels: { 
+                                        boxWidth: 12, 
+                                        usePointStyle: true, 
+                                        font: { size: 11, family: "'Plus Jakarta Sans', sans-serif" } 
+                                    } 
+                                },
+                                tooltip: {
+                                    callbacks: {
+                                        label: function(context) {
+                                            let label = context.label || ''; 
+                                            let adet = aiKategoriData[context.dataIndex].adet; 
+                                            return ` ${label.split('(')[0].trim()} : ${adet} Görev`; 
+                                        }
+                                    }
+                                }
+                            }
+                        }
                     });
                 }
 
-                // SAYI SAYDIRMA ANİMASYONU
+                // --- 🚀 DOM THRASHING SIFIRLANDI: Tarayıcı CPU Kasmasını Önleyen Sayaç Animasyonu ---
                 const counters = document.querySelectorAll('.counter-value');
                 const speed = 15;
 
                 counters.forEach(counter => {
-                    const targetValue = parseInt(counter.innerText) || 0;
-                    counter.setAttribute('data-target', targetValue);
-                    counter.innerText = '0';
+                    // String okuyup Number yapıyoruz
+                    const targetValue = Number(counter.textContent) || 0;
+                    
+                    if (targetValue === 0) {
+                        counter.textContent = '0';
+                        return;
+                    }
+                    
+                    let currentValue = 0; // Değeri DOM yerine JavaScript belleğinde (RAM) işliyoruz
+                    const inc = Math.max(1, Math.ceil(targetValue / speed));
 
                     const updateCount = () => {
-                        const target = +counter.getAttribute('data-target');
-                        const count = +counter.innerText;
-                        const inc = target / speed;
+                        currentValue += inc;
 
-                        if (count < target) {
-                            counter.innerText = Math.ceil(count + inc);
+                        if (currentValue < targetValue) {
+                            counter.textContent = currentValue; // Yalnızca yazma (Write) işlemi
                             requestAnimationFrame(updateCount);
                         } else {
-                            counter.innerText = target;
+                            counter.textContent = targetValue;
                         }
                     };
-
-                    if (targetValue > 0) { updateCount(); } else { counter.innerText = targetValue; }
+                    
+                    counter.textContent = '0';
+                    requestAnimationFrame(updateCount);
                 });
 
-            }, 150); // Tarayıcıya 150ms zaman tanı
+            }, 100); // UI yerleşebilsin diye ufak bir asenkron pay (100ms)
         });
     </script>
 }

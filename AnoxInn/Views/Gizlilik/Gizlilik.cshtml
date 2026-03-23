@@ -9,6 +9,20 @@
 </noscript>
 
 <style>
+    /* --- ASP.NET STANDART FOOTER BOŞLUĞUNU VE SABİTLEMESİNİ EZME --- */
+    body {
+        margin-bottom: 0 !important;
+    }
+    
+    main {
+        padding-bottom: 0 !important;
+    }
+
+    footer {
+        position: static !important;
+        margin-top: 1rem !important;
+    }
+
     /* --- 1. SKELETON LOADER ANİMASYONU --- */
     .skeleton-box {
         display: inline-block;
@@ -40,15 +54,31 @@
     /* --- 2. TEK EKRAN UYUMLULUK VE EFEKTLER --- */
     .compact-container {
         max-width: 850px;
-        /* Tek ekrana sığması için yüksekliği menüden kalan alana göre ayarlar */
-        min-height: calc(100vh - 100px);
+        min-height: calc(100vh - 240px);
         display: flex;
         flex-direction: column;
         justify-content: center;
+        margin: 0 auto;
+    }
+
+    /* --- BOŞLUK AYARLARI (ARTIRILDI) --- */
+    
+    /* Üst başlık bölmesi ile ilk kart arasındaki boşluk */
+    #mainContent .mb-4 {
+        margin-bottom: 2rem !important;
+    }
+    
+    /* İki kart (Veri Toplama ve Güvenlik) arasındaki boşluk */
+    #mainContent .g-3 {
+        --bs-gutter-y: 1.75rem !important;
+    }
+    
+    /* Kartlar ile en alttaki "AxonInn Güvenlik Protokolü" yazısı arasındaki boşluk */
+    #mainContent .mt-4 {
+        margin-top: 2rem !important;
     }
 
     .transition-hover {
-        /* ⚡ GPU OPTİMİZASYONU: "all" yerine sadece değişen özellikleri izleyerek grafik işlemciyi rahatlatıyoruz */
         transition: transform 0.3s ease, box-shadow 0.3s ease;
     }
 
@@ -61,6 +91,8 @@
         box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.03) !important;
     }
 </style>
+
+
 
 <div id="skeletonLoader" class="container compact-container py-2">
     <div class="text-center mb-4">

@@ -29,7 +29,9 @@
         <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css" />
     </noscript>
 
-    <style>
+
+
+  <style>
         body {
             font-family: 'Inter', sans-serif;
             background-color: #f8f9fa;
@@ -41,7 +43,7 @@
             padding: 0;
             width: 100%;
             overflow-x: hidden;
-            font-display: swap; 
+            font-display: swap;
         }
 
         .login-card-container {
@@ -49,7 +51,7 @@
             max-width: 850px;
             padding: 20px;
             animation: fadeIn 0.8s ease-out;
-            will-change: transform, opacity; 
+            will-change: transform, opacity;
         }
 
         .card {
@@ -57,7 +59,7 @@
             border: none !important;
             box-shadow: 0 15px 40px rgba(0, 0, 0, 0.06) !important;
             background: #ffffff;
-            will-change: transform, box-shadow; 
+            will-change: transform, box-shadow;
         }
 
         .brand-gradient {
@@ -104,52 +106,53 @@
         /* ======================================================== */
         @@media (max-width: 767px) {
             body {
-                align-items: stretch; /* Formun tüm ekrana yayılabilmesi için tavan hizalamasını iptal eder */
+                align-items: stretch;
                 padding: 0;
                 overflow-y: auto;
             }
             .login-card-container {
-                padding: max(20px, env(safe-area-inset-top)) 20px max(20px, env(safe-area-inset-bottom)) 20px;
+                padding: 1rem; /* Daha dengeli dış boşluk */
                 display: flex;
                 flex-direction: column;
                 min-height: 100dvh; /* Ekran yüksekliğini tam doldurur */
+                justify-content: space-between; /* İçeriği ekrana orantılı yayar */
             }
             .card {
                 border-radius: 1.5rem;
                 margin: auto 0; /* Kartı dikeyde KUSURSUZ merkeze iter */
             }
             .card-body {
-                padding: 2.5rem 1.5rem !important; /* Objelerin kenarlara sıkışmasını önler, ferahlatır */
+                padding: 1.5rem !important; /* Formun sığması için iç boşlukları hafif daralttık */
             }
             .brand-logo {
-                width: 70px !important;
-                height: 70px !important;
-                margin-bottom: 15px !important;
+                width: 60px !important; /* Logoyu bir tık küçülttük */
+                height: 60px !important;
+                margin-bottom: 10px !important;
                 display: block !important;
                 visibility: visible !important;
                 opacity: 1 !important;
             }
             h1 {
-                font-size: 2.2rem !important;
+                font-size: 2rem !important;
                 margin-bottom: 5px !important;
             }
             .login-divider {
                 border-bottom: 1px solid rgba(0,0,0,0.06);
-                padding-bottom: 1.5rem; /* Logo ile form arasına ferah boşluk */
-                margin-bottom: 1.5rem; 
+                padding-bottom: 1rem; /* Logo ile form arasına ferah boşluk */
+                margin-bottom: 1rem;
             }
             /* Inputlar arasındaki sıkışık mesafeyi orantılı hale getirdik */
             .mb-3 {
-                margin-bottom: 1.25rem !important; 
+                margin-bottom: 1rem !important;
             }
             .mb-4 {
-                margin-bottom: 1.75rem !important;
+                margin-bottom: 1.25rem !important;
             }
             /* Alt kısımdaki boşluğu silen ve footer'ı en alta yapıştıran sihirli alan */
             .mobile-footer {
                 margin-top: auto !important; /* Formu ortada bırakıp kendini dibe iter */
-                padding-top: 1.5rem;
-                padding-bottom: 10px;
+                padding-top: 1rem;
+                padding-bottom: 1.5rem !important; /* Mobil tarayıcı alt menüsüne takılmaması için alt boşluğu açtık */
             }
         }
 
@@ -159,6 +162,17 @@
             cursor: not-allowed;
         }
     </style>
+
+
+
+
+
+
+
+
+
+
+
 </head>
 
 <body>

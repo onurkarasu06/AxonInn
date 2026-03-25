@@ -69,7 +69,7 @@
             </div>
             <div class="col-xl-3 col-md-6">
                 <div class="card kpi-card bg-gradient-danger shadow-sm h-100">
-                    <h6 class="text-uppercase fw-bold mb-0 opacity-75">En Kötü Yorum Adeti</h6>
+                    <h6 class="text-uppercase fw-bold mb-0 opacity-75">En Kötü Yorum Oranı</h6>
                     <div class="kpi-value" id="kpiAcilDurum">0 </div>
                     <i class="fas fa-siren-on"></i>
                 </div>
@@ -256,30 +256,42 @@
                 };
             });
 
-            // --- 3. KPI KARTLARININ HESAPLANMASI ---
-            let toplamYorum = yorumVerileri.length;
-            let toplamSkor = yorumVerileri.reduce((sum, y) => sum + y.Skor, 0);
-            let ortalamaPuan = (toplamSkor / toplamYorum).toFixed(1);
-            let pozitifSayisi = yorumVerileri.filter(y => y.DuyguDurumu.toLowerCase() === 'pozitif').length;
-            let pozitifOran = Math.round((pozitifSayisi / toplamYorum) * 100);
-            let acilSayisi = yorumVerileri.filter(y => y.Acil === 1).length;
+     // --- 3. KPI KARTLARININ HESAPLANMASI ---
+       let toplamYorum = yorumVerileri.length;
+       
+       // Yorum yoksa sıfıra bölme hatasını (NaN) önlemek için ufak bir kontrol eklemek iyi olabilir
+       if (toplamYorum === 0) return; 
 
-            document.getElementById('kpiToplamYorum').innerText = toplamYorum;
-            document.getElementById('kpiOrtalamaPuan').innerText = ortalamaPuan + " / 10";
-            document.getElementById('kpiPozitifOran').innerText = "%" + pozitifOran;
+       let toplamSkor = yorumVerileri.reduce((sum, y) => sum + y.Skor, 0);
+       let ortalamaPuan = (toplamSkor / toplamYorum).toFixed(1);
+       let pozitifSayisi = yorumVerileri.filter(y => y.DuyguDurumu.toLowerCase() === 'pozitif').length;
+       let pozitifOran = Math.round((pozitifSayisi / toplamYorum) * 100);
+       
+       let acilSayisi = yorumVerileri.filter(y => y.Acil === 1).length;
+       // Acil durum yüzdesini hesaplıyoruz
+       let acilOran = Math.round((acilSayisi / toplamYorum) * 100);
+
+       document.getElementById('kpiToplamYorum').innerText = toplamYorum;
+       document.getElementById('kpiOrtalamaPuan').innerText = ortalamaPuan + " / 10";
+       document.getElementById('kpiPozitifOran').innerText = "%" + pozitifOran;
             
-            let kpiAcilEl = document.getElementById('kpiAcilDurum');
-            kpiAcilEl.innerText = acilSayisi;
-            if(acilSayisi > 0) { kpiAcilEl.parentElement.classList.add('border', 'border-4', 'border-white'); }
+       let kpiAcilEl = document.getElementById('kpiAcilDurum');
+       // Ekrana sayıyı değil, hesapladığımız oranı yazdırıyoruz
+       kpiAcilEl.innerText = "%" + acilOran; 
+       
+       // Acil durum varsa çerçeve ekleme mantığı sayıyı baz almaya devam edebilir
+       if(acilSayisi > 0) { 
+           kpiAcilEl.parentElement.classList.add('border', 'border-4', 'border-white'); 
+       }
 
-            // Chart.js Ortak Ayarları (ÇÖKME ÖNLEYİCİ: Objeyi paylaşmak yerine fonksiyon olarak çağırıyoruz)
-            const getOrtakSecenekler = () => ({
-                responsive: true, maintainAspectRatio: false,
-                plugins: {
-                    legend: { position: 'bottom', labels: { padding: 15, usePointStyle: true, pointStyle: 'circle' } },
-                    tooltip: { backgroundColor: 'rgba(30,30,30,0.9)', padding: 12, cornerRadius: 8 }
-                }
-            });
+       // Chart.js Ortak Ayarları (ÇÖKME ÖNLEYİCİ: Objeyi paylaşmak yerine fonksiyon olarak çağırıyoruz)
+       const getOrtakSecenekler = () => ({
+           responsive: true, maintainAspectRatio: false,
+           plugins: {
+               legend: { position: 'bottom', labels: { padding: 15, usePointStyle: true, pointStyle: 'circle' } },
+               tooltip: { backgroundColor: 'rgba(30,30,30,0.9)', padding: 12, cornerRadius: 8 }
+           }
+       });
 
             try {
                 // 1. DUYGU PASTA GRAFİĞİ
@@ -298,7 +310,7 @@
                     options: pastaAyar
                 });
 
-              // 2. DEPARTMAN PERFORMANS SKORLARI (SÜTUN GRAFİĞİ)
+             // 2. DEPARTMAN PERFORMANS SKORLARI (SÜTUN GRAFİĞİ) - YÜZDE BAZLI
 let deptSkorlari = {}, deptSayilari = {};
 
 yorumVerileri.forEach(y => {
@@ -308,20 +320,17 @@ yorumVerileri.forEach(y => {
         rawDept = "Genel";
     }
 
-    // 2. Virgüllere göre departmanları parçala (Tek departmansa tek elemanlı dizi döner)
+    // 2. Virgüllere göre departmanları parçala
     let departmanDizisi = rawDept.split(',');
 
     // 3. Her bir parçalanmış departman için puanları işle
     departmanDizisi.forEach(d => {
-        // Boşlukları temizle ve "departmanı" kelimelerini sil
         let temizDept = d.trim()
                          .replace(/ departmanı/gi, '')
                          .replace(/ departmani/gi, '');
 
-        // Sadece ilk harfi büyük, kalanı küçük yap
         temizDept = temizDept.charAt(0).toUpperCase() + temizDept.slice(1).toLowerCase();
 
-        // Puanları topla ve sayacı artır
         if (!deptSkorlari[temizDept]) { 
             deptSkorlari[temizDept] = 0; 
             deptSayilari[temizDept] = 0; 
@@ -331,27 +340,49 @@ yorumVerileri.forEach(y => {
     });
 });
 
-// 4. Ortalamaları hesapla ve listeye çevir
+// 4. Ortalamaları hesapla ve listeye çevir (% formatına dönüştürüyoruz)
 let deptDataList = Object.keys(deptSkorlari).map(d => {
-    return { isim: d, ortalama: parseFloat((deptSkorlari[d] / deptSayilari[d]).toFixed(1)) };
+    // 10 üzerinden olan ortalamayı 10 ile çarparak % değerine (100 üzerinden) çeviriyoruz
+    let ortalamaYuzde = (deptSkorlari[d] / deptSayilari[d]) * 10;
+    return { isim: d, ortalama: parseFloat(ortalamaYuzde.toFixed(1)) };
 });
 
 // Büyükten küçüğe sırala
 deptDataList.sort((a, b) => b.ortalama - a.ortalama); 
               
 let deptAyar = getOrtakSecenekler();
+
+// 5. Y ekseni ayarlarını % gösterecek şekilde güncelleme
 deptAyar.scales = { 
-    y: { beginAtZero: true, max: 10, grid: { borderDash: [5, 5] } }, 
-    x: { grid: { display: false } } 
+    y: { 
+        beginAtZero: true, 
+        max: 100, // Maksimum değeri 10 yerine 100 yaptık
+        grid: { borderDash: [5, 5] },
+        ticks: {
+            callback: function(value) {
+                return '%' + value; // Y eksenindeki sayıların başına % ekler
+            }
+        }
+    }, 
+    x: { 
+        grid: { display: false } 
+    } 
 };
 
-// 5. Grafiği Çizdir
+// Tooltip (Fareyle üzerine gelince çıkan kutu) formatını % olarak ayarlama
+deptAyar.plugins.tooltip.callbacks = {
+    label: function(context) {
+        return ' Başarı Oranı: %' + context.parsed.y;
+    }
+};
+
+// 6. Grafiği Çizdir
 new Chart(document.getElementById('departmanBarGrafigi').getContext('2d'), {
     type: 'bar', 
     data: {
         labels: deptDataList.map(d => d.isim),
         datasets: [{
-            label: 'Ortalama Başarı Puanı (10 Üzerinden)',
+            label: 'Ortalama Başarı Oranı (%)', // Etiketi güncelledik
             data: deptDataList.map(d => d.ortalama),
             backgroundColor: 'rgba(111, 66, 193, 0.85)', 
             borderColor: '#6f42c1',
@@ -363,150 +394,309 @@ new Chart(document.getElementById('departmanBarGrafigi').getContext('2d'), {
     options: deptAyar
 });
 
-                // 3. MİSAFİR PSİKOLOJİSİ (POLAR AREA) 
-                let hisFrekanslari = {};
-                yorumVerileri.forEach(y => {
-                    let his = y.BaskinHis;
-                    if(his && his.toLowerCase() !== "belirtilmemiş" && his.toLowerCase() !== "null") {
-                        let formatliHis = his.charAt(0).toUpperCase() + his.slice(1).toLowerCase();
-                        hisFrekanslari[formatliHis] = (hisFrekanslari[formatliHis] || 0) + 1;
-                    }
-                });
-                
-                let renkPaleti = [
-                    'rgba(232, 62, 140, 0.7)', 'rgba(253, 126, 20, 0.7)', 'rgba(32, 201, 151, 0.7)', 
-                    'rgba(13, 202, 240, 0.7)', 'rgba(102, 16, 242, 0.7)', 'rgba(214, 51, 132, 0.7)', 
-                    'rgba(255, 193, 7, 0.7)', 'rgba(25, 135, 84, 0.7)'
-                ];
+                                                 // 3. MİSAFİR PSİKOLOJİSİ (POLAR AREA) - TOP 5
+                                let hisFrekanslari = {};
+                                let toplamHisSayisi = 0; // Yüzde hesabı için toplam geçerli veriyi tutacağımız değişken
 
-                new Chart(document.getElementById('hisPolarGrafigi').getContext('2d'), {
-                    type: 'polarArea',
-                    data: {
-                        labels: Object.keys(hisFrekanslari),
-                        datasets: [{
-                            data: Object.values(hisFrekanslari),
-                            backgroundColor: renkPaleti, 
-                            borderColor: '#ffffff',
-                            borderWidth: 2
-                        }]
-                    },
-                    options: getOrtakSecenekler()
-                });
+                                yorumVerileri.forEach(y => {
+                                    let his = y.BaskinHis;
+                                    if(his && his.toLowerCase() !== "belirtilmemiş" && his.toLowerCase() !== "null") {
+                                        let formatliHis = his.charAt(0).toUpperCase() + his.slice(1).toLowerCase();
+                                        hisFrekanslari[formatliHis] = (hisFrekanslari[formatliHis] || 0) + 1;
+                                        toplamHisSayisi++; // Geçerli her his için toplamı 1 artırıyoruz
+                                    }
+                                });
 
-                // 4. ANAHTAR KELİMELER (YATAY BAR)
-                let kelimeHavuzu = {};
-                yorumVerileri.forEach(y => {
-                    if(y.Kelimeler) {
-                        y.Kelimeler.split(',').forEach(k => {
-                            let temizKelime = k.trim().toLowerCase();
-                            if (temizKelime.length > 2) { 
-                                let kelimeIlkHarfBuyuk = temizKelime.charAt(0).toUpperCase() + temizKelime.slice(1);
-                                kelimeHavuzu[kelimeIlkHarfBuyuk] = (kelimeHavuzu[kelimeIlkHarfBuyuk] || 0) + 1;
-                            }
-                        });
-                    }
-                });
-                
-                let siraliKelimeler = Object.entries(kelimeHavuzu).sort((a, b) => b[1] - a[1]).slice(0, 10);
-                
-                let kelimeAyar = getOrtakSecenekler();
-                kelimeAyar.indexAxis = 'y';
-                kelimeAyar.scales = { x: { beginAtZero: true, grid: { borderDash: [5, 5] } }, y: { grid: { display: false } } };
+                                // 1. Objeyi [Anahtar, Değer] dizisine çevir
+                                // 2. Değerlere (frekanslara) göre büyükten küçüğe sırala
+                                // 3. Sadece ilk 5 elemanı al
+                                let top5HisDizisi = Object.entries(hisFrekanslari)
+                                    .sort((a, b) => b[1] - a[1]) 
+                                    .slice(0, 5);
 
-                new Chart(document.getElementById('kelimeBarGrafigi').getContext('2d'), {
-                    type: 'bar',
-                    data: {
-                        labels: siraliKelimeler.map(k => k[0]), 
-                        datasets: [{
-                            label: 'Yorumlarda Tekrar Edilme Sıklığı',
-                            data: siraliKelimeler.map(k => k[1]),
-                            backgroundColor: 'rgba(52, 58, 64, 0.85)',
-                            borderRadius: 4
-                        }]
-                    },
-                    options: kelimeAyar
-                });
+                                // Etiketleri ayır
+                                let top5Etiketler = top5HisDizisi.map(item => item[0]);
 
-                // 5. ÜLKE SKORLARI
-                let ulkeSkor = {}, ulkeSayi = {};
-                yorumVerileri.forEach(y => {
-                    let ulke = y.Ulke;
-                    if (!ulkeSkor[ulke]) { ulkeSkor[ulke] = 0; ulkeSayi[ulke] = 0; }
-                    ulkeSkor[ulke] += y.Skor; 
-                    ulkeSayi[ulke]++;
-                });
-                let ulkeler = Object.keys(ulkeSkor);
-                
-                let ulkeAyar = getOrtakSecenekler();
-                ulkeAyar.scales = { y: { beginAtZero: true, max: 10, grid: { borderDash: [5, 5] } }, x: { grid: { display: false } } };
+                                // Verileri YÜZDELİK oranlara çevir (Virgülden sonra 1 basamak gösterir, örn: 45.2)
+                                // NOT: Yüzdeler "Tüm geçerli yorumlar" üzerinden hesaplanmıştır.
+                                let top5Veriler = top5HisDizisi.map(item => ((item[1] / toplamHisSayisi) * 100).toFixed(1));
 
-                new Chart(document.getElementById('ulkeGrafigi').getContext('2d'), {
-                    type: 'bar',
-                    data: {
-                        labels: ulkeler,
-                        datasets: [{ 
-                            label: 'Ortalama Puan', 
-                            data: ulkeler.map(u => parseFloat((ulkeSkor[u] / ulkeSayi[u]).toFixed(1))), 
-                            backgroundColor: 'rgba(25, 135, 84, 0.85)', 
-                            borderRadius: 4 
-                        }]
-                    },
-                    options: ulkeAyar
-                });
+                                let renkPaleti = [
+                                    'rgba(232, 62, 140, 0.7)', 'rgba(253, 126, 20, 0.7)', 'rgba(32, 201, 151, 0.7)', 
+                                    'rgba(13, 202, 240, 0.7)', 'rgba(102, 16, 242, 0.7)', 'rgba(214, 51, 132, 0.7)', 
+                                    'rgba(255, 193, 7, 0.7)', 'rgba(25, 135, 84, 0.7)'
+                                ];
 
-                // 6. KONAKLAMA TİPİ
-                let tipler = [...new Set(yorumVerileri.map(y => y.Tipi))];
-                let posTipi = tipler.map(t => yorumVerileri.filter(y => y.Tipi === t && y.DuyguDurumu.toLowerCase() === 'pozitif').length);
-                let negTipi = tipler.map(t => yorumVerileri.filter(y => y.Tipi === t && y.DuyguDurumu.toLowerCase() === 'negatif').length);
-                let notrTipi = tipler.map(t => yorumVerileri.filter(y => y.Tipi === t && y.DuyguDurumu.toLowerCase() !== 'pozitif' && y.DuyguDurumu.toLowerCase() !== 'negatif').length);
+                                // Mevcut seçeneklerinizi alıp üzerine Tooltip (üzerine gelince % yazması) ayarını ekliyoruz
+                                let chartSecenekleri = getOrtakSecenekler() || {};
+                                chartSecenekleri.plugins = chartSecenekleri.plugins || {};
+                                chartSecenekleri.plugins.tooltip = {
+                                    callbacks: {
+                                        label: function(context) {
+                                            // Grafiğin üzerine gelindiğinde "Mutlu: %45.2" şeklinde görünmesini sağlar
+                                            return context.label + ': %' + context.raw;
+                                        }
+                                    }
+                                };
 
-                let tipAyar = getOrtakSecenekler();
-                tipAyar.scales = { x: { grid: { display: false } }, y: { beginAtZero: true, grid: { borderDash: [5, 5] } } };
+                                new Chart(document.getElementById('hisPolarGrafigi').getContext('2d'), {
+                                    type: 'polarArea',
+                                    data: {
+                                        labels: top5Etiketler,
+                                        datasets: [{
+                                            data: top5Veriler,
+                                            // İlk 5 veriye karşılık ilk 5 rengi alıyoruz
+                                            backgroundColor: renkPaleti.slice(0, 5), 
+                                            borderColor: '#ffffff',
+                                            borderWidth: 2
+                                        }]
+                                    },
+                                    options: chartSecenekleri
+                                });
 
-                new Chart(document.getElementById('konaklamaGrafigi').getContext('2d'), {
-                    type: 'bar',
-                    data: {
-                        labels: tipler,
-                        datasets: [
-                            { label: 'Pozitif', data: posTipi, backgroundColor: '#1cc88a', borderRadius: 4 },
-                            { label: 'Nötr', data: notrTipi, backgroundColor: '#f6c23e', borderRadius: 4 },
-                            { label: 'Negatif', data: negTipi, backgroundColor: '#e74a3b', borderRadius: 4 }
-                        ]
-                    },
-                    options: tipAyar
-                });
 
-                // 7. AYLIK TREND (İVME)
-                let aylar = {};
-                yorumVerileri.forEach(y => {
-                    if (!y.Tarih) return;
-                    let d = new Date(y.Tarih);
-                    if (isNaN(d.getTime())) return;
 
-                    let ayKey = d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, '0');
-                    if (!aylar[ayKey]) { aylar[ayKey] = { top: 0, poz: 0 }; }
-                    aylar[ayKey].top++;
-                    if (y.DuyguDurumu.toLowerCase() === 'pozitif') aylar[ayKey].poz++;
-                });
-                
-                let sAylar = Object.keys(aylar).sort();
-                
-                let trendAyar = getOrtakSecenekler();
-                trendAyar.scales = { x: { grid: { display: false } }, y: { beginAtZero: true, max: 100, grid: { borderDash: [5, 5] } } };
 
-                new Chart(document.getElementById('trendGrafigi').getContext('2d'), {
-                    type: 'line',
-                    data: {
-                        labels: sAylar,
-                        datasets: [{ 
-                            label: 'Pozitif Yorum İvmesi (%)', 
-                            data: sAylar.map(a => parseFloat(((aylar[a].poz / aylar[a].top) * 100).toFixed(1))), 
-                            borderColor: '#fd7e14', backgroundColor: 'rgba(253, 126, 20, 0.1)', 
-                            borderWidth: 3, pointBackgroundColor: '#fff', fill: true, tension: 0.4 
-                        }]
-                    },
-                    options: trendAyar
-                });
+
+
+
+
+
+
+
+                                             // 4. ANAHTAR KELİMELER (YATAY BAR)
+                                    let kelimeHavuzu = {};
+                                    // Yüzde hesabı için toplam yorum sayısını alıyoruz (0'a bölünme hatasını önlemek için en az 1 kabul ediyoruz)
+                                    let toplamYorumSayisi = yorumVerileri.length || 1; 
+
+                                    yorumVerileri.forEach(y => {
+                                        if(y.Kelimeler) {
+                                            y.Kelimeler.split(',').forEach(k => {
+                                                let temizKelime = k.trim().toLowerCase();
+                                                if (temizKelime.length > 2) { 
+                                                    let kelimeIlkHarfBuyuk = temizKelime.charAt(0).toUpperCase() + temizKelime.slice(1);
+                                                    kelimeHavuzu[kelimeIlkHarfBuyuk] = (kelimeHavuzu[kelimeIlkHarfBuyuk] || 0) + 1;
+                                                }
+                                            });
+                                        }
+                                    });
+         
+                                    let siraliKelimeler = Object.entries(kelimeHavuzu).sort((a, b) => b[1] - a[1]).slice(0, 10);
+         
+                                    let kelimeAyar = getOrtakSecenekler();
+                                    kelimeAyar.indexAxis = 'y';
+
+                                    // 1. X Eksenine "%" işareti ekleme
+                                    kelimeAyar.scales = { 
+                                        x: { 
+                                            beginAtZero: true, 
+                                            grid: { borderDash: [5, 5] },
+                                            ticks: {
+                                                callback: function(value) {
+                                                    return '%' + value; // X eksenindeki sayıların başına % ekler
+                                                }
+                                            }
+                                        }, 
+                                        y: { 
+                                            grid: { display: false } 
+                                        } 
+                                    };
+
+                                    // 2. Tooltip (Fareyle üzerine gelince çıkan kutu) formatını "%" olarak ayarlama
+                                    kelimeAyar.plugins.tooltip.callbacks = {
+                                        label: function(context) {
+                                            return ' Yorumlarda Geçme Oranı: %' + context.parsed.x;
+                                        }
+                                    };
+
+                                    new Chart(document.getElementById('kelimeBarGrafigi').getContext('2d'), {
+                                        type: 'bar',
+                                        data: {
+                                            labels: siraliKelimeler.map(k => k[0]), 
+                                            datasets: [{
+                                                label: 'Yorumlarda Tekrar Edilme Oranı',
+                                                // 3. Frekans sayısını toplam yoruma bölüp yüzdeye çeviriyoruz (virgülden sonra 1 hane)
+                                                data: siraliKelimeler.map(k => ((k[1] / toplamYorumSayisi) * 100).toFixed(1)),
+                                                backgroundColor: 'rgba(52, 58, 64, 0.85)',
+                                                borderRadius: 4
+                                            }]
+                                        },
+                                        options: kelimeAyar
+                                    });
+
+       // 5. ÜLKE SKORLARI (YÜZDE BAZLI)
+let ulkeSkor = {}, ulkeSayi = {};
+yorumVerileri.forEach(y => {
+    let ulke = y.Ulke;
+    if (!ulkeSkor[ulke]) { ulkeSkor[ulke] = 0; ulkeSayi[ulke] = 0; }
+    ulkeSkor[ulke] += y.Skor; 
+    ulkeSayi[ulke]++;
+});
+let ulkeler = Object.keys(ulkeSkor);
+       
+let ulkeAyar = getOrtakSecenekler();
+
+// 1. Y ekseni ayarlarını % gösterecek şekilde güncelleme
+ulkeAyar.scales = { 
+    y: { 
+        beginAtZero: true, 
+        max: 100, // Maksimum değeri 10 yerine 100 yaptık
+        grid: { borderDash: [5, 5] },
+        ticks: {
+            callback: function(value) {
+                return '%' + value; // Y eksenindeki değerlerin başına % ekler
+            }
+        }
+    }, 
+    x: { 
+        grid: { display: false } 
+    } 
+};
+
+// 2. Tooltip (Fareyle üzerine gelince çıkan kutu) formatını % olarak ayarlama
+// Eğer getOrtakSecenekler içinde tooltip objesi tam tanımlanmamışsa diye güvenlik kontrolü yapıyoruz
+if (!ulkeAyar.plugins) ulkeAyar.plugins = {};
+if (!ulkeAyar.plugins.tooltip) ulkeAyar.plugins.tooltip = {};
+ulkeAyar.plugins.tooltip.callbacks = {
+    label: function(context) {
+        return ' Memnuniyet Oranı: %' + context.parsed.y;
+    }
+};
+
+new Chart(document.getElementById('ulkeGrafigi').getContext('2d'), {
+    type: 'bar',
+    data: {
+        labels: ulkeler,
+        datasets: [{ 
+            label: 'Ortalama Memnuniyet Oranı (%)', 
+            // 3. 10 üzerinden olan puanı 10 ile çarparak yüzelik dilime çeviriyoruz
+            data: ulkeler.map(u => parseFloat(((ulkeSkor[u] / ulkeSayi[u]) * 10).toFixed(1))), 
+            backgroundColor: 'rgba(25, 135, 84, 0.85)', 
+            borderRadius: 4 
+        }]
+    },
+    options: ulkeAyar
+});
+
+               // 6. KONAKLAMA TİPİ (YÜZDE BAZLI)
+let tipler = [...new Set(yorumVerileri.map(y => y.Tipi))];
+
+// Önce ham sayıları hesaplıyoruz
+let posSayilari = tipler.map(t => yorumVerileri.filter(y => y.Tipi === t && y.DuyguDurumu.toLowerCase() === 'pozitif').length);
+let negSayilari = tipler.map(t => yorumVerileri.filter(y => y.Tipi === t && y.DuyguDurumu.toLowerCase() === 'negatif').length);
+let notrSayilari = tipler.map(t => yorumVerileri.filter(y => y.Tipi === t && y.DuyguDurumu.toLowerCase() !== 'pozitif' && y.DuyguDurumu.toLowerCase() !== 'negatif').length);
+
+// Sayıları kendi konaklama tipi içindeki toplamlarına bölerek yüzdeye çeviriyoruz
+let posTipi = [], negTipi = [], notrTipi = [];
+
+tipler.forEach((t, index) => {
+    let toplam = posSayilari[index] + negSayilari[index] + notrSayilari[index];
+    
+    // 0'a bölünme hatasını önlemek için kontrol ekliyoruz
+    if (toplam > 0) {
+        posTipi.push(parseFloat(((posSayilari[index] / toplam) * 100).toFixed(1)));
+        notrTipi.push(parseFloat(((notrSayilari[index] / toplam) * 100).toFixed(1)));
+        negTipi.push(parseFloat(((negSayilari[index] / toplam) * 100).toFixed(1)));
+    } else {
+        posTipi.push(0);
+        notrTipi.push(0);
+        negTipi.push(0);
+    }
+});
+
+let tipAyar = getOrtakSecenekler();
+
+// 1. Y Ekseni Ayarlarını Güncelliyoruz
+tipAyar.scales = { 
+    x: { grid: { display: false } }, 
+    y: { 
+        beginAtZero: true, 
+        max: 100, // Yüzde bazlı olduğu için maksimum 100
+        grid: { borderDash: [5, 5] },
+        ticks: {
+            callback: function(value) {
+                return '%' + value; // Değerlerin başına % ekler
+            }
+        }
+    } 
+};
+
+// 2. Tooltip (Bilgi Kutucuğu) Formatını Ayarlıyoruz
+if (!tipAyar.plugins) tipAyar.plugins = {};
+if (!tipAyar.plugins.tooltip) tipAyar.plugins.tooltip = {};
+tipAyar.plugins.tooltip.callbacks = {
+    label: function(context) {
+        return ' ' + context.dataset.label + ' Oranı: %' + context.parsed.y;
+    }
+};
+
+new Chart(document.getElementById('konaklamaGrafigi').getContext('2d'), {
+    type: 'bar',
+    data: {
+        labels: tipler,
+        datasets: [
+            { label: 'Pozitif', data: posTipi, backgroundColor: '#1cc88a', borderRadius: 4 },
+            { label: 'Nötr', data: notrTipi, backgroundColor: '#f6c23e', borderRadius: 4 },
+            { label: 'Negatif', data: negTipi, backgroundColor: '#e74a3b', borderRadius: 4 }
+        ]
+    },
+    options: tipAyar
+});
+
+               // 7. AYLIK TREND (İVME) - YÜZDE BAZLI
+let aylar = {};
+yorumVerileri.forEach(y => {
+    if (!y.Tarih) return;
+    let d = new Date(y.Tarih);
+    if (isNaN(d.getTime())) return;
+
+    let ayKey = d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, '0');
+    if (!aylar[ayKey]) { aylar[ayKey] = { top: 0, poz: 0 }; }
+    aylar[ayKey].top++;
+    if (y.DuyguDurumu.toLowerCase() === 'pozitif') aylar[ayKey].poz++;
+});
+            
+let sAylar = Object.keys(aylar).sort();
+            
+let trendAyar = getOrtakSecenekler();
+
+// 1. Y Ekseni Ayarlarına "%" İşareti Ekleme
+trendAyar.scales = { 
+    x: { grid: { display: false } }, 
+    y: { 
+        beginAtZero: true, 
+        max: 100, 
+        grid: { borderDash: [5, 5] },
+        ticks: {
+            callback: function(value) {
+                return '%' + value; // Y eksenindeki sayıların başına % ekler
+            }
+        }
+    } 
+};
+
+// 2. Tooltip (Bilgi Kutucuğu) Formatını Ayarlama
+if (!trendAyar.plugins) trendAyar.plugins = {};
+if (!trendAyar.plugins.tooltip) trendAyar.plugins.tooltip = {};
+trendAyar.plugins.tooltip.callbacks = {
+    label: function(context) {
+        return ' Pozitif Yorum Oranı: %' + context.parsed.y;
+    }
+};
+
+new Chart(document.getElementById('trendGrafigi').getContext('2d'), {
+    type: 'line',
+    data: {
+        labels: sAylar,
+        datasets: [{ 
+            label: 'Pozitif Yorum İvmesi', // Tooltip ile uyumlu olması için başlık güncellendi
+            data: sAylar.map(a => parseFloat(((aylar[a].poz / aylar[a].top) * 100).toFixed(1))), 
+            borderColor: '#fd7e14', backgroundColor: 'rgba(253, 126, 20, 0.1)', 
+            borderWidth: 3, pointBackgroundColor: '#fff', fill: true, tension: 0.4 
+        }]
+    },
+    options: trendAyar
+});
                 
             } catch (error) {
                 console.error("Grafik çizimi sırasında bir hata oluştu: ", error);

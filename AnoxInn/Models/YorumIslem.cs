@@ -266,5 +266,88 @@ namespace AxonInn.Models
                 throw;
             }
         }
+
+
+
+
+
+
+
+        public async Task<int> YorumlariPartilerHalindeIsleAsync(List<Yorum> dbYorumList, YorumIslem yorumIslem, string apiKey, AxonInnContext _context)
+        {
+            int partiBuyuklugu = 15;
+            int toplamPartiSayisi = (int)Math.Ceiling((double)dbYorumList.Count / partiBuyuklugu);
+            int basariylaIslenenToplam = 0;
+
+            for (int i = 0; i < toplamPartiSayisi; i++)
+            {
+                var suAnkiParti = dbYorumList.Skip(i * partiBuyuklugu).Take(partiBuyuklugu).ToList();
+
+                try
+                {
+                    // Tek bir partinin işlenmesini başka bir metoda verdik
+                    int buPartideIslenen = await TekPartiyiIsleVeKaydetAsync(suAnkiParti, yorumIslem, apiKey, _context);
+                    basariylaIslenenToplam += buPartideIslenen;
+
+                    // Thread.Sleep yerine asenkron bekleme (Task.Delay) kullanıyoruz. Sunucuyu kilitlemez!
+                    if (i < toplamPartiSayisi - 1)
+                    {
+                        await Task.Delay(5000);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    // Loglama alanı: Hata alınırsa döngü devam eder.
+                    // Console.WriteLine($"Parti {i} işlenirken hata oluştu: {ex.Message}");
+                }
+            }
+
+            return basariylaIslenenToplam;
+        }
+
+        public async Task<int> TekPartiyiIsleVeKaydetAsync(List<Yorum> parti, YorumIslem yorumIslem, string apiKey, AxonInnContext _context)
+        {
+            // API isteği
+            string topluAnalizCevabi = yorumIslem.GeminiYorumAnaliziYap(parti, apiKey);
+
+            // JSON ayrıştırma işini de ayırdık
+            int islenenSayisi = JsonCevabiniYorumlaraUygula(topluAnalizCevabi, parti);
+
+            // Eğer başarılı işlenen varsa veritabanına asenkron olarak kaydet
+            if (islenenSayisi > 0)
+            {
+                await _context.SaveChangesAsync();
+            }
+
+            return islenenSayisi;
+        }
+
+        public int JsonCevabiniYorumlaraUygula(string jsonCevabi, List<Yorum> parti)
+        {
+            int basariliIslem = 0;
+
+            using JsonDocument doc = JsonDocument.Parse(jsonCevabi);
+            JsonElement root = doc.RootElement;
+
+            if (root.ValueKind != JsonValueKind.Array)
+                return basariliIslem;
+
+            foreach (JsonElement analizItem in root.EnumerateArray())
+            {
+                if (analizItem.TryGetProperty("YorumId", out JsonElement idElement) &&
+                    long.TryParse(idElement.ToString(), out long currentYorumId))
+                {
+                    var dbYorum = parti.FirstOrDefault(y => y.MisafirYorumId == currentYorumId.ToString().Trim());
+
+                    if (dbYorum != null)
+                    {
+                        dbYorum.GeminiVerileriniIsle(analizItem.GetRawText());
+                        basariliIslem++;
+                    }
+                }
+            }
+
+            return basariliIslem;
+        }
     }
 }

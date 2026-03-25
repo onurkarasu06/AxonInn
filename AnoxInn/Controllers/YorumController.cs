@@ -62,41 +62,98 @@ namespace AxonInn.Controllers
             int getirilecekKayitAdeti = 20;
             string apiToken = _configuration["ApifyApiToken:ApiToken"];
             YorumIslem yorumIslem = new YorumIslem();
-            List<Yorum> yorumList = await yorumIslem.TripadvisorYorumGetirAsync(hotelID, getirilecekKayitAdeti, apiToken);
-            await yorumIslem.TripadvisorYorumKaydetAsync(hotelID, yorumList, _context);
+            List<Yorum> yorumList = yorumIslem.TripadvisorYorumGetirApifyApi(hotelID, getirilecekKayitAdeti, apiToken);
+            yorumIslem.TripadvisorYorumKaydet(hotelID, yorumList, _context);
             return null;
         }
+
+        public async Task<IActionResult> TripadvisorYorumlariRapidApiKaydet()
+        {
+            // veri hazırlamak için ben kullanacagım sadece
+            long hotelID = 1;
+            long tripadvisorHotelID = 23426767;
+            int getirilecekKayitAdeti = 1000;
+            string apiToken = _configuration["RapidApiToken:ApiToken"];
+            YorumIslem yorumIslem = new YorumIslem();
+            List<Yorum> yorumList = yorumIslem.TripadvisorYorumGetirRapidApi(hotelID,tripadvisorHotelID, getirilecekKayitAdeti, apiToken);
+            yorumIslem.TripadvisorYorumKaydet(hotelID, yorumList, _context);
+            return null;
+        }
+
         public IActionResult GeminiAnalizleriKaydet()
         {
             long hotelID = 1;
             string geminiApiKey = _configuration["GeminiApi:ApiKey"];
             YorumIslem yorumIslem = new YorumIslem();
+
+            // Veritabanından analiz edilecek yorumları senkron olarak çekiyoruz
             List<Yorum> dbYorumList = yorumIslem.GeminiAnaliziOlmayanVeritabaniYorumListGetirAsync(hotelID, _context)
                                                 .GetAwaiter()
                                                 .GetResult();
+
             if (dbYorumList == null || !dbYorumList.Any())
                 return Ok("Analiz edilecek yeni yorum bulunamadı.");
-            string topluAnalizCevabi = yorumIslem.GeminiYorumAnaliziYap(dbYorumList, geminiApiKey);
-            using JsonDocument doc = JsonDocument.Parse(topluAnalizCevabi);
-            JsonElement root = doc.RootElement;
-            if (root.ValueKind == JsonValueKind.Array)
+
+            // PARÇALAMA (BATCHING) AYARLARI
+            int partiBuyuklugu = 15; // Gemini'ye her defasında 10 yorum göndereceğiz (Timeout yememek için ideal sayı)
+            int toplamPartiSayisi = (int)Math.Ceiling((double)dbYorumList.Count / partiBuyuklugu);
+            int basariylaIslenenYorumSayisi = 0;
+
+            for (int i = 0; i < toplamPartiSayisi; i++)
             {
-                foreach (JsonElement analizItem in root.EnumerateArray())
+                // O anki 10'luk grubu (partiyi) listeden çekiyoruz
+                var suAnkiParti = dbYorumList.Skip(i * partiBuyuklugu).Take(partiBuyuklugu).ToList();
+
+                try
                 {
-                    if (analizItem.TryGetProperty("YorumId", out JsonElement idElement))
+                    // Gemini'ye sadece bu 10 yorumu gönderiyoruz
+                    string topluAnalizCevabi = yorumIslem.GeminiYorumAnaliziYap(suAnkiParti, geminiApiKey);
+
+                    using JsonDocument doc = JsonDocument.Parse(topluAnalizCevabi);
+                    JsonElement root = doc.RootElement;
+
+                    if (root.ValueKind == JsonValueKind.Array)
                     {
-                        string idString = idElement.ToString();
-                        if (long.TryParse(idString, out long currentYorumId))
+                        foreach (JsonElement analizItem in root.EnumerateArray())
                         {
-                            var dbYorum = dbYorumList.FirstOrDefault(y => y.MisafirYorumId == currentYorumId.ToString().Trim());
-                            if (dbYorum != null)
-                                dbYorum.GeminiVerileriniIsle(analizItem.GetRawText());
+                            if (analizItem.TryGetProperty("YorumId", out JsonElement idElement))
+                            {
+                                string idString = idElement.ToString();
+                                if (long.TryParse(idString, out long currentYorumId))
+                                {
+                                    // Aramayı tüm listede değil, sadece o anki 10'luk parti içinde yapıyoruz (Hız kazandırır)
+                                    var dbYorum = suAnkiParti.FirstOrDefault(y => y.MisafirYorumId == currentYorumId.ToString().Trim());
+
+                                    if (dbYorum != null)
+                                    {
+                                        dbYorum.GeminiVerileriniIsle(analizItem.GetRawText());
+                                        basariylaIslenenYorumSayisi++;
+                                    }
+                                }
+                            }
                         }
+
+                        // HER PARTİDEN SONRA VERİTABANINA KAYDET (SENKRON)
+                        // Bu sayede sistem 3. partide patlasa bile, ilk 2 parti veritabanına çoktan işlenmiş olur!
+                        _context.SaveChanges();
+                    }
+
+                    // GEMİNİ'Yİ BOĞMAMAK İÇİN KISA BİR MOLA (RATE LIMIT KORUMASI)
+                    // Son parti değilse, bir sonraki isteği atmadan önce 3 saniye (3000 ms) bekliyoruz
+                    if (i < toplamPartiSayisi - 1)
+                    {
+                        Thread.Sleep(5000);
                     }
                 }
-                _context.SaveChanges();
+                catch (Exception ex)
+                {
+                    // EĞER BİR PARTİDE HATA ÇIKARSA: 
+                    // Döngü kırılmaz, hata yoksayılır ve sistem bir sonraki 10'luk partiyi analiz etmeye devam eder.
+                    // İstersen buraya loglama (Console.WriteLine vb.) ekleyebilirsin.
+                }
             }
-            return Ok("Analizler başarıyla tamamlandı ve kaydedildi.");
+
+            return Ok($"Toplam {dbYorumList.Count} yorumdan {basariylaIslenenYorumSayisi} tanesi 10'arlı parçalar halinde başarıyla analiz edildi ve kaydedildi.");
         }
     }
 }

@@ -48,7 +48,7 @@
         <div class="row g-4 mb-4">
             <div class="col-xl-3 col-md-6">
                 <div class="card kpi-card bg-gradient-primary shadow-sm h-100">
-                    <h6 class="text-uppercase fw-bold mb-0 opacity-75">Analiz Edilen Yorum</h6>
+                    <h6 class="text-uppercase fw-bold mb-0 opacity-75">Analiz Edilen Yorum Adeti</h6>
                     <div class="kpi-value" id="kpiToplamYorum">0</div>
                     <i class="fas fa-robot"></i>
                 </div>
@@ -69,7 +69,7 @@
             </div>
             <div class="col-xl-3 col-md-6">
                 <div class="card kpi-card bg-gradient-danger shadow-sm h-100">
-                    <h6 class="text-uppercase fw-bold mb-0 opacity-75">En Kötü Yorum Oranı</h6>
+                    <h6 class="text-uppercase fw-bold mb-0 opacity-75">Negatif Yorum Oranı</h6>
                     <div class="kpi-value" id="kpiAcilDurum">0 </div>
                     <i class="fas fa-siren-on"></i>
                 </div>
@@ -207,9 +207,9 @@
                 <div class="card info-card shadow-sm p-4 h-100" style="border-left: 5px solid #fd7e14 !important;">
                     <h5 class="mb-3 info-title" style="color: #fd7e14;"><i class="fas fa-calendar-alt me-2"></i>Sezonsal Stres Testi</h5>
                     <p class="info-text mb-0">
-                        Aylara göre toplam geri bildirimler içerisindeki <strong>Pozitif Yorum Oranının (%)</strong> dalgalanma grafiğidir.<br><br>
-                        <strong>Yönetim Özeti:</strong> Tesisin "Peak Season" (Yüksek Sezon) dediğimiz en kalabalık aylarda operasyonel yükü kaldırıp kaldıramadığını ölçer. Düşüş olan aylar genellikle eksik personel veya aşırı yoğunluk kaynaklı krizleri temsil eder.
-                    </p>
+    Konaklama aylarına göre tesise bırakılan <strong>Toplam Yorum Hacminin (Adet)</strong> dalgalanma grafiğidir. Bu veri, tesisin dönemsel doluluk oranını (occupancy) yansıtan güçlü bir vekil metriktir.<br><br>
+    <strong>Yönetim Özeti:</strong> Tesisin "Peak Season" (Yüksek Sezon) ve "Low Season" (Düşük Sezon) döngülerini net bir şekilde görselleştirir. Zirve noktaları otelin maksimum kapasiteye ulaştığı operasyonel hareketliliği temsil ederken; bu hacim trendi, gelecek sezonun personel istihdamı, satın alma bütçeleri ve pazarlama planlamaları için yönetime doğrudan rehberlik eder.
+</p>
                 </div>
             </div>
         </div>
@@ -256,42 +256,55 @@
                 };
             });
 
-     // --- 3. KPI KARTLARININ HESAPLANMASI ---
-       let toplamYorum = yorumVerileri.length;
-       
-       // Yorum yoksa sıfıra bölme hatasını (NaN) önlemek için ufak bir kontrol eklemek iyi olabilir
-       if (toplamYorum === 0) return; 
 
-       let toplamSkor = yorumVerileri.reduce((sum, y) => sum + y.Skor, 0);
-       let ortalamaPuan = (toplamSkor / toplamYorum).toFixed(1);
-       let pozitifSayisi = yorumVerileri.filter(y => y.DuyguDurumu.toLowerCase() === 'pozitif').length;
-       let pozitifOran = Math.round((pozitifSayisi / toplamYorum) * 100);
-       
-       let acilSayisi = yorumVerileri.filter(y => y.Acil === 1).length;
-       // Acil durum yüzdesini hesaplıyoruz
-       let acilOran = Math.round((acilSayisi / toplamYorum) * 100);
 
-       document.getElementById('kpiToplamYorum').innerText = toplamYorum;
-       document.getElementById('kpiOrtalamaPuan').innerText = ortalamaPuan + " / 10";
-       document.getElementById('kpiPozitifOran').innerText = "%" + pozitifOran;
+
+
+ // --- 3. KPI KARTLARININ HESAPLANMASI ---
+let toplamYorum = yorumVerileri.length;
+       
+// Yorum yoksa sıfıra bölme hatasını (NaN) önlemek için ufak bir kontrol
+if (toplamYorum === 0) return; 
+
+// GÜNCELLEME 1: String birleştirme hatasını önlemek için y.Skor'u parseFloat ile kesin olarak sayıya çeviriyoruz
+let toplamSkor = yorumVerileri.reduce((sum, y) => sum + (parseFloat(y.Skor) || 0), 0);
+
+// Gerçek ortalamayı (TripAdvisor standartlarında 50 üzerinden) buluyoruz
+let gercekOrtalama = (toplamSkor / toplamYorum);
+
+// GÜNCELLEME 2: Puan 50 üzerinden olduğu için, 100 üzerinden bir yüzdeye çevirmek adına 2 ile çarpıyoruz (Örn: 35.7 * 2 = 71)
+let memnuniyetYuzdesi = Math.round(gercekOrtalama * 2);
+
+let pozitifSayisi = yorumVerileri.filter(y => y.DuyguDurumu && y.DuyguDurumu.toLowerCase() === 'pozitif').length;
+let pozitifOran = Math.round((pozitifSayisi / toplamYorum) * 100);
+       
+let acilSayisi = yorumVerileri.filter(y => y.Acil === 1).length;
+let acilOran = Math.round((acilSayisi / toplamYorum) * 100);
+
+document.getElementById('kpiToplamYorum').innerText = toplamYorum;
+
+// GÜNCELLEME 3: Ekrana "%71" formatında şık bir şekilde yazdırıyoruz
+document.getElementById('kpiOrtalamaPuan').innerText = "%" + memnuniyetYuzdesi;
+document.getElementById('kpiPozitifOran').innerText = "%" + pozitifOran;
             
-       let kpiAcilEl = document.getElementById('kpiAcilDurum');
-       // Ekrana sayıyı değil, hesapladığımız oranı yazdırıyoruz
-       kpiAcilEl.innerText = "%" + acilOran; 
+let kpiAcilEl = document.getElementById('kpiAcilDurum');
+kpiAcilEl.innerText = "%" + acilOran; 
        
-       // Acil durum varsa çerçeve ekleme mantığı sayıyı baz almaya devam edebilir
-       if(acilSayisi > 0) { 
-           kpiAcilEl.parentElement.classList.add('border', 'border-4', 'border-white'); 
-       }
+if(acilSayisi > 0) { 
+    kpiAcilEl.parentElement.classList.add('border', 'border-4', 'border-white'); 
+}
 
-       // Chart.js Ortak Ayarları (ÇÖKME ÖNLEYİCİ: Objeyi paylaşmak yerine fonksiyon olarak çağırıyoruz)
-       const getOrtakSecenekler = () => ({
-           responsive: true, maintainAspectRatio: false,
-           plugins: {
-               legend: { position: 'bottom', labels: { padding: 15, usePointStyle: true, pointStyle: 'circle' } },
-               tooltip: { backgroundColor: 'rgba(30,30,30,0.9)', padding: 12, cornerRadius: 8 }
-           }
-       });
+const getOrtakSecenekler = () => ({
+    responsive: true, maintainAspectRatio: false,
+    plugins: {
+        legend: { position: 'bottom', labels: { padding: 15, usePointStyle: true, pointStyle: 'circle' } },
+        tooltip: { backgroundColor: 'rgba(30,30,30,0.9)', padding: 12, cornerRadius: 8 }
+    }
+});
+
+
+
+
 
             try {
                 // 1. DUYGU PASTA GRAFİĞİ
@@ -524,14 +537,21 @@ new Chart(document.getElementById('departmanBarGrafigi').getContext('2d'), {
                                         options: kelimeAyar
                                     });
 
-       // 5. ÜLKE SKORLARI (YÜZDE BAZLI)
+// 5. ÜLKE SKORLARI (YÜZDE BAZLI)
 let ulkeSkor = {}, ulkeSayi = {};
 yorumVerileri.forEach(y => {
     let ulke = y.Ulke;
+    
+    // GÜNCELLEME: Eğer ülke null, undefined, boşluk veya "Bilinmiyor" ise bu yorumu grafiğe dahil etme (atla)
+    if (!ulke || ulke.trim() === "" || ulke.toLowerCase() === "bilinmiyor" || ulke.toLowerCase() === "null") {
+        return; // return diyerek bu adımı pas geçiyoruz
+    }
+
     if (!ulkeSkor[ulke]) { ulkeSkor[ulke] = 0; ulkeSayi[ulke] = 0; }
     ulkeSkor[ulke] += y.Skor; 
     ulkeSayi[ulke]++;
 });
+
 let ulkeler = Object.keys(ulkeSkor);
        
 let ulkeAyar = getOrtakSecenekler();
@@ -554,7 +574,6 @@ ulkeAyar.scales = {
 };
 
 // 2. Tooltip (Fareyle üzerine gelince çıkan kutu) formatını % olarak ayarlama
-// Eğer getOrtakSecenekler içinde tooltip objesi tam tanımlanmamışsa diye güvenlik kontrolü yapıyoruz
 if (!ulkeAyar.plugins) ulkeAyar.plugins = {};
 if (!ulkeAyar.plugins.tooltip) ulkeAyar.plugins.tooltip = {};
 ulkeAyar.plugins.tooltip.callbacks = {
@@ -569,7 +588,7 @@ new Chart(document.getElementById('ulkeGrafigi').getContext('2d'), {
         labels: ulkeler,
         datasets: [{ 
             label: 'Ortalama Memnuniyet Oranı (%)', 
-            // 3. 10 üzerinden olan puanı 10 ile çarparak yüzelik dilime çeviriyoruz
+            // 3. 10 üzerinden olan puanı 10 ile çarparak yüzdelik dilime çeviriyoruz
             data: ulkeler.map(u => parseFloat(((ulkeSkor[u] / ulkeSayi[u]) * 10).toFixed(1))), 
             backgroundColor: 'rgba(25, 135, 84, 0.85)', 
             borderRadius: 4 
@@ -643,44 +662,46 @@ new Chart(document.getElementById('konaklamaGrafigi').getContext('2d'), {
     options: tipAyar
 });
 
-               // 7. AYLIK TREND (İVME) - YÜZDE BAZLI
+
+// 7. AYLIK TESİS YOĞUNLUĞU (YORUM HACMİNE GÖRE)
 let aylar = {};
 yorumVerileri.forEach(y => {
-    if (!y.Tarih) return;
-    let d = new Date(y.Tarih);
+    let tarihVerisi = y.MisafirKonaklamaTarihi || y.misafirKonaklamaTarihi || y.Tarih;
+    if (!tarihVerisi) return; 
+    
+    let d = new Date(tarihVerisi);
     if (isNaN(d.getTime())) return;
 
+    // YYYY-MM formatında ayı yakala
     let ayKey = d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, '0');
-    if (!aylar[ayKey]) { aylar[ayKey] = { top: 0, poz: 0 }; }
-    aylar[ayKey].top++;
-    if (y.DuyguDurumu.toLowerCase() === 'pozitif') aylar[ayKey].poz++;
+    if (!aylar[ayKey]) { aylar[ayKey] = { yogunluk: 0 }; }
+    
+    // O ayki her bir yorumu, yoğunluk skoru olarak +1 ekle
+    aylar[ayKey].yogunluk++; 
 });
             
-let sAylar = Object.keys(aylar).sort();
+let sAylar = Object.keys(aylar).sort(); // Ayları kronolojik sırala
             
 let trendAyar = getOrtakSecenekler();
 
-// 1. Y Ekseni Ayarlarına "%" İşareti Ekleme
+// 1. Y Ekseni Ayarlarını Düzenleme (Küsuratsız Adet Gösterimi)
 trendAyar.scales = { 
     x: { grid: { display: false } }, 
     y: { 
         beginAtZero: true, 
-        max: 100, 
         grid: { borderDash: [5, 5] },
         ticks: {
-            callback: function(value) {
-                return '%' + value; // Y eksenindeki sayıların başına % ekler
-            }
+            stepSize: 1 // Yorum sayısı buçuklu olamayacağı için tam sayı adımları
         }
     } 
 };
 
-// 2. Tooltip (Bilgi Kutucuğu) Formatını Ayarlama
+// 2. Tooltip (Bilgi Kutucuğu) Formatını "Yoğunluk" Olarak Ayarlama
 if (!trendAyar.plugins) trendAyar.plugins = {};
 if (!trendAyar.plugins.tooltip) trendAyar.plugins.tooltip = {};
 trendAyar.plugins.tooltip.callbacks = {
     label: function(context) {
-        return ' Pozitif Yorum Oranı: %' + context.parsed.y;
+        return ' Tesis Yoğunluğu (Yorum Sayısı): ' + context.parsed.y;
     }
 };
 
@@ -689,15 +710,27 @@ new Chart(document.getElementById('trendGrafigi').getContext('2d'), {
     data: {
         labels: sAylar,
         datasets: [{ 
-            label: 'Pozitif Yorum İvmesi', // Tooltip ile uyumlu olması için başlık güncellendi
-            data: sAylar.map(a => parseFloat(((aylar[a].poz / aylar[a].top) * 100).toFixed(1))), 
-            borderColor: '#fd7e14', backgroundColor: 'rgba(253, 126, 20, 0.1)', 
-            borderWidth: 3, pointBackgroundColor: '#fff', fill: true, tension: 0.4 
+            label: 'Aylık Tesis Yoğunluk Trendi', 
+            data: sAylar.map(a => aylar[a].yogunluk), 
+            borderColor: '#fd7e14', 
+            backgroundColor: 'rgba(253, 126, 20, 0.1)', 
+            borderWidth: 3, 
+            pointBackgroundColor: '#fff', 
+            fill: true, 
+            tension: 0.4 
         }]
     },
     options: trendAyar
 });
-                
+
+
+
+
+
+
+
+
+
             } catch (error) {
                 console.error("Grafik çizimi sırasında bir hata oluştu: ", error);
             }

@@ -1,4 +1,4 @@
-﻿namespace AxonInn.Apify
+﻿namespace AxonInn.Models
 {
     public class GeminiAnalizSonucu
     {

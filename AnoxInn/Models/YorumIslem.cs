@@ -1,12 +1,11 @@
-﻿using AxonInn.Models;
-using Microsoft.EntityFrameworkCore;
+﻿using Microsoft.EntityFrameworkCore;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 
-namespace AxonInn.Apify
+namespace AxonInn.Models
 {
     public class YorumIslem
     {

@@ -1,5 +1,4 @@
-﻿using AxonInn.Apify;
-using AxonInn.Models;
+﻿using AxonInn.Models;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using System.Diagnostics;

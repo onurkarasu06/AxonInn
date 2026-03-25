@@ -90,13 +90,33 @@ namespace AxonInn.Apify
             return eklenecekYorumlar.Count;
         }
 
-        public async Task<string> GeminiYorumAnaliziYapAsync(Yorum tekYorum, string geminiApiKey)
+        public string GeminiYorumAnaliziYap(List<Yorum> yorumList, string geminiApiKey)
         {
             string geminiUrl = $"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={geminiApiKey}";
-            string tekYorumJson = System.Text.Json.JsonSerializer.Serialize(tekYorum);
+            string yorumListJson = System.Text.Json.JsonSerializer.Serialize(yorumList);
+            string prompt = $@"Sen AxonInn otel yönetim sistemi için çalışan kıdemli bir turizm ve veri analistisin. 
+                                Sana aşağıda JSON formatında BİRDEN FAZLA misafir yorumu içeren bir liste veriyorum. 
+                                Lütfen listedeki HER BİR yorumu; misafirin ülkesini, konaklama tipini ve tarihini de göz önünde bulundurarak aşağıdaki JSON kalıbına göre çok boyutlu analiz et ve sonuçları bir JSON DİZİSİ (Array) olarak döndür.
 
-            string prompt = $@"Sen AxonInn otel yönetim sistemi için çalışan kıdemli bir turizm ve veri analistisin. Sana aşağıda JSON formatında TEK BİR misafir yorumu veriyorum. Lütfen bu yorumu; misafirin ülkesini, konaklama tipini ve tarihini de göz önünde bulundurarak aşağıdaki JSON kalıbına göre çok boyutlu analiz et.ÖNEMLİ KURAL: Lütfen bana SADECE aşağıdaki JSON formatında cevap ver. Herhangi bir markdown (```json vb.) veya açıklama cümlesi KULLANMA.İstenen Kalıp:{{  ""DuyguAnalizi"": {{    ""Durum"": """", ""Skor"": 0, ""BaskinHis"": """", ""IlgiliDepartman"": """" }},  ""AnahtarKelimeler"": [], ""ProfilBeklentisi"": """", ""KulturelHassasiyet"": """", ""SezonsalDurum"": """", ""KisaOzet"": """", ""AcilDurumVarMi"": false, ""MudureTavsiye"": """" }}Analiz edilecek misafir yorumu verisi:{tekYorumJson}";
+                                ÖNEMLİ KURAL: Lütfen bana SADECE aşağıdaki JSON formatında bir dizi olarak cevap ver. Herhangi bir markdown (```json vb.) veya açıklama cümlesi KULLANMA.
 
+                                İstenen Kalıp (Bu kalıptaki objelerden oluşan bir dizi dönmelisin):
+                                [
+                                  {{
+                                    ""YorumId"": ""(Gelen verideki Id değerini buraya tam olarak yaz)"",
+                                    ""DuyguAnalizi"": {{ ""Durum"": """", ""Skor"": 0, ""BaskinHis"": """", ""IlgiliDepartman"": """" }},
+                                    ""AnahtarKelimeler"": [], 
+                                    ""ProfilBeklentisi"": """", 
+                                    ""KulturelHassasiyet"": """", 
+                                    ""SezonsalDurum"": """", 
+                                    ""KisaOzet"": """", 
+                                    ""AcilDurumVarMi"": false, 
+                                    ""MudureTavsiye"": """" 
+                                  }}
+                                ]
+
+                                Analiz edilecek misafir yorumları listesi:
+                                {yorumListJson}";
             var requestBody = new
             {
                 contents = new[] { new { parts = new[] { new { text = prompt } } } },
@@ -104,23 +124,33 @@ namespace AxonInn.Apify
             };
 
             using var content = new StringContent(System.Text.Json.JsonSerializer.Serialize(requestBody), Encoding.UTF8, "application/json");
+            using var request = new HttpRequestMessage(HttpMethod.Post, geminiUrl) { Content = content };
 
-            // PERFORMANS: Thread kitleyen (GetAwaiter) kodlar silindi
-            HttpResponseMessage response = await _httpClient.PostAsync(geminiUrl, content);
-
-            if (response.IsSuccessStatusCode)
+            try
             {
-                string responseString = await response.Content.ReadAsStringAsync();
-                using JsonDocument doc = JsonDocument.Parse(responseString);
-                return doc.RootElement.GetProperty("candidates")[0]
-                                      .GetProperty("content")
-                                      .GetProperty("parts")[0]
-                                      .GetProperty("text")
-                                      .GetString() ?? "";
+                using HttpResponseMessage response = _httpClient.Send(request);
+
+                if (response.IsSuccessStatusCode)
+                {
+                    string responseString = response.Content.ReadAsStringAsync().GetAwaiter().GetResult();
+                    using JsonDocument doc = JsonDocument.Parse(responseString);
+                    return doc.RootElement
+                              .GetProperty("candidates")[0]
+                              .GetProperty("content")
+                              .GetProperty("parts")[0]
+                              .GetProperty("text")
+                              .GetString() ?? "[]";
+                }
+                else
+                {
+                    string errorDetail = response.Content.ReadAsStringAsync().GetAwaiter().GetResult();
+                    throw new Exception($"Gemini API Hatası (Kod: {response.StatusCode}): {errorDetail}");
+                }
             }
-            else
+            catch (Exception ex)
             {
-                throw new Exception($"Gemini API Hatası: {await response.Content.ReadAsStringAsync()}");
+                Console.WriteLine($"Analiz sırasında hata oluştu: {ex.Message}");
+                throw;
             }
         }
     }

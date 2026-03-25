@@ -3,6 +3,7 @@ using AxonInn.Models;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using System.Diagnostics;
+using System.Text.Json;
 
 namespace AxonInn.Controllers
 {
@@ -65,20 +66,37 @@ namespace AxonInn.Controllers
             await yorumIslem.TripadvisorYorumKaydetAsync(hotelID, yorumList, _context);
             return null;
         }
-        public async Task<IActionResult> GeminiAnalizleriKaydet()
+        public IActionResult GeminiAnalizleriKaydet()
         {
-            // veri hazırlamak için ben kullanacagım sadece
             long hotelID = 1;
             string geminiApiKey = _configuration["GeminiApi:ApiKey"];
             YorumIslem yorumIslem = new YorumIslem();
-            List<Yorum> dbYorumList = await yorumIslem.GeminiAnaliziOlmayanVeritabaniYorumListGetirAsync(hotelID, _context);
-            foreach (Yorum dbyorum in dbYorumList)
+            List<Yorum> dbYorumList = yorumIslem.GeminiAnaliziOlmayanVeritabaniYorumListGetirAsync(hotelID, _context)
+                                                .GetAwaiter()
+                                                .GetResult();
+            if (dbYorumList == null || !dbYorumList.Any())
+                return Ok("Analiz edilecek yeni yorum bulunamadı.");
+            string topluAnalizCevabi = yorumIslem.GeminiYorumAnaliziYap(dbYorumList, geminiApiKey);
+            using JsonDocument doc = JsonDocument.Parse(topluAnalizCevabi);
+            JsonElement root = doc.RootElement;
+            if (root.ValueKind == JsonValueKind.Array)
             {
-                string analizCevabi = await yorumIslem.GeminiYorumAnaliziYapAsync(dbyorum, geminiApiKey);
-                dbyorum.GeminiVerileriniIsle(analizCevabi);
-                await _context.SaveChangesAsync();
+                foreach (JsonElement analizItem in root.EnumerateArray())
+                {
+                    if (analizItem.TryGetProperty("YorumId", out JsonElement idElement))
+                    {
+                        string idString = idElement.ToString();
+                        if (long.TryParse(idString, out long currentYorumId))
+                        {
+                            var dbYorum = dbYorumList.FirstOrDefault(y => y.MisafirYorumId == currentYorumId.ToString().Trim());
+                            if (dbYorum != null)
+                                dbYorum.GeminiVerileriniIsle(analizItem.GetRawText());
+                        }
+                    }
+                }
+                _context.SaveChanges();
             }
-            return null;
+            return Ok("Analizler başarıyla tamamlandı ve kaydedildi.");
         }
     }
 }

@@ -307,7 +307,14 @@ const getOrtakSecenekler = () => ({
 
 
             try {
-                // 1. DUYGU PASTA GRAFİĞİ
+               
+                
+                
+                
+                
+                
+                
+                // 1. DUYGU PASTA GRAFİĞİ ////////////////////////////////////////////////////////////////////////
                 let negatifSayisi = yorumVerileri.filter(y => y.DuyguDurumu.toLowerCase() === 'negatif').length;
                 let notrSayisi = yorumVerileri.filter(y => y.DuyguDurumu.toLowerCase() !== 'pozitif' && y.DuyguDurumu.toLowerCase() !== 'negatif').length;
                 
@@ -322,8 +329,16 @@ const getOrtakSecenekler = () => ({
                     },
                     options: pastaAyar
                 });
-
-             // 2. DEPARTMAN PERFORMANS SKORLARI (SÜTUN GRAFİĞİ) - YÜZDE BAZLI
+                ////////////////////////////////////////////////////////////////////////////////////////////////////
+            
+                
+                
+                
+                
+                
+                
+                
+                // 2. DEPARTMAN PERFORMANS SKORLARI (SÜTUN GRAFİĞİ) - YÜZDE BAZLI ////////////////////////////////////////////////////////////////////////
 let deptSkorlari = {}, deptSayilari = {};
 
 yorumVerileri.forEach(y => {
@@ -406,8 +421,14 @@ new Chart(document.getElementById('departmanBarGrafigi').getContext('2d'), {
     },
     options: deptAyar
 });
+////////////////////////////////////////////////////////////////////////////////////////////////////
 
-                                                 // 3. MİSAFİR PSİKOLOJİSİ (POLAR AREA) - TOP 5
+
+
+
+
+
+                                                 // 3. MİSAFİR PSİKOLOJİSİ (POLAR AREA) - TOP 5 ////////////////////////////////////////////////////////////////////////
                                 let hisFrekanslari = {};
                                 let toplamHisSayisi = 0; // Yüzde hesabı için toplam geçerli veriyi tutacağımız değişken
 
@@ -466,6 +487,7 @@ new Chart(document.getElementById('departmanBarGrafigi').getContext('2d'), {
                                     },
                                     options: chartSecenekleri
                                 });
+                                ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 
 
@@ -476,8 +498,7 @@ new Chart(document.getElementById('departmanBarGrafigi').getContext('2d'), {
 
 
 
-
-                                             // 4. ANAHTAR KELİMELER (YATAY BAR)
+                                             // 4. ANAHTAR KELİMELER (YATAY BAR) ////////////////////////////////////////////////////////////////////////
                                     let kelimeHavuzu = {};
                                     // Yüzde hesabı için toplam yorum sayısını alıyoruz (0'a bölünme hatasını önlemek için en az 1 kabul ediyoruz)
                                     let toplamYorumSayisi = yorumVerileri.length || 1; 
@@ -536,8 +557,19 @@ new Chart(document.getElementById('departmanBarGrafigi').getContext('2d'), {
                                         },
                                         options: kelimeAyar
                                     });
+                                    ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-// 5. ÜLKE SKORLARI (YÜZDE BAZLI)
+
+
+
+
+
+
+
+
+
+
+// 5. ÜLKE SKORLARI (YÜZDE BAZLI) ////////////////////////////////////////////////////////////////////////
 let ulkeSkor = {}, ulkeSayi = {};
 yorumVerileri.forEach(y => {
     let ulke = y.Ulke;
@@ -596,8 +628,23 @@ new Chart(document.getElementById('ulkeGrafigi').getContext('2d'), {
     },
     options: ulkeAyar
 });
+////////////////////////////////////////////////////////////////////////////////////////////////////
 
-               // 6. KONAKLAMA TİPİ (YÜZDE BAZLI)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+               // 6. KONAKLAMA TİPİ (YÜZDE BAZLI) ////////////////////////////////////////////////////////////////////////
 let tipler = [...new Set(yorumVerileri.map(y => y.Tipi))];
 
 // Önce ham sayıları hesaplıyoruz
@@ -661,9 +708,24 @@ new Chart(document.getElementById('konaklamaGrafigi').getContext('2d'), {
     },
     options: tipAyar
 });
+////////////////////////////////////////////////////////////////////////////////////////////////////
 
 
-// 7. AYLIK TESİS YOĞUNLUĞU (YORUM HACMİNE GÖRE)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+// 7. AYLIK TESİS YOĞUNLUĞU (YORUM HACMİNE GÖRE) ////////////////////////////////////////////////////////////////////////////////////////////////////
 let aylar = {};
 yorumVerileri.forEach(y => {
     let tarihVerisi = y.MisafirKonaklamaTarihi || y.misafirKonaklamaTarihi || y.Tarih;
@@ -722,7 +784,7 @@ new Chart(document.getElementById('trendGrafigi').getContext('2d'), {
     },
     options: trendAyar
 });
-
+////////////////////////////////////////////////////////////////////////////////////////////////////
 
 
 

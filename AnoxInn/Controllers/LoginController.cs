@@ -58,7 +58,7 @@ namespace AxonInn.Controllers
                 }
 
                 // ⚡ PERFORMANS: Sadece gerekli kolonları anonim tip ile çekiyoruz (Sıfır izleme - NoTracking)
-                var dbSonuc = await _context.Personels
+                  var dbSonuc = await _context.Personels
                     .AsNoTracking()
                     .Where(p => p.MailAdresi == email && p.AktifMi == 1)
                     .Select(p => new
@@ -74,6 +74,7 @@ namespace AxonInn.Controllers
                         p.TelefonNumarasi,
                         p.MailOnayliMi,
                         p.Sifre,
+                        p.DepartmanRefNavigation,
                         DepartmanAdi = p.DepartmanRefNavigation != null ? p.DepartmanRefNavigation.Adi : string.Empty,
                         HotelAdi = (p.DepartmanRefNavigation != null && p.DepartmanRefNavigation.HotelRefNavigation != null) ? p.DepartmanRefNavigation.HotelRefNavigation.Adi : string.Empty
                     })
@@ -99,7 +100,8 @@ namespace AxonInn.Controllers
                         DepartmanRef = dbSonuc.DepartmanRef,
                         MailAdresi = dbSonuc.MailAdresi,
                         TelefonNumarasi = dbSonuc.TelefonNumarasi,
-                        MailOnayliMi = dbSonuc.MailOnayliMi
+                        MailOnayliMi = dbSonuc.MailOnayliMi,
+                        DepartmanRefNavigation=dbSonuc.DepartmanRefNavigation
                     };
 
                     bool logKayit = await LogKaydet(sessionPersonel, "Sisteme Giriş Başarılı", "Login İşlemi", email, dbSonuc.HotelAdi, dbSonuc.DepartmanAdi);

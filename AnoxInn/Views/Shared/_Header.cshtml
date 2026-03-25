@@ -53,6 +53,38 @@
             background-color: #e6f0ff;
             font-weight: 700;
         }
+
+    /* --- 3. MOBİL CİHAZLAR İÇİN 2'Lİ IZGARA (GRID) DÜZENİ YENİ EKLENDİ --- */
+    /* Razor Syntax hatası almamak için @@media kullanıldı */
+    @@media (max-width: 767.98px) {
+        .mobile-grid-nav {
+            display: grid !important;
+            grid-template-columns: repeat(2, 1fr); /* Ekranı tam ortadan 2 eşit sütuna böler */
+            gap: 0.5rem; /* Butonlar arası boşluk */
+        }
+        
+            .mobile-grid-nav .nav-item {
+                width: 100%;
+            }
+
+            .mobile-grid-nav .custom-nav-link {
+                margin: 0 !important; /* Standart dış boşluğu sıfırla ki kutulara tam otursun */
+                padding: 0.6rem 0.2rem !important; /* İç boşluk ayarı */
+                font-size: 0.82rem; /* Mobilde uzun kelimeler sığsın diye fontu ufak bir miktar küçültüyoruz */
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                height: 100%; /* Tüm butonların yüksekliklerini eşitler */
+                text-align: center;
+            }
+        /* Mobilde menü butonları ile alt taraftaki kullanıcı bilgisi arasına ayrıştırıcı çizgi */
+        .mobile-user-section {
+            border-top: 1px dashed rgba(0, 0, 0, 0.1) !important;
+            padding-top: 1rem !important;
+            margin-top: 0.5rem !important;
+            width: 100%;
+        }
+    }
 </style>
 
 <header class="sticky-top">
@@ -76,7 +108,7 @@
 
             <div class="collapse navbar-collapse" id="navbarContent">
 
-                <ul class="navbar-nav me-auto mb-2 mb-md-0 mt-3 mt-md-0 gap-1 text-center text-md-start">
+                <ul class="navbar-nav mobile-grid-nav me-auto mb-2 mb-md-0 mt-3 mt-md-0 gap-1 text-center text-md-start">
                     <li class="nav-item">
                         <a class="nav-link custom-nav-link @(currentController == "Ana" && currentAction == "Ana" ? "active" : "")" asp-controller="Ana" asp-action="Ana">Anasayfa</a>
                     </li>
@@ -87,6 +119,9 @@
                         <a class="nav-link custom-nav-link @(currentController == "Gorev" ? "active" : "")" asp-controller="Gorev" asp-action="Gorev">Görevler</a>
                     </li>
                     <li class="nav-item">
+                        <a class="nav-link custom-nav-link @(currentController == "Yorum" ? "active" : "")" asp-controller="Yorum" asp-action="Yorum">Analitik</a>
+                    </li>
+                    <li class="nav-item">
                         <a class="nav-link custom-nav-link @(currentController == "Iletisim" ? "active" : "")" asp-controller="Iletisim" asp-action="Iletisim">İletişim</a>
                     </li>
                     <li class="nav-item">
@@ -94,8 +129,8 @@
                     </li>
                 </ul>
 
-                <div class="d-flex flex-column align-items-center align-items-md-end pt-2 pt-md-0 border-top border-md-0 mt-2 mt-md-0">
-                    <div class="d-flex align-items-center mb-0">
+                <div class="mobile-user-section d-flex flex-column align-items-center align-items-md-end pt-2 pt-md-0 border-md-0 mt-2 mt-md-0">
+                    <div class="d-flex align-items-center mb-2 mb-md-0">
                         <span class="badge rounded-circle bg-success p-0 me-2" style="width: 7px; height: 7px;">
                             <span class="visually-hidden">Online</span>
                         </span>

@@ -30,6 +30,8 @@ public partial class AxonInnContext : DbContext
 
     public virtual DbSet<PersonelFotograf> PersonelFotografs { get; set; }
 
+    public DbSet<Yorum> Yorum { get; set; }
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         // ⚡ KRİTİK HATA (NVARCHAR(MAX)) ÖNLEMİ: AuditLog tablosu kısıtlamaları eklendi

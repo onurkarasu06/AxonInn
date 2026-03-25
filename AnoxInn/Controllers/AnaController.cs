@@ -9,16 +9,11 @@ namespace AxonInn.Controllers
     public class AnaController : Controller
     {
         private readonly AxonInnContext _context;
-
-        // ⚡ PERFORMANS: JsonSerializerOptions'ı static readonly yaparak her HTTP isteğinde RAM'de yeniden üretilmesini engelliyoruz.
         private static readonly JsonSerializerOptions _jsonOptions = new() { PropertyNamingPolicy = JsonNamingPolicy.CamelCase };
-
         public AnaController(AxonInnContext context)
         {
             _context = context;
         }
-
-        // ⚡ KOD TEKRARINI ÖNLEME (DRY): Session okuma işlemleri tek merkeze bağlandı, Hata koruması sağlandı.
         private Personel? GetActiveUser()
         {
             try

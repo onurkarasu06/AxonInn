@@ -1,4 +1,4 @@
-﻿@model List<AxonInn.Models.Yorum>
+﻿@model AxonInn.Models.YorumDashboardViewModel
 
 @{
     Layout = "~/Views/Shared/_Layout.cshtml";
@@ -12,9 +12,8 @@
     .dashboard-card { border-radius: 12px; transition: transform 0.25s ease-in-out; border: 1px solid #eef2f7; background-color: #fff; }
     .dashboard-card:hover { transform: translateY(-4px); box-shadow: 0 10px 20px rgba(0,0,0,0.06)!important; }
     
-    /* Info Card: Yazıları dikeyde tam ortalamak için Flexbox eklendi */
-    .info-card { border-radius: 12px; background: linear-gradient(145deg, #ffffff, #f8f9fa); display: flex; flex-direction: column; justify-content: center; }
-    
+    /* Info Card */
+    .info-card { border-radius: 12px; background: linear-gradient(145deg, #ffffff, #f8f9fa); display: flex; flex-direction: column; justify-content: flex-start; }
     .chart-container { position: relative; height: 320px; width: 100%; }
     .info-title { font-weight: 600; font-size: 1.1rem; letter-spacing: 0.3px; }
     .info-text { font-size: 0.95rem; line-height: 1.6; color: #5a5c69; text-align: justify; }
@@ -32,51 +31,47 @@
 
 <div class="container-fluid py-4 mb-5">
     
-    <div class="d-flex justify-content-between align-items-center mb-4 pb-2 border-bottom">
-        <h4 class="text-secondary fw-bold"><i class="fas fa-brain me-2 text-primary"></i>Yapay Zeka Analitik Paneli</h4>
+ <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center mb-4 pb-2 border-bottom gap-3">
+        <h4 class="text-secondary fw-bold mb-0"><i class="fas fa-brain me-2 text-primary"></i>Yapay Zeka Analitik Paneli</h4>
+        <div class="d-grid d-md-block">
+            <button id="btnAiTavsiye" class="btn btn-primary shadow-sm fw-bold">
+                <i class="fas fa-magic me-2"></i> Yönetim Özetlerini Yapay Zeka ile Güncelle
+            </button>
+        </div>
     </div>
 
-    @if (Model == null || !Model.Any(x => x.GeminiAnalizYapildiMi == 1))
-    {
-        <div class="alert alert-warning shadow-sm border-0 rounded-3 p-4 mb-4">
-            <h5 class="text-warning mb-2"><i class="fas fa-exclamation-triangle me-2 fs-5"></i> Analiz Edilmiş Veri Bulunamadı</h5>
-            <p class="mb-0 text-muted">Sistemde henüz Gemini yapay zekası tarafından analiz edilmiş bir misafir yorumu bulunmuyor. Lütfen önce Tripadvisor'dan yorumları çekin ve ardından <strong>"Gemini Analizleri Kaydet"</strong> işlemini başlatın.</p>
-        </div>
-    }
-    else
-    {
-        <div class="row g-4 mb-4">
-            <div class="col-xl-3 col-md-6">
-                <div class="card kpi-card bg-gradient-primary shadow-sm h-100">
-                    <h6 class="text-uppercase fw-bold mb-0 opacity-75">Analiz Edilen Yorum Adeti</h6>
-                    <div class="kpi-value" id="kpiToplamYorum">0</div>
-                    <i class="fas fa-robot"></i>
-                </div>
-            </div>
-            <div class="col-xl-3 col-md-6">
-                <div class="card kpi-card bg-gradient-success shadow-sm h-100">
-                    <h6 class="text-uppercase fw-bold mb-0 opacity-75">Genel Memnuniyet</h6>
-                    <div class="kpi-value" id="kpiOrtalamaPuan">0.0 / 10</div>
-                    <i class="fas fa-star"></i>
-                </div>
-            </div>
-            <div class="col-xl-3 col-md-6">
-                <div class="card kpi-card bg-gradient-info shadow-sm h-100">
-                    <h6 class="text-uppercase fw-bold mb-0 opacity-75">Pozitif Yorum Oranı</h6>
-                    <div class="kpi-value" id="kpiPozitifOran">%0</div>
-                    <i class="fas fa-smile-beam"></i>
-                </div>
-            </div>
-            <div class="col-xl-3 col-md-6">
-                <div class="card kpi-card bg-gradient-danger shadow-sm h-100">
-                    <h6 class="text-uppercase fw-bold mb-0 opacity-75">Negatif Yorum Oranı</h6>
-                    <div class="kpi-value" id="kpiAcilDurum">0 </div>
-                    <i class="fas fa-siren-on"></i>
-                </div>
+    <div class="row g-4 mb-4">
+        <div class="col-xl-3 col-md-6">
+            <div class="card kpi-card bg-gradient-primary shadow-sm h-100">
+                <h6 class="text-uppercase fw-bold mb-0 opacity-75">Analiz Edilen Yorum Adeti</h6>
+                <div class="kpi-value" id="kpiToplamYorumAdeti">0</div>
+                <i class="fas fa-robot"></i>
             </div>
         </div>
+        <div class="col-xl-3 col-md-6">
+            <div class="card kpi-card bg-gradient-success shadow-sm h-100">
+                <h6 class="text-uppercase fw-bold mb-0 opacity-75">Genel Memnuniyet</h6>
+                <div class="kpi-value" id="kpiMemnuniyetOrani">%0</div>
+                <i class="fas fa-star"></i>
+            </div>
+        </div>
+        <div class="col-xl-3 col-md-6">
+            <div class="card kpi-card bg-gradient-info shadow-sm h-100">
+                <h6 class="text-uppercase fw-bold mb-0 opacity-75">Pozitif Yorum Oranı</h6>
+                <div class="kpi-value" id="kpiPozitifYorumOrani">%0</div>
+                <i class="fas fa-smile-beam"></i>
+            </div>
+        </div>
+        <div class="col-xl-3 col-md-6">
+            <div class="card kpi-card bg-gradient-danger shadow-sm h-100" id="kpiNegatifYorumOraniCard">
+                <h6 class="text-uppercase fw-bold mb-0 opacity-75">Negatif Yorum Oranı</h6>
+                <div class="kpi-value" id="kpiNegatifYorumOrani">%0</div>
+                <i class="fas fa-exclamation-circle"></i>
+            </div>
+        </div>
+    </div>
 
-      <div class="row mb-4">
+    <div class="row mb-4">
         <div class="col-12">
             <div class="d-flex align-items-center justify-content-center shadow-sm w-100 py-3" style="background-color: #f0f4ff; border-radius: 12px; border: 1px solid rgba(92, 124, 250, 0.1);">
                 <h6 class="mb-0 text-uppercase fw-900" style="letter-spacing: 5px; color: #5c7cfa; font-size: 0.85rem;">
@@ -84,719 +79,448 @@
                 </h6>
             </div>
         </div>
-      </div>
+    </div>
 
-        <div class="row g-4 mb-4 align-items-stretch">
-            <div class="col-lg-8 col-md-12">
-                <div class="card dashboard-card shadow-sm h-100">
-                    <div class="card-header bg-white info-title text-primary border-0 pt-4 pb-0">
-                        <i class="fas fa-chart-pie me-2"></i>Operasyonel Memnuniyet Özeti (Sentiment)
-                    </div>
-                    <div class="card-body"><div class="chart-container"><canvas id="duyguPastaGrafigi"></canvas></div></div>
+
+
+
+
+
+
+
+    <div class="row g-4 mb-4 align-items-stretch">
+        <div class="col-lg-8 col-md-12">
+            <div class="card dashboard-card shadow-sm h-100">
+                <div class="card-header bg-white info-title text-primary border-0 pt-4 pb-0">
+                    <i class="fas fa-chart-pie me-2"></i>Operasyonel Memnuniyet Özeti (Sentiment)
                 </div>
-            </div>
-            <div class="col-lg-4 col-md-12">
-                <div class="card info-card shadow-sm p-4 h-100" style="border-left: 5px solid #0d6efd !important;">
-                    <h5 class="text-primary mb-3 info-title"><i class="fas fa-microscope me-2"></i>Operasyonel Memnuniyet Analizi</h5>
-                    <p class="info-text mb-0">Tesisimize bırakılan misafir geri bildirimleri AI ile taranarak sınıflandırılır.<br><br><strong>Yönetim Özeti:</strong> Yeşil alanın dominasyonu sahadaki hizmet standartlarının korunduğunu gösterir. Kırmızı alanlar anlık itibar kaybı riski taşır ve müdahale gerektirir.</p>
-                </div>
+                <div class="card-body"><div class="chart-container"><canvas id="duyguPastaGrafigi"></canvas></div></div>
             </div>
         </div>
+        <div class="col-lg-4 col-md-12">
+             <div class="card info-card shadow-sm p-4 h-100" style="border-left: 5px solid #0d6efd !important;">
+                    <h5 class="text-primary mb-2 info-title"><i class="fas fa-microscope me-2"></i>Operasyonel Memnuniyet Analizi</h5>
+                    <p class="text-muted" style="font-size: 0.85rem; line-height: 1.4;">Tesisimize bırakılan misafir geri bildirimleri AI ile taranarak sınıflandırılır.</p>
+                    <hr class="my-2 opacity-25">
+                    <p class="info-text mt-2 mb-0"><strong><i class="fas fa-robot text-primary me-1"></i> Yönetim Özeti :</strong> <span id="ozetDuygu">Yeşil alanın dominasyonu sahadaki hizmet standartlarının korunduğunu gösterir. Kırmızı alanlar anlık itibar kaybı riski taşır ve müdahale gerektirir.</span></p>
+                </div>
+        </div>
+    </div>
 
-        <div class="row g-4 mb-4 align-items-stretch">
-            <div class="col-lg-8 col-md-12">
-                <div class="card dashboard-card shadow-sm h-100">
-                    <div class="card-header bg-white info-title border-0 pt-4 pb-0" style="color: #6f42c1;">
-                        <i class="fas fa-chart-column me-2"></i>Departman Performans Skorları
-                    </div>
-                    <div class="card-body"><div class="chart-container"><canvas id="departmanBarGrafigi"></canvas></div></div>
+    <div class="row g-4 mb-4 align-items-stretch">
+        <div class="col-lg-8 col-md-12">
+            <div class="card dashboard-card shadow-sm h-100">
+                <div class="card-header bg-white info-title border-0 pt-4 pb-0" style="color: #6f42c1;">
+                    <i class="fas fa-chart-column me-2"></i>Departman Performans Skorları
                 </div>
-            </div>
-            <div class="col-lg-4 col-md-12">
-                <div class="card info-card shadow-sm p-4 h-100" style="border-left: 5px solid #6f42c1 !important;">
-                    <h5 class="mb-3 info-title" style="color: #6f42c1;"><i class="fas fa-crosshairs me-2"></i>Departman Bazlı Performans Tespiti</h5>
-                    <p class="info-text mb-0">Yapay zeka, yorumu okuyarak sorunun veya övgünün <strong>HANGİ departmandan</strong> (Temizlik, Resepsiyon, Yemek vs.) kaynaklandığını bulur ve puanlar.<br><br><strong>Yönetim Özeti:</strong> En düşük sütuna (en az puana) sahip olan departmanlar, misafir şikayetlerinin odak noktasını oluşturur ve acil müdahale gerektirir. Yüksek sütunlar ise tesisin en başarılı birimleridir.</p>
-                </div>
+                <div class="card-body"><div class="chart-container"><canvas id="departmanBarGrafigi"></canvas></div></div>
             </div>
         </div>
+        <div class="col-lg-4 col-md-12">
+         <div class="card info-card shadow-sm p-4 h-100" style="border-left: 5px solid #6f42c1 !important;">
+    <h5 class="mb-2 info-title" style="color: #6f42c1;"><i class="fas fa-crosshairs me-2"></i>Departman Bazlı Performans Tespiti</h5>
+    <p class="text-muted" style="font-size: 0.85rem; line-height: 1.4;">Yapay zeka, yorumu okuyarak sorunun veya övgünün <strong>HANGİ departmandan</strong> kaynaklandığını bulur ve puanlar.</p>
+    <hr class="my-2 opacity-25">
+    <p class="info-text mt-2 mb-0"><strong><i class="fas fa-robot me-1" style="color: #6f42c1;"></i> Yönetim Özeti :</strong> <span id="ozetDepartman">En düşük sütuna (en az puana) sahip olan departmanlar, misafir şikayetlerinin odak noktasını oluşturur ve acil müdahale gerektirir. Yüksek sütunlar ise tesisin en başarılı birimleridir.</span></p>
+</div>
+        </div>
+    </div>
 
-        <div class="row g-4 mb-4 align-items-stretch">
-            <div class="col-lg-8 col-md-12">
-                <div class="card dashboard-card shadow-sm h-100">
-                    <div class="card-header bg-white info-title border-0 pt-4 pb-0" style="color: #e83e8c;">
-                        <i class="fas fa-heartbeat me-2"></i>Misafir Psikolojisi (Baskın His)
-                    </div>
-                    <div class="card-body"><div class="chart-container"><canvas id="hisPolarGrafigi"></canvas></div></div>
+    <div class="row g-4 mb-4 align-items-stretch">
+        <div class="col-lg-8 col-md-12">
+            <div class="card dashboard-card shadow-sm h-100">
+                <div class="card-header bg-white info-title border-0 pt-4 pb-0" style="color: #e83e8c;">
+                    <i class="fas fa-heartbeat me-2"></i>Misafir Psikolojisi (Baskın His)
                 </div>
-            </div>
-            <div class="col-lg-4 col-md-12">
-                <div class="card info-card shadow-sm p-4 h-100" style="border-left: 5px solid #e83e8c !important;">
-                    <h5 class="mb-3 info-title" style="color: #e83e8c;"><i class="fas fa-theater-masks me-2"></i>Misafir Psikolojisi Analizi</h5>
-                    <p class="info-text mb-0">Misafirlerin yorum yazarken yaşadığı temel duyguyu (Öfke, Hayal Kırıklığı, Minnet, Şaşkınlık) oransal yapraklar şeklinde algılar.<br><br><strong>Yönetim Özeti:</strong> "Hayal Kırıklığı" beklentinin karşılanmadığını, "Öfke" ise personelin kaba davranışını veya çözülmeyen bir krizi işaret eder.</p>
-                </div>
+                <div class="card-body"><div class="chart-container"><canvas id="hisPolarGrafigi"></canvas></div></div>
             </div>
         </div>
+        <div class="col-lg-4 col-md-12">
+         <div class="card info-card shadow-sm p-4 h-100" style="border-left: 5px solid #e83e8c !important;">
+    <h5 class="mb-2 info-title" style="color: #e83e8c;"><i class="fas fa-theater-masks me-2"></i>Misafir Psikolojisi Analizi</h5>
+    <p class="text-muted" style="font-size: 0.85rem; line-height: 1.4;">Misafirlerin yorum yazarken yaşadığı temel duyguyu (Öfke, Hayal Kırıklığı, Minnet, Şaşkınlık) oransal yapraklar şeklinde algılar.</p>
+    <hr class="my-2 opacity-25">
+    <p class="info-text mt-2 mb-0"><strong><i class="fas fa-robot me-1" style="color: #e83e8c;"></i> Yönetim Özeti :</strong> <span id="ozetHisPolar">"Hayal Kırıklığı" beklentinin karşılanmadığını, "Öfke" ise personelin kaba davranışını veya çözülmeyen bir krizi işaret eder.</span></p>
+</div>
+        </div>
+    </div>
 
-        <div class="row g-4 mb-4 align-items-stretch">
-            <div class="col-lg-8 col-md-12">
-                <div class="card dashboard-card shadow-sm h-100">
-                    <div class="card-header bg-white info-title text-dark border-0 pt-4 pb-0">
-                        <i class="fas fa-hashtag me-2"></i>Trend Gündem: En Çok Konuşulan 10 Konu
-                    </div>
-                    <div class="card-body"><div class="chart-container"><canvas id="kelimeBarGrafigi"></canvas></div></div>
+    <div class="row g-4 mb-4 align-items-stretch">
+        <div class="col-lg-8 col-md-12">
+            <div class="card dashboard-card shadow-sm h-100">
+                <div class="card-header bg-white info-title text-dark border-0 pt-4 pb-0">
+                    <i class="fas fa-hashtag me-2"></i>Trend Gündem: En Çok Konuşulan Konular
                 </div>
-            </div>
-            <div class="col-lg-4 col-md-12">
-                <div class="card info-card shadow-sm p-4 h-100" style="border-left: 5px solid #343a40 !important;">
-                    <h5 class="text-dark mb-3 info-title"><i class="fas fa-search me-2"></i>BilinçAltı Eğilim Analizi</h5>
-                    <p class="info-text mb-0">Yüzlerce sayfalık yorum metinlerinden cımbızlanan kilit kelimelerin frekansıdır.<br><br><strong>Yönetim Özeti:</strong> Tesiste o dönem neyin öne çıktığını gösterir. Listede "klima, böcek, kirli" gibi kelimeler zirvedeyse kronik bir sorun var demektir. "Animasyon, lezzet" zirvedeyse pazarlama dili bu yöne kaydırılmalıdır.</p>
-                </div>
+                <div class="card-body"><div class="chart-container"><canvas id="kelimeBarGrafigi"></canvas></div></div>
             </div>
         </div>
+        <div class="col-lg-4 col-md-12">
+          <div class="card info-card shadow-sm p-4 h-100" style="border-left: 5px solid #343a40 !important;">
+    <h5 class="text-dark mb-2 info-title"><i class="fas fa-search me-2"></i>BilinçAltı Eğilim Analizi</h5>
+    <p class="text-muted" style="font-size: 0.85rem; line-height: 1.4;">Yüzlerce sayfalık yorum metinlerinden cımbızlanan kilit kelimelerin frekansıdır.</p>
+    <hr class="my-2 opacity-25">
+    <p class="info-text mt-2 mb-0"><strong><i class="fas fa-robot text-dark me-1"></i> Yönetim Özeti :</strong> <span id="ozetKelime">Tesiste o dönem neyin öne çıktığını gösterir. Listede "klima, böcek, kirli" gibi kelimeler zirvedeyse kronik bir sorun var demektir.</span></p>
+</div>
+        </div>
+    </div>
 
-        <div class="row g-4 mb-4 align-items-stretch">
-            <div class="col-lg-8 col-md-12">
-                <div class="card dashboard-card shadow-sm h-100">
-                    <div class="card-header bg-white info-title text-success border-0 pt-4 pb-0">
-                        <i class="fas fa-globe-americas me-2"></i>Demografik Memnuniyet (Ülkelere Göre)
-                    </div>
-                    <div class="card-body"><div class="chart-container"><canvas id="ulkeGrafigi"></canvas></div></div>
+    <div class="row g-4 mb-4 align-items-stretch">
+        <div class="col-lg-8 col-md-12">
+            <div class="card dashboard-card shadow-sm h-100">
+                <div class="card-header bg-white info-title text-success border-0 pt-4 pb-0">
+                    <i class="fas fa-globe-americas me-2"></i>Demografik Memnuniyet (Ülkelere Göre)
                 </div>
-            </div>
-            <div class="col-lg-4 col-md-12">
-                <div class="card info-card shadow-sm p-4 h-100" style="border-left: 5px solid #198754 !important;">
-                    <h5 class="text-success mb-3 info-title"><i class="fas fa-map-marked-alt me-2"></i>Ülkelere Göre Pazar Endeksi</h5>
-                    <p class="info-text mb-0">
-                        Konaklayan misafirlerin milliyetlerine göre derecelendirdiği <strong>100 üzerinden ağırlıklı memnuniyet ortalamasıdır.</strong><br><br>
-                        <strong>Yönetim Özeti:</strong> Otelin uluslararası pazarlara olan uyumunu ve hizmet kalitesinin kültürel farklılıklara göre nasıl şekillendiğini gösterir. Düşük skorlu pazarlar tespit edilerek, o bölgeye özgü beklentiler doğrultusunda hizmet standartları optimize edilmelidir.
-                    </p>
-                </div>
+                <div class="card-body"><div class="chart-container"><canvas id="ulkeGrafigi"></canvas></div></div>
             </div>
         </div>
+        <div class="col-lg-4 col-md-12">
+          <div class="card info-card shadow-sm p-4 h-100" style="border-left: 5px solid #198754 !important;">
+    <h5 class="text-success mb-2 info-title"><i class="fas fa-map-marked-alt me-2"></i>Ülkelere Göre Pazar Endeksi</h5>
+    <p class="text-muted" style="font-size: 0.85rem; line-height: 1.4;">Konaklayan misafirlerin milliyetlerine göre derecelendirdiği <strong>100 üzerinden ağırlıklı memnuniyet ortalamasıdır.</strong></p>
+    <hr class="my-2 opacity-25">
+    <p class="info-text mt-2 mb-0"><strong><i class="fas fa-robot text-success me-1"></i> Yönetim Özeti :</strong> <span id="ozetUlke">Otelin uluslararası pazarlara olan uyumunu gösterir. Düşük skorlu pazarlar tespit edilerek hizmet optimize edilmelidir.</span></p>
+</div>
+        </div>
+    </div>
 
-        <div class="row g-4 mb-4 align-items-stretch">
-            <div class="col-lg-8 col-md-12">
-                <div class="card dashboard-card shadow-sm h-100">
-                    <div class="card-header bg-white info-title text-info border-0 pt-4 pb-0">
-                        <i class="fas fa-users-cog me-2"></i>Konaklama Segmentasyonu
-                    </div>
-                    <div class="card-body"><div class="chart-container"><canvas id="konaklamaGrafigi"></canvas></div></div>
+    <div class="row g-4 mb-4 align-items-stretch">
+        <div class="col-lg-8 col-md-12">
+            <div class="card dashboard-card shadow-sm h-100">
+                <div class="card-header bg-white info-title text-info border-0 pt-4 pb-0">
+                    <i class="fas fa-users-cog me-2"></i>Konaklama Segmentasyonu
                 </div>
-            </div>
-            <div class="col-lg-4 col-md-12">
-                <div class="card info-card shadow-sm p-4 h-100" style="border-left: 5px solid #0dcaf0 !important;">
-                    <h5 class="text-info mb-3 info-title"><i class="fas fa-bullseye me-2"></i>Konaklama Segmentasyonu Analizi</h5>
-                    <p class="info-text mb-0">
-                        Misafir profillerinin (Aile, Çift, Yalnız Seyahat vb.) duygu durumlarına göre ayrıştırılmış reaksiyon haritasıdır.<br><br>
-                        <strong>Yönetim Özeti:</strong> "Aile" segmentinde negatif yığılma varsa çocuk animasyonları ve aile odaları; "Çift" segmentinde sıkıntı varsa romantik organizasyonlar ve sessiz alan eksiklikleri gözden geçirilmelidir.
-                    </p>
-                </div>
+                <div class="card-body"><div class="chart-container"><canvas id="konaklamaGrafigi"></canvas></div></div>
             </div>
         </div>
+        <div class="col-lg-4 col-md-12">
+        <div class="card info-card shadow-sm p-4 h-100" style="border-left: 5px solid #0dcaf0 !important;">
+    <h5 class="text-info mb-2 info-title"><i class="fas fa-bullseye me-2"></i>Konaklama Segmentasyonu Analizi</h5>
+    <p class="text-muted" style="font-size: 0.85rem; line-height: 1.4;">Misafir profillerinin (Aile, Çift, Yalnız Seyahat vb.) duygu durumlarına göre ayrıştırılmış reaksiyon haritasıdır.</p>
+    <hr class="my-2 opacity-25">
+    <p class="info-text mt-2 mb-0"><strong><i class="fas fa-robot text-info me-1"></i> Yönetim Özeti :</strong> <span id="ozetKonaklama">"Aile" segmentinde negatif yığılma varsa çocuk animasyonları ve aile odaları; "Çift" segmentinde sıkıntı varsa romantik organizasyonlar gözden geçirilmelidir.</span></p>
+</div>
+        </div>
+    </div>
 
-        <div class="row g-4 mb-4 align-items-stretch">
-            <div class="col-lg-8 col-md-12">
-                <div class="card dashboard-card shadow-sm h-100">
-                    <div class="card-header bg-white info-title border-0 pt-4 pb-0" style="color: #fd7e14;">
-                        <i class="fas fa-wave-square me-2"></i>Sezonsal Stres Grafiği
-                    </div>
-                    <div class="card-body"><div class="chart-container"><canvas id="trendGrafigi"></canvas></div></div>
+    <div class="row g-4 mb-4 align-items-stretch">
+        <div class="col-lg-8 col-md-12">
+            <div class="card dashboard-card shadow-sm h-100">
+                <div class="card-header bg-white info-title border-0 pt-4 pb-0" style="color: #fd7e14;">
+                    <i class="fas fa-wave-square me-2"></i>Sezonsal Stres Grafiği
                 </div>
-            </div>
-            <div class="col-lg-4 col-md-12">
-                <div class="card info-card shadow-sm p-4 h-100" style="border-left: 5px solid #fd7e14 !important;">
-                    <h5 class="mb-3 info-title" style="color: #fd7e14;"><i class="fas fa-calendar-alt me-2"></i>Sezonsal Stres Testi</h5>
-                    <p class="info-text mb-0">
-    Konaklama aylarına göre tesise bırakılan <strong>Toplam Yorum Hacminin (Adet)</strong> dalgalanma grafiğidir. Bu veri, tesisin dönemsel doluluk oranını (occupancy) yansıtan güçlü bir vekil metriktir.<br><br>
-    <strong>Yönetim Özeti:</strong> Tesisin "Peak Season" (Yüksek Sezon) ve "Low Season" (Düşük Sezon) döngülerini net bir şekilde görselleştirir. Zirve noktaları otelin maksimum kapasiteye ulaştığı operasyonel hareketliliği temsil ederken; bu hacim trendi, gelecek sezonun personel istihdamı, satın alma bütçeleri ve pazarlama planlamaları için yönetime doğrudan rehberlik eder.
-</p>
-                </div>
+                <div class="card-body"><div class="chart-container"><canvas id="trendGrafigi"></canvas></div></div>
             </div>
         </div>
-    }
+        <div class="col-lg-4 col-md-12">
+         <div class="card info-card shadow-sm p-4 h-100" style="border-left: 5px solid #fd7e14 !important;">
+    <h5 class="mb-2 info-title" style="color: #fd7e14;"><i class="fas fa-calendar-alt me-2"></i>Sezonsal Stres Testi Yorumu</h5>
+    <p class="text-muted" style="font-size: 0.85rem; line-height: 1.4;">Bu veri, tesisin dönemsel doluluk oranını (occupancy) yansıtan güçlü bir vekil metriktir.</p>
+    <hr class="my-2 opacity-25">
+    <p class="info-text mt-2 mb-0"><strong><i class="fas fa-robot me-1" style="color: #fd7e14;"></i> Yönetim Özeti : </strong> <span id="ozetTrend">Tesisin "Peak Season" (Yüksek Sezon) ve "Low Season" (Düşük Sezon) döngülerini net bir şekilde görselleştirir.</span></p>
+</div>
+        </div>
+    </div>
 
 </div>
 
-@if (Model != null && Model.Any(x => x.GeminiAnalizYapildiMi == 1))
-{
-    <script>
-        document.addEventListener("DOMContentLoaded", function () {
-            
-            // --- 1. GÜVENLİ VERİ AKTARIMI ---
-            // C#'tan gelen JSON verisi alınıyor.
-            const rawVeriler = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(
-                Model.Where(x => x.GeminiAnalizYapildiMi == 1).Select(x => new {
-                    DuyguDurumu = x.GeminiAnalizDuyguDurumu,
-                    Skor = x.GeminiAnalizDuyguSkoru,
-                    Ulke = x.MisafirUlkesi,
-                    Tipi = x.MisafirKonaklamaTipi,
-                    Tarih = x.MisafirYorumTarihi,
-                    Departman = x.GeminiAnalizIlgiliDepartman,
-                    BaskinHis = x.GeminiAnalizBaskinHis,
-                    Kelimeler = x.GeminiAnalizAnahtarKelimeler,
-                    Acil = x.GeminiAnalizAcilDurumVarMi == true ? 1 : 0
-                })
-            ));
+<script>
+document.addEventListener("DOMContentLoaded", function() {
 
-            if (!rawVeriler || rawVeriler.length === 0) return;
-
-            // --- 2. VERİ TEMİZLEME VE FORMATLAMA KATI ---
-            // Sunucudaki harf büyüklüğü farklılıklarını ve "null" çökmelerini engellemek için filtreliyoruz.
-            const yorumVerileri = rawVeriler.map(y => {
-                return {
-                    DuyguDurumu: String(y.DuyguDurumu || y.duyguDurumu || "Belirtilmemiş").trim(),
-                    Skor: Number(y.Skor !== undefined ? y.Skor : (y.skor || 0)),
-                    Ulke: String(y.Ulke || y.ulke || "Bilinmiyor").trim(),
-                    Tipi: String(y.Tipi || y.tipi || "Tanımsız Profil").trim(),
-                    Tarih: y.Tarih || y.tarih || null,
-                    Departman: String(y.Departman || y.departman || "Genel").trim(),
-                    BaskinHis: String(y.BaskinHis || y.baskinHis || "Belirtilmemiş").trim(),
-                    Kelimeler: String(y.Kelimeler || y.kelimeler || "").trim(),
-                    Acil: Number(y.Acil !== undefined ? y.Acil : (y.acil || 0))
-                };
-            });
-
-
-
-
-
- // --- 3. KPI KARTLARININ HESAPLANMASI ---
-let toplamYorum = yorumVerileri.length;
-       
-// Yorum yoksa sıfıra bölme hatasını (NaN) önlemek için ufak bir kontrol
-if (toplamYorum === 0) return; 
-
-// GÜNCELLEME 1: String birleştirme hatasını önlemek için y.Skor'u parseFloat ile kesin olarak sayıya çeviriyoruz
-let toplamSkor = yorumVerileri.reduce((sum, y) => sum + (parseFloat(y.Skor) || 0), 0);
-
-// Gerçek ortalamayı (TripAdvisor standartlarında 50 üzerinden) buluyoruz
-let gercekOrtalama = (toplamSkor / toplamYorum);
-
-// GÜNCELLEME 2: Puan 50 üzerinden olduğu için, 100 üzerinden bir yüzdeye çevirmek adına 2 ile çarpıyoruz (Örn: 35.7 * 2 = 71)
-let memnuniyetYuzdesi = Math.round(gercekOrtalama * 2);
-
-let pozitifSayisi = yorumVerileri.filter(y => y.DuyguDurumu && y.DuyguDurumu.toLowerCase() === 'pozitif').length;
-let pozitifOran = Math.round((pozitifSayisi / toplamYorum) * 100);
-       
-let acilSayisi = yorumVerileri.filter(y => y.Acil === 1).length;
-let acilOran = Math.round((acilSayisi / toplamYorum) * 100);
-
-document.getElementById('kpiToplamYorum').innerText = toplamYorum;
-
-// GÜNCELLEME 3: Ekrana "%71" formatında şık bir şekilde yazdırıyoruz
-document.getElementById('kpiOrtalamaPuan').innerText = "%" + memnuniyetYuzdesi;
-document.getElementById('kpiPozitifOran').innerText = "%" + pozitifOran;
-            
-let kpiAcilEl = document.getElementById('kpiAcilDurum');
-kpiAcilEl.innerText = "%" + acilOran; 
-       
-if(acilSayisi > 0) { 
-    kpiAcilEl.parentElement.classList.add('border', 'border-4', 'border-white'); 
-}
-
-const getOrtakSecenekler = () => ({
-    responsive: true, maintainAspectRatio: false,
-    plugins: {
-        legend: { position: 'bottom', labels: { padding: 15, usePointStyle: true, pointStyle: 'circle' } },
-        tooltip: { backgroundColor: 'rgba(30,30,30,0.9)', padding: 12, cornerRadius: 8 }
-    }
-});
-
-
-
-
-
-            try {
-               
-                
-                
-                
-                
-                
-                
-                // 1. DUYGU PASTA GRAFİĞİ ////////////////////////////////////////////////////////////////////////
-                let negatifSayisi = yorumVerileri.filter(y => y.DuyguDurumu.toLowerCase() === 'negatif').length;
-                let notrSayisi = yorumVerileri.filter(y => y.DuyguDurumu.toLowerCase() !== 'pozitif' && y.DuyguDurumu.toLowerCase() !== 'negatif').length;
-                
-                let pastaAyar = getOrtakSecenekler();
-                pastaAyar.cutout = '65%';
-                
-                new Chart(document.getElementById('duyguPastaGrafigi').getContext('2d'), {
-                    type: 'doughnut',
-                    data: {
-                        labels: ['Pozitif / Memnun', 'Negatif / Gelişim Alanı', 'Nötr / Standart'],
-                        datasets: [{ data: [pozitifSayisi, negatifSayisi, notrSayisi], backgroundColor: ['#1cc88a', '#e74a3b', '#f6c23e'], borderWidth: 2, hoverOffset: 5 }]
-                    },
-                    options: pastaAyar
-                });
-                ////////////////////////////////////////////////////////////////////////////////////////////////////
-            
-                
-                
-                
-                
-                
-                
-                
-                // 2. DEPARTMAN PERFORMANS SKORLARI (SÜTUN GRAFİĞİ) - YÜZDE BAZLI ////////////////////////////////////////////////////////////////////////
-let deptSkorlari = {}, deptSayilari = {};
-
-yorumVerileri.forEach(y => {
-    // 1. Departman bilgisini al, boşsa veya belirtilmemişse "Genel" yap
-    let rawDept = y.Departman || "";
-    if (rawDept.toLowerCase() === "belirtilmemiş" || rawDept.trim() === "") {
-        rawDept = "Genel";
-    }
-
-    // 2. Virgüllere göre departmanları parçala
-    let departmanDizisi = rawDept.split(',');
-
-    // 3. Her bir parçalanmış departman için puanları işle
-    departmanDizisi.forEach(d => {
-        let temizDept = d.trim()
-                         .replace(/ departmanı/gi, '')
-                         .replace(/ departmani/gi, '');
-
-        temizDept = temizDept.charAt(0).toUpperCase() + temizDept.slice(1).toLowerCase();
-
-        if (!deptSkorlari[temizDept]) { 
-            deptSkorlari[temizDept] = 0; 
-            deptSayilari[temizDept] = 0; 
+    const getOrtakSecenekler = () => ({
+        responsive: true, 
+        maintainAspectRatio: false,
+        plugins: {
+            legend: { display: false }, 
+            tooltip: { backgroundColor: 'rgba(30,30,30,0.9)', padding: 12, cornerRadius: 8 }
         }
-        deptSkorlari[temizDept] += y.Skor;
-        deptSayilari[temizDept]++;
     });
-});
 
-// 4. Ortalamaları hesapla ve listeye çevir (% formatına dönüştürüyoruz)
-let deptDataList = Object.keys(deptSkorlari).map(d => {
-    // 10 üzerinden olan ortalamayı 10 ile çarparak % değerine (100 üzerinden) çeviriyoruz
-    let ortalamaYuzde = (deptSkorlari[d] / deptSayilari[d]) * 10;
-    return { isim: d, ortalama: parseFloat(ortalamaYuzde.toFixed(1)) };
-});
-
-// Büyükten küçüğe sırala
-deptDataList.sort((a, b) => b.ortalama - a.ortalama); 
-              
-let deptAyar = getOrtakSecenekler();
-
-// 5. Y ekseni ayarlarını % gösterecek şekilde güncelleme
-deptAyar.scales = { 
-    y: { 
-        beginAtZero: true, 
-        max: 100, // Maksimum değeri 10 yerine 100 yaptık
-        grid: { borderDash: [5, 5] },
-        ticks: {
-            callback: function(value) {
-                return '%' + value; // Y eksenindeki sayıların başına % ekler
-            }
-        }
-    }, 
-    x: { 
-        grid: { display: false } 
-    } 
-};
-
-// Tooltip (Fareyle üzerine gelince çıkan kutu) formatını % olarak ayarlama
-deptAyar.plugins.tooltip.callbacks = {
-    label: function(context) {
-        return ' Başarı Oranı: %' + context.parsed.y;
-    }
-};
-
-// 6. Grafiği Çizdir
-new Chart(document.getElementById('departmanBarGrafigi').getContext('2d'), {
-    type: 'bar', 
-    data: {
-        labels: deptDataList.map(d => d.isim),
-        datasets: [{
-            label: 'Ortalama Başarı Oranı (%)', // Etiketi güncelledik
-            data: deptDataList.map(d => d.ortalama),
-            backgroundColor: 'rgba(111, 66, 193, 0.85)', 
-            borderColor: '#6f42c1',
-            borderWidth: 1,
-            borderRadius: 6,
-            barPercentage: 0.5 
-        }]
-    },
-    options: deptAyar
-});
-////////////////////////////////////////////////////////////////////////////////////////////////////
-
-
-
-
-
-
-                                                 // 3. MİSAFİR PSİKOLOJİSİ (POLAR AREA) - TOP 5 ////////////////////////////////////////////////////////////////////////
-                                let hisFrekanslari = {};
-                                let toplamHisSayisi = 0; // Yüzde hesabı için toplam geçerli veriyi tutacağımız değişken
-
-                                yorumVerileri.forEach(y => {
-                                    let his = y.BaskinHis;
-                                    if(his && his.toLowerCase() !== "belirtilmemiş" && his.toLowerCase() !== "null") {
-                                        let formatliHis = his.charAt(0).toUpperCase() + his.slice(1).toLowerCase();
-                                        hisFrekanslari[formatliHis] = (hisFrekanslari[formatliHis] || 0) + 1;
-                                        toplamHisSayisi++; // Geçerli her his için toplamı 1 artırıyoruz
-                                    }
-                                });
-
-                                // 1. Objeyi [Anahtar, Değer] dizisine çevir
-                                // 2. Değerlere (frekanslara) göre büyükten küçüğe sırala
-                                // 3. Sadece ilk 5 elemanı al
-                                let top5HisDizisi = Object.entries(hisFrekanslari)
-                                    .sort((a, b) => b[1] - a[1]) 
-                                    .slice(0, 5);
-
-                                // Etiketleri ayır
-                                let top5Etiketler = top5HisDizisi.map(item => item[0]);
-
-                                // Verileri YÜZDELİK oranlara çevir (Virgülden sonra 1 basamak gösterir, örn: 45.2)
-                                // NOT: Yüzdeler "Tüm geçerli yorumlar" üzerinden hesaplanmıştır.
-                                let top5Veriler = top5HisDizisi.map(item => ((item[1] / toplamHisSayisi) * 100).toFixed(1));
-
-                                let renkPaleti = [
-                                    'rgba(232, 62, 140, 0.7)', 'rgba(253, 126, 20, 0.7)', 'rgba(32, 201, 151, 0.7)', 
-                                    'rgba(13, 202, 240, 0.7)', 'rgba(102, 16, 242, 0.7)', 'rgba(214, 51, 132, 0.7)', 
-                                    'rgba(255, 193, 7, 0.7)', 'rgba(25, 135, 84, 0.7)'
-                                ];
-
-                                // Mevcut seçeneklerinizi alıp üzerine Tooltip (üzerine gelince % yazması) ayarını ekliyoruz
-                                let chartSecenekleri = getOrtakSecenekler() || {};
-                                chartSecenekleri.plugins = chartSecenekleri.plugins || {};
-                                chartSecenekleri.plugins.tooltip = {
-                                    callbacks: {
-                                        label: function(context) {
-                                            // Grafiğin üzerine gelindiğinde "Mutlu: %45.2" şeklinde görünmesini sağlar
-                                            return context.label + ': %' + context.raw;
-                                        }
-                                    }
-                                };
-
-                                new Chart(document.getElementById('hisPolarGrafigi').getContext('2d'), {
-                                    type: 'polarArea',
-                                    data: {
-                                        labels: top5Etiketler,
-                                        datasets: [{
-                                            data: top5Veriler,
-                                            // İlk 5 veriye karşılık ilk 5 rengi alıyoruz
-                                            backgroundColor: renkPaleti.slice(0, 5), 
-                                            borderColor: '#ffffff',
-                                            borderWidth: 2
-                                        }]
-                                    },
-                                    options: chartSecenekleri
-                                });
-                                ////////////////////////////////////////////////////////////////////////////////////////////////////
-
-
-
-
-
-
-
-
-
-
-                                             // 4. ANAHTAR KELİMELER (YATAY BAR) ////////////////////////////////////////////////////////////////////////
-                                    let kelimeHavuzu = {};
-                                    // Yüzde hesabı için toplam yorum sayısını alıyoruz (0'a bölünme hatasını önlemek için en az 1 kabul ediyoruz)
-                                    let toplamYorumSayisi = yorumVerileri.length || 1; 
-
-                                    yorumVerileri.forEach(y => {
-                                        if(y.Kelimeler) {
-                                            y.Kelimeler.split(',').forEach(k => {
-                                                let temizKelime = k.trim().toLowerCase();
-                                                if (temizKelime.length > 2) { 
-                                                    let kelimeIlkHarfBuyuk = temizKelime.charAt(0).toUpperCase() + temizKelime.slice(1);
-                                                    kelimeHavuzu[kelimeIlkHarfBuyuk] = (kelimeHavuzu[kelimeIlkHarfBuyuk] || 0) + 1;
-                                                }
-                                            });
-                                        }
-                                    });
-         
-                                    let siraliKelimeler = Object.entries(kelimeHavuzu).sort((a, b) => b[1] - a[1]).slice(0, 10);
-         
-                                    let kelimeAyar = getOrtakSecenekler();
-                                    kelimeAyar.indexAxis = 'y';
-
-                                    // 1. X Eksenine "%" işareti ekleme
-                                    kelimeAyar.scales = { 
-                                        x: { 
-                                            beginAtZero: true, 
-                                            grid: { borderDash: [5, 5] },
-                                            ticks: {
-                                                callback: function(value) {
-                                                    return '%' + value; // X eksenindeki sayıların başına % ekler
-                                                }
-                                            }
-                                        }, 
-                                        y: { 
-                                            grid: { display: false } 
-                                        } 
-                                    };
-
-                                    // 2. Tooltip (Fareyle üzerine gelince çıkan kutu) formatını "%" olarak ayarlama
-                                    kelimeAyar.plugins.tooltip.callbacks = {
-                                        label: function(context) {
-                                            return ' Yorumlarda Geçme Oranı: %' + context.parsed.x;
-                                        }
-                                    };
-
-                                    new Chart(document.getElementById('kelimeBarGrafigi').getContext('2d'), {
-                                        type: 'bar',
-                                        data: {
-                                            labels: siraliKelimeler.map(k => k[0]), 
-                                            datasets: [{
-                                                label: 'Yorumlarda Tekrar Edilme Oranı',
-                                                // 3. Frekans sayısını toplam yoruma bölüp yüzdeye çeviriyoruz (virgülden sonra 1 hane)
-                                                data: siraliKelimeler.map(k => ((k[1] / toplamYorumSayisi) * 100).toFixed(1)),
-                                                backgroundColor: 'rgba(52, 58, 64, 0.85)',
-                                                borderRadius: 4
-                                            }]
-                                        },
-                                        options: kelimeAyar
-                                    });
-                                    ////////////////////////////////////////////////////////////////////////////////////////////////////
-
-
-
-
-
-
-
-
-
-
-
-// 5. ÜLKE SKORLARI (YÜZDE BAZLI) ////////////////////////////////////////////////////////////////////////
-let ulkeSkor = {}, ulkeSayi = {};
-yorumVerileri.forEach(y => {
-    let ulke = y.Ulke;
-    
-    // GÜNCELLEME: Eğer ülke null, undefined, boşluk veya "Bilinmiyor" ise bu yorumu grafiğe dahil etme (atla)
-    if (!ulke || ulke.trim() === "" || ulke.toLowerCase() === "bilinmiyor" || ulke.toLowerCase() === "null") {
-        return; // return diyerek bu adımı pas geçiyoruz
-    }
-
-    if (!ulkeSkor[ulke]) { ulkeSkor[ulke] = 0; ulkeSayi[ulke] = 0; }
-    ulkeSkor[ulke] += y.Skor; 
-    ulkeSayi[ulke]++;
-});
-
-let ulkeler = Object.keys(ulkeSkor);
-       
-let ulkeAyar = getOrtakSecenekler();
-
-// 1. Y ekseni ayarlarını % gösterecek şekilde güncelleme
-ulkeAyar.scales = { 
-    y: { 
-        beginAtZero: true, 
-        max: 100, // Maksimum değeri 10 yerine 100 yaptık
-        grid: { borderDash: [5, 5] },
-        ticks: {
-            callback: function(value) {
-                return '%' + value; // Y eksenindeki değerlerin başına % ekler
-            }
-        }
-    }, 
-    x: { 
-        grid: { display: false } 
-    } 
-};
-
-// 2. Tooltip (Fareyle üzerine gelince çıkan kutu) formatını % olarak ayarlama
-if (!ulkeAyar.plugins) ulkeAyar.plugins = {};
-if (!ulkeAyar.plugins.tooltip) ulkeAyar.plugins.tooltip = {};
-ulkeAyar.plugins.tooltip.callbacks = {
-    label: function(context) {
-        return ' Memnuniyet Oranı: %' + context.parsed.y;
-    }
-};
-
-new Chart(document.getElementById('ulkeGrafigi').getContext('2d'), {
-    type: 'bar',
-    data: {
-        labels: ulkeler,
-        datasets: [{ 
-            label: 'Ortalama Memnuniyet Oranı (%)', 
-            // 3. 10 üzerinden olan puanı 10 ile çarparak yüzdelik dilime çeviriyoruz
-            data: ulkeler.map(u => parseFloat(((ulkeSkor[u] / ulkeSayi[u]) * 10).toFixed(1))), 
-            backgroundColor: 'rgba(25, 135, 84, 0.85)', 
-            borderRadius: 4 
-        }]
-    },
-    options: ulkeAyar
-});
-////////////////////////////////////////////////////////////////////////////////////////////////////
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-               // 6. KONAKLAMA TİPİ (YÜZDE BAZLI) ////////////////////////////////////////////////////////////////////////
-let tipler = [...new Set(yorumVerileri.map(y => y.Tipi))];
-
-// Önce ham sayıları hesaplıyoruz
-let posSayilari = tipler.map(t => yorumVerileri.filter(y => y.Tipi === t && y.DuyguDurumu.toLowerCase() === 'pozitif').length);
-let negSayilari = tipler.map(t => yorumVerileri.filter(y => y.Tipi === t && y.DuyguDurumu.toLowerCase() === 'negatif').length);
-let notrSayilari = tipler.map(t => yorumVerileri.filter(y => y.Tipi === t && y.DuyguDurumu.toLowerCase() !== 'pozitif' && y.DuyguDurumu.toLowerCase() !== 'negatif').length);
-
-// Sayıları kendi konaklama tipi içindeki toplamlarına bölerek yüzdeye çeviriyoruz
-let posTipi = [], negTipi = [], notrTipi = [];
-
-tipler.forEach((t, index) => {
-    let toplam = posSayilari[index] + negSayilari[index] + notrSayilari[index];
-    
-    // 0'a bölünme hatasını önlemek için kontrol ekliyoruz
-    if (toplam > 0) {
-        posTipi.push(parseFloat(((posSayilari[index] / toplam) * 100).toFixed(1)));
-        notrTipi.push(parseFloat(((notrSayilari[index] / toplam) * 100).toFixed(1)));
-        negTipi.push(parseFloat(((negSayilari[index] / toplam) * 100).toFixed(1)));
-    } else {
-        posTipi.push(0);
-        notrTipi.push(0);
-        negTipi.push(0);
-    }
-});
-
-let tipAyar = getOrtakSecenekler();
-
-// 1. Y Ekseni Ayarlarını Güncelliyoruz
-tipAyar.scales = { 
-    x: { grid: { display: false } }, 
-    y: { 
-        beginAtZero: true, 
-        max: 100, // Yüzde bazlı olduğu için maksimum 100
-        grid: { borderDash: [5, 5] },
-        ticks: {
-            callback: function(value) {
-                return '%' + value; // Değerlerin başına % ekler
-            }
-        }
-    } 
-};
-
-// 2. Tooltip (Bilgi Kutucuğu) Formatını Ayarlıyoruz
-if (!tipAyar.plugins) tipAyar.plugins = {};
-if (!tipAyar.plugins.tooltip) tipAyar.plugins.tooltip = {};
-tipAyar.plugins.tooltip.callbacks = {
-    label: function(context) {
-        return ' ' + context.dataset.label + ' Oranı: %' + context.parsed.y;
-    }
-};
-
-new Chart(document.getElementById('konaklamaGrafigi').getContext('2d'), {
-    type: 'bar',
-    data: {
-        labels: tipler,
-        datasets: [
-            { label: 'Pozitif', data: posTipi, backgroundColor: '#1cc88a', borderRadius: 4 },
-            { label: 'Nötr', data: notrTipi, backgroundColor: '#f6c23e', borderRadius: 4 },
-            { label: 'Negatif', data: negTipi, backgroundColor: '#e74a3b', borderRadius: 4 }
-        ]
-    },
-    options: tipAyar
-});
-////////////////////////////////////////////////////////////////////////////////////////////////////
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-// 7. AYLIK TESİS YOĞUNLUĞU (YORUM HACMİNE GÖRE) ////////////////////////////////////////////////////////////////////////////////////////////////////
-let aylar = {};
-yorumVerileri.forEach(y => {
-    let tarihVerisi = y.MisafirKonaklamaTarihi || y.misafirKonaklamaTarihi || y.Tarih;
-    if (!tarihVerisi) return; 
-    
-    let d = new Date(tarihVerisi);
-    if (isNaN(d.getTime())) return;
-
-    // YYYY-MM formatında ayı yakala
-    let ayKey = d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, '0');
-    if (!aylar[ayKey]) { aylar[ayKey] = { yogunluk: 0 }; }
-    
-    // O ayki her bir yorumu, yoğunluk skoru olarak +1 ekle
-    aylar[ayKey].yogunluk++; 
-});
+    // 1. KPI KARTLARI VERİ BÖLÜMÜ
+    const kpiVerisi = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model?.KpiVerileri));
+    if (kpiVerisi) {
+        let toplam = kpiVerisi.ToplamYorumAdeti ?? kpiVerisi.toplamYorumAdeti ?? 0;
+        let memnuniyet = kpiVerisi.MemnuniyetOrani ?? kpiVerisi.memnuniyetOrani ?? 0;
+        let pozitif = kpiVerisi.PozitifYorumOrani ?? kpiVerisi.pozitifYorumOrani ?? 0;
+        let negatif = kpiVerisi.NegatifYorumOrani ?? kpiVerisi.negatifYorumOrani ?? 0;
+
+        if (toplam > 0) {
+            document.getElementById('kpiToplamYorumAdeti').innerText = toplam;
+            document.getElementById('kpiMemnuniyetOrani').innerText = "%" + memnuniyet;
+            document.getElementById('kpiPozitifYorumOrani').innerText = "%" + pozitif;
             
-let sAylar = Object.keys(aylar).sort(); // Ayları kronolojik sırala
-            
-let trendAyar = getOrtakSecenekler();
-
-// 1. Y Ekseni Ayarlarını Düzenleme (Küsuratsız Adet Gösterimi)
-trendAyar.scales = { 
-    x: { grid: { display: false } }, 
-    y: { 
-        beginAtZero: true, 
-        grid: { borderDash: [5, 5] },
-        ticks: {
-            stepSize: 1 // Yorum sayısı buçuklu olamayacağı için tam sayı adımları
-        }
-    } 
-};
-
-// 2. Tooltip (Bilgi Kutucuğu) Formatını "Yoğunluk" Olarak Ayarlama
-if (!trendAyar.plugins) trendAyar.plugins = {};
-if (!trendAyar.plugins.tooltip) trendAyar.plugins.tooltip = {};
-trendAyar.plugins.tooltip.callbacks = {
-    label: function(context) {
-        return ' Tesis Yoğunluğu (Yorum Sayısı): ' + context.parsed.y;
-    }
-};
-
-new Chart(document.getElementById('trendGrafigi').getContext('2d'), {
-    type: 'line',
-    data: {
-        labels: sAylar,
-        datasets: [{ 
-            label: 'Aylık Tesis Yoğunluk Trendi', 
-            data: sAylar.map(a => aylar[a].yogunluk), 
-            borderColor: '#fd7e14', 
-            backgroundColor: 'rgba(253, 126, 20, 0.1)', 
-            borderWidth: 3, 
-            pointBackgroundColor: '#fff', 
-            fill: true, 
-            tension: 0.4 
-        }]
-    },
-    options: trendAyar
-});
-////////////////////////////////////////////////////////////////////////////////////////////////////
-
-
-
-
-
-
-
-
-            } catch (error) {
-                console.error("Grafik çizimi sırasında bir hata oluştu: ", error);
+            let kpiAcilEl = document.getElementById('kpiNegatifYorumOrani');
+            if (kpiAcilEl) {
+                kpiAcilEl.innerText = "%" + negatif;
             }
 
+            if(negatif > 0) { 
+                let acilCard = document.getElementById('kpiNegatifYorumOraniCard');
+                if (acilCard) {
+                    acilCard.classList.add('border', 'border-4', 'border-white');
+                }
+            }
+        }
+    }
+
+    // 2. DUYGU PASTA GRAFİĞİ
+    let pastaGrafikVerisi = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model?.DuyguGrafik));
+    if (pastaGrafikVerisi && pastaGrafikVerisi.CokIyiSayisi !== undefined) {
+        let pastaAyar = getOrtakSecenekler();
+        pastaAyar.cutout = '65%';
+        pastaAyar.plugins.legend = { display: true, position: 'bottom', labels: { padding: 15, usePointStyle: true, pointStyle: 'circle' } };
+        pastaAyar.plugins.tooltip = {
+            callbacks: {
+                label: function(context) {
+                    let toplam = context.dataset.data.reduce((a, b) => a + b, 0);
+                    let deger = context.raw;
+                    let yuzde = toplam > 0 ? ((deger / toplam) * 100).toFixed(1) : 0;
+                    return ` ${context.label}: ${deger} (%${yuzde})`;
+                }
+            }
+        };
+        new Chart(document.getElementById('duyguPastaGrafigi').getContext('2d'), {
+            type: 'doughnut',
+            data: {
+                labels: ['Çok İyi', 'İyi', 'Nötr', 'Kötü', 'Çok Kötü'],
+                datasets: [{ 
+                    data: [
+                        pastaGrafikVerisi.CokIyiSayisi, 
+                        pastaGrafikVerisi.IyiSayisi, 
+                        pastaGrafikVerisi.NotrSayisi, 
+                        pastaGrafikVerisi.KotuSayisi, 
+                        pastaGrafikVerisi.CokKotuSayisi
+                    ], 
+                    backgroundColor: ['#157347', '#20c997', '#ffc107', '#dc3545', '#8b0000'], 
+                    borderWidth: 2, hoverOffset: 5 
+                }]
+            },
+            options: pastaAyar
         });
-    </script>
-}
+    }
+
+    // 3. DEPARTMAN BAR GRAFİĞİ
+    let deptGrafikVerisi = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model?.DepartmanGrafik));
+    if (deptGrafikVerisi && (deptGrafikVerisi.Departmanlar || deptGrafikVerisi.departmanlar)) {
+        let labels = deptGrafikVerisi.Departmanlar ?? deptGrafikVerisi.departmanlar;
+        let data = deptGrafikVerisi.BasariOranlari ?? deptGrafikVerisi.basariOranlari;
+        
+        if(labels && labels.length > 0){
+            let deptAyar = getOrtakSecenekler();
+            deptAyar.scales = { 
+                y: { beginAtZero: true, max: 100, grid: { borderDash: [5, 5] }, ticks: { callback: function(value) { return '%' + value; } } }, 
+                x: { grid: { display: false } } 
+            };
+            deptAyar.plugins.tooltip.callbacks = { label: function(context) { return ' Başarı Oranı: %' + context.parsed.y; } };
+            new Chart(document.getElementById('departmanBarGrafigi').getContext('2d'), {
+                type: 'bar', 
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Ortalama Başarı Oranı (%)',
+                        data: data,
+                        backgroundColor: 'rgba(111, 66, 193, 0.85)', borderColor: '#6f42c1', borderWidth: 1, borderRadius: 6, barPercentage: 0.5 
+                    }]
+                },
+                options: deptAyar
+            });
+        }
+    }
+
+    // 4. HİS POLAR GRAFİĞİ
+    let polarGrafikVerisi = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model?.HisPolarGrafik));
+    if (polarGrafikVerisi && (polarGrafikVerisi.Etiketler || polarGrafikVerisi.etiketler)) {
+        let labels = polarGrafikVerisi.Etiketler ?? polarGrafikVerisi.etiketler;
+        let data = polarGrafikVerisi.Oranlar ?? polarGrafikVerisi.oranlar;
+
+        if(labels && labels.length > 0) {
+            const hisRenkleri = {
+                "Neşe": "rgba(255, 193, 7, 0.7)", "Coşku": "rgba(253, 126, 20, 0.7)", "Rahatlık": "rgba(13, 202, 240, 0.7)",
+                "Memnuniyet": "rgba(32, 201, 151, 0.7)", "Tekrar Gelme İsteği": "rgba(25, 135, 84, 0.7)", "Harika": "rgba(111, 66, 193, 0.7)",
+                "Rahatsızlık": "rgba(108, 117, 125, 0.7)", "Hayal Kırıklığı": "rgba(214, 51, 132, 0.7)", "Memnuniyetsizlik": "rgba(231, 74, 59, 0.7)",
+                "Şikayet": "rgba(220, 53, 69, 0.7)", "Öfke ve Haksızlık Hissi": "rgba(139, 0, 0, 0.7)"
+            };
+            let dinamikRenkler = labels.map(etiket => hisRenkleri[etiket] || "rgba(150, 150, 150, 0.7)");
+            let polarAyar = getOrtakSecenekler();
+            polarAyar.plugins.tooltip.callbacks = { label: function(context) { return context.label + ': %' + context.raw; } };
+            polarAyar.plugins.legend = { display: true, position: 'right', labels: { padding: 15, usePointStyle: true, pointStyle: 'circle' } };
+            new Chart(document.getElementById('hisPolarGrafigi').getContext('2d'), {
+                type: 'polarArea',
+                data: {
+                    labels: labels,
+                    datasets: [{ data: data, backgroundColor: dinamikRenkler, borderColor: '#ffffff', borderWidth: 2 }]
+                },
+                options: polarAyar
+            });
+        }
+    }
+
+    // 5. KELİME BAR GRAFİĞİ
+    let kelimeGrafikVerisi = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model?.KelimeGrafik));
+    if (kelimeGrafikVerisi && (kelimeGrafikVerisi.Kelimeler || kelimeGrafikVerisi.kelimeler)) {
+        let labels = kelimeGrafikVerisi.Kelimeler ?? kelimeGrafikVerisi.kelimeler;
+        let data = kelimeGrafikVerisi.Oranlar ?? kelimeGrafikVerisi.oranlar;
+
+        if(labels && labels.length > 0) {
+            let kelimeAyar = getOrtakSecenekler();
+            kelimeAyar.indexAxis = 'y';
+            kelimeAyar.scales = { 
+                x: { beginAtZero: true, grid: { borderDash: [5, 5] }, ticks: { callback: function(value) { return '%' + value; } } }, 
+                y: { grid: { display: false } } 
+            };
+            kelimeAyar.plugins.tooltip.callbacks = { label: function(context) { return ' Yorumlarda Geçme Oranı: %' + context.parsed.x; } };
+            new Chart(document.getElementById('kelimeBarGrafigi').getContext('2d'), {
+                type: 'bar',
+                data: { labels: labels, datasets: [{ label: 'Yorumlarda Tekrar Edilme Oranı', data: data, backgroundColor: 'rgba(52, 58, 64, 0.85)', borderRadius: 4 }] },
+                options: kelimeAyar
+            });
+        }
+    }
+
+   // 6. ÜLKE GRAFİĞİ (3'LÜ BAR SİSTEMİ)
+    let ulkeGrafikVerisi = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model?.UlkeGrafik));
+    if (ulkeGrafikVerisi && (ulkeGrafikVerisi.Ulkeler || ulkeGrafikVerisi.ulkeler)) {
+        let labels = ulkeGrafikVerisi.Ulkeler ?? ulkeGrafikVerisi.ulkeler;
+        let pozData = ulkeGrafikVerisi.PozitifOranlari ?? ulkeGrafikVerisi.pozitifOranlari;
+        let notrData = ulkeGrafikVerisi.NotrOranlari ?? ulkeGrafikVerisi.notrOranlari;
+        let negData = ulkeGrafikVerisi.NegatifOranlari ?? ulkeGrafikVerisi.negatifOranlari;
+        if(labels && labels.length > 0){
+            let ulkeAyar = getOrtakSecenekler();
+            ulkeAyar.plugins.legend = { display: true, position: 'top', labels: { padding: 15, usePointStyle: true, pointStyle: 'circle' } };
+            ulkeAyar.scales = { 
+                x: { grid: { display: false } }, 
+                y: { beginAtZero: true, max: 100, grid: { borderDash: [5, 5] }, ticks: { callback: function(value) { return '%' + value; } } } 
+            };
+            ulkeAyar.plugins.tooltip.callbacks = { label: function(context) { return ' ' + context.dataset.label + ' Oranı: %' + context.parsed.y; } };
+            new Chart(document.getElementById('ulkeGrafigi').getContext('2d'), {
+                    type: 'bar',
+                    data: {
+                        labels: labels, 
+                        datasets: [
+                            { label: 'Pozitif', data: pozData, backgroundColor: 'rgba(25, 135, 84, 0.85)', borderRadius: 4, minBarLength: 6 },
+                            { label: 'Nötr', data: notrData, backgroundColor: 'rgba(255, 193, 7, 0.85)', borderRadius: 4, minBarLength: 6 },
+                            { label: 'Negatif', data: negData, backgroundColor: 'rgba(220, 53, 69, 0.85)', borderRadius: 4, minBarLength: 6 }
+                        ]
+                    },
+                    options: ulkeAyar
+                });
+        }
+    }
+
+    // 7. KONAKLAMA TİPİ GRAFİĞİ
+    let konaklamaGrafikVerisi = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model?.KonaklamaGrafik));
+    if (konaklamaGrafikVerisi && (konaklamaGrafikVerisi.Tipler || konaklamaGrafikVerisi.tipler)) {
+        let labels = konaklamaGrafikVerisi.Tipler ?? konaklamaGrafikVerisi.tipler;
+        let pozData = konaklamaGrafikVerisi.PozitifOranlari ?? konaklamaGrafikVerisi.pozitifOranlari;
+        let notrData = konaklamaGrafikVerisi.NotrOranlari ?? konaklamaGrafikVerisi.notrOranlari;
+        let negData = konaklamaGrafikVerisi.NegatifOranlari ?? konaklamaGrafikVerisi.negatifOranlari;
+        if(labels && labels.length > 0){
+            let tipAyar = getOrtakSecenekler();
+            tipAyar.plugins.legend = { display: true, position: 'top', labels: { padding: 15, usePointStyle: true, pointStyle: 'circle' } };
+            tipAyar.scales = { 
+                x: { grid: { display: false } }, 
+                y: { beginAtZero: true, max: 100, grid: { borderDash: [5, 5] }, ticks: { callback: function(value) { return '%' + value; } } } 
+            };
+            tipAyar.plugins.tooltip.callbacks = { label: function(context) { return ' ' + context.dataset.label + ' Oranı: %' + context.parsed.y; } };
+            new Chart(document.getElementById('konaklamaGrafigi').getContext('2d'), {
+                type: 'bar',
+                data: {
+                    labels: labels, 
+                    datasets: [
+                        { label: 'Pozitif', data: pozData, backgroundColor: 'rgba(25, 135, 84, 0.85)', borderRadius: 4 },
+                        { label: 'Nötr', data: notrData, backgroundColor: 'rgba(255, 193, 7, 0.85)', borderRadius: 4 },
+                        { label: 'Negatif', data: negData, backgroundColor: 'rgba(220, 53, 69, 0.85)', borderRadius: 4 }
+                     ]
+                },
+                options: tipAyar
+            });
+        }
+    }
+
+    // 8. AYLIK TREND GRAFİĞİ
+    let trendGrafikVerisi = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model?.TrendGrafik));
+    if (trendGrafikVerisi && (trendGrafikVerisi.Aylar || trendGrafikVerisi.aylar)) {
+        let labels = trendGrafikVerisi.Aylar ?? trendGrafikVerisi.aylar;
+        let data = trendGrafikVerisi.Yogunluklar ?? trendGrafikVerisi.yogunluklar;
+
+        if(labels && labels.length > 0){
+            let trendAyar = getOrtakSecenekler();
+            trendAyar.scales = { 
+                x: { grid: { display: false } }, 
+                y: { beginAtZero: true, grid: { borderDash: [5, 5] }, ticks: { stepSize: 1 } } 
+            };
+            trendAyar.plugins.tooltip.callbacks = { label: function(context) { return ' Tesis Yoğunluğu (Yorum Sayısı): ' + context.parsed.y; } };
+            new Chart(document.getElementById('trendGrafigi').getContext('2d'), {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [{ 
+                        label: 'Aylık Tesis Yoğunluk Trendi', data: data, borderColor: '#fd7e14', backgroundColor: 'rgba(253, 126, 20, 0.1)', borderWidth: 3, pointBackgroundColor: '#fff', fill: true, tension: 0.4 
+                    }]
+                },
+                options: trendAyar
+            });
+        }
+    }
+});
+
+document.getElementById('btnAiTavsiye').addEventListener('click', async function() {
+    let btn = this;
+    let orijinalMetin = btn.innerHTML;
+    
+    // Butonu yükleniyor moduna al
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i> Yapay Zeka Analiz Ediyor...';
+    btn.disabled = true;
+
+    // C#'tan gelen View Model'i JSON formatında hazırlıyoruz
+    let payload = {
+        DuyguGrafik: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model?.DuyguGrafik)),
+        DepartmanGrafik: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model?.DepartmanGrafik)),
+        HisPolarGrafik: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model?.HisPolarGrafik)),
+        KelimeGrafik: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model?.KelimeGrafik)),
+        UlkeGrafik: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model?.UlkeGrafik)),
+        KonaklamaGrafik: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model?.KonaklamaGrafik)),
+        TrendGrafik: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model?.TrendGrafik))
+    };
+
+    try {
+        let response = await fetch('/Yorum/YapayZekaTavsiyesiAl', { // Controller ismi Yorum olarak düzeltildi
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+
+        if (response.ok) {
+            let aiVerisi = await response.json();
+            
+            // AI tavsiyelerini Span'ların içine gömüyoruz
+            if(aiVerisi.duyguTavsiyesi) document.getElementById('ozetDuygu').innerHTML = aiVerisi.duyguTavsiyesi;
+            if(aiVerisi.departmanTavsiyesi) document.getElementById('ozetDepartman').innerHTML = aiVerisi.departmanTavsiyesi;
+            if(aiVerisi.hisPolarTavsiyesi) document.getElementById('ozetHisPolar').innerHTML = aiVerisi.hisPolarTavsiyesi;
+            if(aiVerisi.kelimeTavsiyesi) document.getElementById('ozetKelime').innerHTML = aiVerisi.kelimeTavsiyesi;
+            if(aiVerisi.ulkeTavsiyesi) document.getElementById('ozetUlke').innerHTML = aiVerisi.ulkeTavsiyesi;
+            if(aiVerisi.konaklamaTavsiyesi) document.getElementById('ozetKonaklama').innerHTML = aiVerisi.konaklamaTavsiyesi;
+            if(aiVerisi.trendTavsiyesi) document.getElementById('ozetTrend').innerHTML = aiVerisi.trendTavsiyesi;
+
+            // Başarılı efekti
+            btn.innerHTML = '<i class="fas fa-check-circle me-2"></i> Raporlar Güncellendi';
+            btn.classList.replace('btn-primary', 'btn-success');
+            setTimeout(() => { 
+                btn.innerHTML = orijinalMetin; 
+                btn.classList.replace('btn-success', 'btn-primary'); 
+                btn.disabled = false; 
+            }, 3000);
+        } else {
+            throw new Error("Sunucu hatası");
+        }
+    } catch (error) {
+        console.error("Yapay Zeka Hatası:", error);
+        btn.innerHTML = '<i class="fas fa-exclamation-triangle me-2"></i> Bir Hata Oluştu';
+        btn.classList.replace('btn-primary', 'btn-danger');
+        setTimeout(() => { 
+            btn.innerHTML = orijinalMetin; 
+            btn.classList.replace('btn-danger', 'btn-primary'); 
+            btn.disabled = false; 
+        }, 3000);
+    }
+});
+</script>

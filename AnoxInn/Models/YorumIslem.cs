@@ -73,11 +73,9 @@ namespace AxonInn.Models
             int sayfaSayaci = 0;
             string guncelUpdateToken = "";
 
-            // GÜNCELLEME 1: Döngüyü kırmak için hedef ID ve kontrol bayrağı ekledik
             string durdurulacakYorumId = "0";
             bool hedefYorumaUlasildi = false;
 
-            // GÜNCELLEME 2: Hedefe ulaşıldıysa while döngüsü de çalışmasın
             while (cekilenSayi < getirilecekKayitAdeti && !hedefYorumaUlasildi)
             {
                 var payload = new
@@ -96,11 +94,11 @@ namespace AxonInn.Models
                     Method = HttpMethod.Post,
                     RequestUri = new Uri(apiUrl),
                     Headers =
-            {
-                { "x-rapidapi-key", rapidApiKey },
-                { "x-rapidapi-host", "travel-advisor.p.rapidapi.com" },
-                { "User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36" }
-            },
+                    {
+                        { "x-rapidapi-key", rapidApiKey },
+                        { "x-rapidapi-host", "travel-advisor.p.rapidapi.com" },
+                        { "User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36" }
+                    },
                     Content = new StringContent(jsonPayload, Encoding.UTF8, "application/json")
                 };
 
@@ -126,14 +124,12 @@ namespace AxonInn.Models
 
                     if (singleCardContent != null && singleCardContent["__typename"]?.ToString() == "AppPresentation_ReviewCard")
                     {
-                        // GÜNCELLEME 3: O anki kartın ID'sini yakalıyoruz
                         string oAnkiYorumId = (string)singleCardContent.SelectToken("helpfulVote.helpfulVoteAction.objectId");
 
-                        // Eğer aradığımız sınıra (hedef yoruma) geldiysek döngüyü anında kır!
                         if (oAnkiYorumId == durdurulacakYorumId)
                         {
                             hedefYorumaUlasildi = true;
-                            break; // İçteki foreach döngüsünden çıkar
+                            break;
                         }
 
                         if (cekilenSayi >= getirilecekKayitAdeti) break;
@@ -150,7 +146,6 @@ namespace AxonInn.Models
                     }
                 }
 
-                // GÜNCELLEME 4: Eğer hedefe ulaşıldıysa sonraki sayfaya (request'e) gitmeden çık
                 if (!yeniYorumBulundu || string.IsNullOrEmpty(guncelUpdateToken) || hedefYorumaUlasildi)
                 {
                     break;
@@ -172,10 +167,8 @@ namespace AxonInn.Models
         {
             if (yorumList == null || yorumList.Count == 0) return 0;
 
-            // PERFORMANS: Döngü içinde veritabanı yormamak için gelen ID'leri O(1) hızındaki HashSet ile tarıyoruz
             var gelenYorumIDler = yorumList.Select(y => y.MisafirYorumId).Where(id => !string.IsNullOrEmpty(id)).ToList();
 
-            // SENKRON: ToListAsync() yerine ToList() kullanıldı
             var mevcutYorumIdler = context.Yorum
                                           .AsNoTracking()
                                           .Where(y => y.HotelRef == hotelID && gelenYorumIDler.Contains(y.MisafirYorumId))
@@ -195,8 +188,7 @@ namespace AxonInn.Models
 
             if (eklenecekYorumlar.Any())
             {
-                // SENKRON: AddRangeAsync ve SaveChangesAsync yerine AddRange ve SaveChanges kullanıldı
-                context.Yorum.AddRange(eklenecekYorumlar); // Toplu Ekleme (Batch Insert)
+                context.Yorum.AddRange(eklenecekYorumlar);
                 context.SaveChanges();
             }
 
@@ -207,28 +199,37 @@ namespace AxonInn.Models
         {
             string geminiUrl = $"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={geminiApiKey}";
             string yorumListJson = System.Text.Json.JsonSerializer.Serialize(yorumList);
-            string prompt = $@"Sen AxonInn otel yönetim sistemi için çalışan kıdemli bir turizm ve veri analistisin. 
-                                Sana aşağıda JSON formatında BİRDEN FAZLA misafir yorumu içeren bir liste veriyorum. 
-                                Lütfen listedeki HER BİR yorumu; misafirin ülkesini, konaklama tipini ve tarihini de göz önünde bulundurarak aşağıdaki JSON kalıbına göre çok boyutlu analiz et ve sonuçları bir JSON DİZİSİ (Array) olarak döndür.
+            string prompt = $@"Sen AxonInn otel yönetim sistemi için çalışan kıdemli bir turizm ve veri analistisin.                                                                                     
+                                Sana aşağıda JSON formatında BİRDEN FAZLA misafir yorumu içeren bir liste veriyorum.                                                                                     
+                                Lütfen listedeki HER BİR yorumu; misafirin ülkesini, konaklama tipini ve tarihini de göz önünde bulundurarak aşağıdaki JSON kalıbına göre çok boyutlu analiz et ve sonuçları bir JSON DİZİSİ (Array) olarak döndür.                                                                                    
 
-                                ÖNEMLİ KURAL: Lütfen bana SADECE aşağıdaki JSON formatında bir dizi olarak cevap ver. Herhangi bir markdown (```json vb.) veya açıklama cümlesi KULLANMA.
+                                ÖNEMLİ KURALLAR:                                                             
+                                1- Lütfen bana SADECE aşağıdaki JSON formatında bir dizi olarak cevap ver. Herhangi bir markdown (```json vb.) veya açıklama cümlesi KULLANMA.                                                            
+                                2- 'Skor' değeri KESİNLİKLE 1 ile 100 arasında bir TAM SAYI (Integer) olmalıdır. Ondalıklı (0.95 gibi) değerler KULLANMA.                                          
+                                3- 'DuyguAnalizi.Durum' değeri İSTİSNASIZ OLARAK şu 5 ifadeden SADECE BİRİ olmalıdır: ""Çok İyi"", ""İyi"", ""Nötr"", ""Kötü"", ""Çok Kötü"". Başka hiçbir kelime kullanma.                     
+                                4- 'DuyguAnalizi.IlgiliDepartman' değeri KESİNLİKLE şu listedeki departmanlardan SADECE BİRİ olmalıdır: ""Misafir İlişkileri"", ""Genel Tesis"", ""Personel"", ""Animasyon"", ""Teknik Servis"", ""Kat Hizmetleri"", ""Yiyecek ve İçecek"", ""Satış ve Pazarlama"", ""Ön Büro"", ""İnsan Kaynakları"", ""Güvenlik"". (Yorumda birden fazla departmandan bahsedilse bile, aralarından en ağırlıklı/en baskın olan SADECE TEK BİR departmanı seç. Asla virgül kullanma ve listede olmayan hiçbir isim uydurma).
+                                5- 'DuyguAnalizi.BaskinHis' değeri KESİNLİKLE şu listedeki hislerden SADECE BİRİ olmalıdır: ""Neşe"", ""Rahatlık"", ""Memnuniyet"", ""Rahatsızlık"", ""Hayal Kırıklığı"", ""Tekrar Gelme İsteği"", ""Memnuniyetsizlik"", ""Öfke ve Haksızlık Hissi"", ""Şikayet"", ""Harika"", ""Coşku"". Yorumdaki duyguya en uygun olanı seç ve listede olmayan hiçbir kelime kullanma.
 
-                                İstenen Kalıp (Bu kalıptaki objelerden oluşan bir dizi dönmelisin):
-                                [
-                                  {{
-                                    ""YorumId"": ""(Gelen verideki Id değerini buraya tam olarak yaz)"",
-                                    ""DuyguAnalizi"": {{ ""Durum"": """", ""Skor"": 0, ""BaskinHis"": """", ""IlgiliDepartman"": """" }},
-                                    ""AnahtarKelimeler"": [], 
-                                    ""ProfilBeklentisi"": """", 
-                                    ""KulturelHassasiyet"": """", 
-                                    ""SezonsalDurum"": """", 
-                                    ""KisaOzet"": """", 
-                                    ""AcilDurumVarMi"": false, 
-                                    ""MudureTavsiye"": """" 
-                                  }}
-                                ]
-
-                                Analiz edilecek misafir yorumları listesi:
+                                İstenen Kalıp (Bu kalıptaki objelerden oluşan bir dizi dönmelisin):                                                                                    
+                                [                                                                                            
+                                  {{                                                                                                        
+                                      ""YorumId"": ""(Gelen verideki Id değerini buraya tam olarak yaz)"",                                                                                                        
+                                      ""DuyguAnalizi"": {{                                
+                                          ""Durum"": ""(Sadece: Çok İyi, İyi, Nötr, Kötü, Çok Kötü)"",                                
+                                          ""Skor"": 0,                                
+                                          ""BaskinHis"": ""(Listeden SADECE TEK BİR his)"",                                
+                                          ""IlgiliDepartman"": ""(Listeden SADECE en baskın olan TEK BİR departman)""                            
+                                      }},                                                                                                        
+                                      ""AnahtarKelimeler"": [],                                                                                                         
+                                      ""ProfilBeklentisi"": """",                                                                                                         
+                                      ""KulturelHassasiyet"": """",                                                                                                         
+                                      ""SezonsalDurum"": """",                                                                                                         
+                                      ""KisaOzet"": """",                                                                                                         
+                                      ""AcilDurumVarMi"": false,                                                                                                         
+                                      ""MudureTavsiye"": """"                                                                                             
+                                  }}                                                                                    
+                                ]                                                                                    
+                                Analiz edilecek misafir yorumları listesi:                                                                                    
                                 {yorumListJson}";
             var requestBody = new
             {
@@ -267,82 +268,52 @@ namespace AxonInn.Models
             }
         }
 
-
-
-
-
-
-
         public async Task<int> YorumlariPartilerHalindeIsleAsync(List<Yorum> dbYorumList, YorumIslem yorumIslem, string apiKey, AxonInnContext _context)
         {
             int partiBuyuklugu = 15;
             int toplamPartiSayisi = (int)Math.Ceiling((double)dbYorumList.Count / partiBuyuklugu);
             int basariylaIslenenToplam = 0;
-
             for (int i = 0; i < toplamPartiSayisi; i++)
             {
                 var suAnkiParti = dbYorumList.Skip(i * partiBuyuklugu).Take(partiBuyuklugu).ToList();
-
-                try
-                {
-                    // Tek bir partinin işlenmesini başka bir metoda verdik
-                    int buPartideIslenen = await TekPartiyiIsleVeKaydetAsync(suAnkiParti, yorumIslem, apiKey, _context);
-                    basariylaIslenenToplam += buPartideIslenen;
-
-                    // Thread.Sleep yerine asenkron bekleme (Task.Delay) kullanıyoruz. Sunucuyu kilitlemez!
-                    if (i < toplamPartiSayisi - 1)
-                    {
-                        await Task.Delay(5000);
-                    }
-                }
-                catch (Exception ex)
-                {
-                    // Loglama alanı: Hata alınırsa döngü devam eder.
-                    // Console.WriteLine($"Parti {i} işlenirken hata oluştu: {ex.Message}");
-                }
+                int buPartideIslenen = await TekPartiyiIsleVeKaydetAsync(suAnkiParti, yorumIslem, apiKey, _context);
+                basariylaIslenenToplam += buPartideIslenen;
+                if (i < toplamPartiSayisi - 1)
+                    await Task.Delay(40000);
             }
-
             return basariylaIslenenToplam;
         }
 
         public async Task<int> TekPartiyiIsleVeKaydetAsync(List<Yorum> parti, YorumIslem yorumIslem, string apiKey, AxonInnContext _context)
         {
-            // API isteği
             string topluAnalizCevabi = yorumIslem.GeminiYorumAnaliziYap(parti, apiKey);
-
-            // JSON ayrıştırma işini de ayırdık
-            int islenenSayisi = JsonCevabiniYorumlaraUygula(topluAnalizCevabi, parti);
-
-            // Eğer başarılı işlenen varsa veritabanına asenkron olarak kaydet
-            if (islenenSayisi > 0)
-            {
-                await _context.SaveChangesAsync();
-            }
-
+            int islenenSayisi = await JsonCevabiniYorumlaraUygulaAsync(topluAnalizCevabi, parti, _context);
             return islenenSayisi;
         }
 
-        public int JsonCevabiniYorumlaraUygula(string jsonCevabi, List<Yorum> parti)
+        public async Task<int> JsonCevabiniYorumlaraUygulaAsync(string jsonCevabi, List<Yorum> parti, AxonInnContext _context)
         {
             int basariliIslem = 0;
-
             using JsonDocument doc = JsonDocument.Parse(jsonCevabi);
             JsonElement root = doc.RootElement;
-
             if (root.ValueKind != JsonValueKind.Array)
                 return basariliIslem;
 
             foreach (JsonElement analizItem in root.EnumerateArray())
             {
-                if (analizItem.TryGetProperty("YorumId", out JsonElement idElement) &&
-                    long.TryParse(idElement.ToString(), out long currentYorumId))
+                if (analizItem.TryGetProperty("YorumId", out JsonElement idElement))
                 {
-                    var dbYorum = parti.FirstOrDefault(y => y.MisafirYorumId == currentYorumId.ToString().Trim());
+                    string currentYorumId = idElement.ToString().Trim();
+                    var dbYorum = parti.FirstOrDefault(y => y.MisafirYorumId == currentYorumId);
 
                     if (dbYorum != null)
                     {
                         dbYorum.GeminiVerileriniIsle(analizItem.GetRawText());
-                        basariliIslem++;
+                        if (dbYorum.GeminiAnalizYapildiMi == 1)
+                        {
+                            await _context.SaveChangesAsync();
+                            basariliIslem++;
+                        }
                     }
                 }
             }

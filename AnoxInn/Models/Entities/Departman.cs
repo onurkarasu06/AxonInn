@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 
-namespace AxonInn.Models;
+namespace AxonInn.Models.Entities;
 
 public partial class Departman
 {

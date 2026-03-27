@@ -1,11 +1,12 @@
 ﻿using System.Collections.Concurrent;
-using AxonInn.Models;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using System.Text.Json;
 using System.Net;
 using System.Net.Mail;
 using System.Diagnostics;
+using AxonInn.Models.Entities;
+using AxonInn.Models.Context;
 
 namespace AxonInn.Controllers
 {

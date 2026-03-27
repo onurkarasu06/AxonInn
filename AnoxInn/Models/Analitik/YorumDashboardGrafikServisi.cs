@@ -1,4 +1,6 @@
-﻿namespace AxonInn.Models
+﻿using AxonInn.Models.Entities;
+
+namespace AxonInn.Models.Analitik
 {
     public class YorumDashboardGrafikServisi
     {

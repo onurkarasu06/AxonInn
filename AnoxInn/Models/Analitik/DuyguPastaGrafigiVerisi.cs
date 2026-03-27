@@ -1,4 +1,4 @@
-﻿namespace AxonInn.Models
+﻿namespace AxonInn.Models.Analitik
 {
     public class DuyguPastaGrafigiVerisi
     {

@@ -1,9 +1,10 @@
-﻿using AxonInn.Models;
-using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using System.Net.Mail;
 using System.Net;
-using System.Text.Json; // ⚡ Yüksek Hızlı Yeni Nesil JSON
+using System.Text.Json;
+using AxonInn.Models.Entities;
+using AxonInn.Models.Context; // ⚡ Yüksek Hızlı Yeni Nesil JSON
 
 namespace AxonInn.Controllers
 {

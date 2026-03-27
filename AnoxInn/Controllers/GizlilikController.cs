@@ -1,4 +1,5 @@
-﻿using AxonInn.Models;
+﻿using AxonInn.Models.Context;
+using AxonInn.Models.Entities;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using System.Text.Json; // ⚡ Yüksek Hızlı Yeni Nesil JSON kütüphanesine geçildi

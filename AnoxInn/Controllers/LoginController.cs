@@ -1,4 +1,5 @@
-﻿using AxonInn.Models;
+﻿using AxonInn.Models.Context;
+using AxonInn.Models.Entities;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;

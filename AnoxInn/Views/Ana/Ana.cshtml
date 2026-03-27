@@ -1,7 +1,7 @@
 ﻿@{
     Layout = "~/Views/Shared/_Layout.cshtml";
 
-    var departmanlar = ViewBag.Departmanlar as List<AxonInn.Models.Departman> ?? new List<AxonInn.Models.Departman>();
+    var departmanlar = ViewBag.Departmanlar as List<AxonInn.Models.Entities.Departman> ?? new List<AxonInn.Models.Entities.Departman>();
     var hotelAdi = ViewBag.HotelAdi ?? "Bilinmeyen Otel";
 }
 

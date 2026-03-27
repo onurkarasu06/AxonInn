@@ -1,4 +1,5 @@
-using AxonInn.Models;
+using AxonInn.Models.Analitik;
+using AxonInn.Models.Context;
 using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -11,7 +12,7 @@ builder.Services.AddDbContext<AxonInnContext>(options =>
 // Add services to the container.
 builder.Services.AddControllersWithViews();
 
-builder.Services.AddHttpClient<AxonInn.Models.GeminiApiService>();
+builder.Services.AddHttpClient<GeminiApiService>();
 
 
 // --- 1. SESSION (OTURUM) SERVİSLERİ EKLENİYOR ---

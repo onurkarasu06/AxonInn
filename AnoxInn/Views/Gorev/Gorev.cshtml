@@ -1,14 +1,14 @@
-﻿@model AxonInn.Models.Hotel
+﻿@model AxonInn.Models.Entities.Hotel
 @using Microsoft.AspNetCore.Http
 @using System.Text.Encodings.Web
 
 @{
     Layout = "~/Views/Shared/_Layout.cshtml";
     
-    var girisYapanPersonel = ViewData["GirisYapanPersonel"] as AxonInn.Models.Personel;
+    var girisYapanPersonel = ViewData["GirisYapanPersonel"] as AxonInn.Models.Entities.Personel;
     int yetki = girisYapanPersonel?.Yetki ?? 0;
     
-    var departmanlar = Model?.Departmen ?? Enumerable.Empty<AxonInn.Models.Departman>();
+    var departmanlar = Model?.Departmen ?? Enumerable.Empty<AxonInn.Models.Entities.Departman>();
     var personelList = departmanlar.SelectMany(d => d.Personels);
     var gorevList = personelList.SelectMany(p => p.Gorevs).OrderByDescending(g => g.KayitTarihi);
 }

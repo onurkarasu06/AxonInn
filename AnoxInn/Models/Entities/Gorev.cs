@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 
-namespace AxonInn.Models;
+namespace AxonInn.Models.Entities;
 
 public partial class Gorev
 {

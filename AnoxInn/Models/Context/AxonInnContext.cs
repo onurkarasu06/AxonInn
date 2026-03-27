@@ -1,8 +1,9 @@
 ﻿using System;
 using System.Collections.Generic;
+using AxonInn.Models.Entities;
 using Microsoft.EntityFrameworkCore;
 
-namespace AxonInn.Models;
+namespace AxonInn.Models.Context;
 
 public partial class AxonInnContext : DbContext
 {

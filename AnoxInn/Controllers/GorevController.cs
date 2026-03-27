@@ -1,9 +1,11 @@
-﻿using AxonInn.Models;
-using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using System.Text.Json;
 using System.IO;
 using System.Diagnostics;
+using AxonInn.Models.Entities;
+using AxonInn.Models.Context;
+using AxonInn.Models.Analitik;
 
 namespace AxonInn.Controllers
 {

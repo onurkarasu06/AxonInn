@@ -1,11 +1,12 @@
-﻿using Newtonsoft.Json.Linq;
+﻿using AxonInn.Models.Analitik;
+using Newtonsoft.Json.Linq;
 using System;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 
-namespace AxonInn.Models
+namespace AxonInn.Models.Entities
 {
     [Table("Yorum", Schema = "axoninnc_user")]
     public class Yorum

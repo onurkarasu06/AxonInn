@@ -4,7 +4,7 @@ using System.Text;
 using System.Text.Json;
 using System.Threading.Tasks;
 
-namespace AxonInn.Models
+namespace AxonInn.Models.Analitik
 {
     public class GeminiApiService
     {

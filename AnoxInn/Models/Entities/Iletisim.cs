@@ -1,6 +1,6 @@
 ﻿using System.ComponentModel.DataAnnotations;
 
-namespace AxonInn.Models
+namespace AxonInn.Models.Entities
 {
     public class Iletisim
     {

@@ -1,8 +1,8 @@
-﻿namespace AxonInn.Models
+﻿namespace AxonInn.Models.Analitik
 {
-    public class UlkeMemnuniyetGrafigiVerisi
+    public class KonaklamaTipiGrafigiVerisi
     {
-        public List<string> Ulkeler { get; set; } = new List<string>();
+        public List<string> Tipler { get; set; } = new List<string>();
         public List<double> PozitifOranlari { get; set; } = new List<double>();
         public List<double> NotrOranlari { get; set; } = new List<double>();
         public List<double> NegatifOranlari { get; set; } = new List<double>();

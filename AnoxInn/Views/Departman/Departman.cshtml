@@ -1,12 +1,12 @@
-﻿@model AxonInn.Models.Hotel
+﻿@model AxonInn.Models.Entities.Hotel
 @using Microsoft.AspNetCore.Http
 @using System.Text.Json
 @using AxonInn.Controllers 
 @{
     Layout = "~/Views/Shared/_Layout.cshtml";
 
-    var girisYapanPersonel = ViewData["GirisYapanPersonel"] as AxonInn.Models.Personel;
-    var departmanListesi = Model?.Departmen ?? Enumerable.Empty<AxonInn.Models.Departman>();
+    var girisYapanPersonel = ViewData["GirisYapanPersonel"] as AxonInn.Models.Entities.Personel;
+    var departmanListesi = Model?.Departmen ?? Enumerable.Empty<AxonInn.Models.Entities.Departman>();
 }
 
 <script> 

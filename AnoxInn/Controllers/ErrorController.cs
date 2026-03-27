@@ -1,4 +1,4 @@
-﻿using AxonInn.Models;
+﻿using AxonInn.Models.Entities;
 using Microsoft.AspNetCore.Mvc;
 using System.Diagnostics; // ⚡ YENİ: RAM dostu hata izleme kimliği (TraceIdentifier) için eklendi.
 

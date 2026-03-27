@@ -1,4 +1,4 @@
-﻿namespace AxonInn.Models
+﻿namespace AxonInn.Models.Analitik
 {
     public class YorumDashboardViewModel
     {
@@ -13,5 +13,6 @@
         public UlkeMemnuniyetGrafigiVerisi UlkeGrafik { get; set; }
         public KonaklamaTipiGrafigiVerisi KonaklamaGrafik { get; set; }
         public AylikTrendGrafigiVerisi TrendGrafik { get; set; }
+        public string Yil { get; set; }
     }
 }

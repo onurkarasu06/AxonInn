@@ -2,7 +2,7 @@
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 
-namespace AxonInn.Models
+namespace AxonInn.Models.Entities
 {
     // Veritabanındaki şema (axoninnc_user) ve tablo adını belirtiyoruz
     [Table("AuditLog", Schema = "axoninnc_user")]

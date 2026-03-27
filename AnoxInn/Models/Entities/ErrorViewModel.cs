@@ -1,4 +1,4 @@
-namespace AxonInn.Models
+namespace AxonInn.Models.Entities
 {
     public class ErrorViewModel
     {

@@ -31,12 +31,34 @@
 
 <div class="container-fluid py-4 mb-5">
     
- <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center mb-4 pb-2 border-bottom gap-3">
+<div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center mb-4 pb-2 border-bottom gap-3">
         <h4 class="text-secondary fw-bold mb-0"><i class="fas fa-brain me-2 text-primary"></i>Yapay Zeka Analitik Paneli</h4>
-        <div class="d-grid d-md-block">
-            <button id="btnAiTavsiye" class="btn btn-primary shadow-sm fw-bold">
-                <i class="fas fa-magic me-2"></i> Yönetim Özetlerini Yapay Zeka ile Güncelle
-            </button>
+        
+        <div class="d-flex flex-column flex-md-row gap-2 align-items-center">
+            
+            <select id="yilFiltresi" class="form-select shadow-sm" style="width: auto; min-width: 150px; font-weight: bold; cursor: pointer; color: #5c7cfa; border-color: rgba(92, 124, 250, 0.3);" onchange="yilDegisti()">
+                <option value="">Tüm Yıllar</option>
+                @if(ViewBag.Yillar != null)
+                {
+                    foreach(var y in ViewBag.Yillar)
+                    {
+                        if(ViewBag.SeciliYil != null && ViewBag.SeciliYil == y)
+                        {
+                            <option value="@y" selected>@y Yılı</option>
+                        }
+                        else
+                        {
+                            <option value="@y">@y Yılı</option>
+                        }
+                    }
+                }
+            </select>
+
+            <div class="d-grid d-md-block">
+                <button id="btnAiTavsiye" class="btn btn-primary shadow-sm fw-bold">
+                    <i class="fas fa-magic me-2"></i> Yönetim Özetlerini Yapay Zeka ile Güncelle
+                </button>
+            </div>
         </div>
     </div>
 
@@ -531,4 +553,15 @@ document.addEventListener("DOMContentLoaded", function() {
     }
 
 }); // DOMContentLoaded Bitişi
+
+
+function yilDegisti() {
+        var seciliYil = document.getElementById("yilFiltresi").value;
+        if(seciliYil) {
+            window.location.href = '/Yorum/Yorum?yil=' + seciliYil;
+        } else {
+            // "Tüm Yıllar" seçilirse parametresiz yükle
+            window.location.href = '/Yorum/Yorum';
+        }
+    }
 </script>

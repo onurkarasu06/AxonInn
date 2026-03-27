@@ -35,7 +35,7 @@ namespace AxonInn.Controllers
                                      .FirstOrDefault(d => d.Id == loginOlanPersonel.DepartmanRef);
         }
 
-        public async Task<IActionResult> Yorum()
+        public async Task<IActionResult> Yorum(int? yil = null)
         {
             try
             {
@@ -48,7 +48,28 @@ namespace AxonInn.Controllers
                 long aktifOtelId = sessionBilgisi.HotelRefNavigation.Id;
                 ViewBag.HotelAdi = sessionBilgisi.HotelRefNavigation.Adi;
 
-                List<Yorum> yorumList = await _context.Yorum.AsNoTracking().Where(y => y.HotelRef == aktifOtelId).ToListAsync();
+                // 1. Önce otele ait TÜM yorumları çekiyoruz
+                var tumYorumlarQuery = _context.Yorum.AsNoTracking().Where(y => y.HotelRef == aktifOtelId);
+
+                // 2. Veritabanındaki benzersiz (farklı) yılları bulup Combo Box için hazırlıyoruz
+                var yillar = await tumYorumlarQuery
+                    .Where(y => y.MisafirYorumTarihi != null)
+                    .Select(y => y.MisafirYorumTarihi.Value.Year)
+                    .Distinct()
+                    .OrderByDescending(y => y)
+                    .ToListAsync();
+
+                ViewBag.Yillar = yillar;
+                ViewBag.SeciliYil = yil;
+
+                // 3. EĞER KULLANICI BİR YIL SEÇTİYSE SADECE O YILIN VERİLERİNİ FİLTRELE
+                if (yil.HasValue && yil.Value > 0)
+                {
+                    tumYorumlarQuery = tumYorumlarQuery.Where(y => y.MisafirYorumTarihi != null && y.MisafirYorumTarihi.Value.Year == yil.Value);
+                }
+
+                // Listeyi hafızaya alıyoruz
+                List<Yorum> yorumList = await tumYorumlarQuery.ToListAsync();
 
                 YorumDashboardGrafikServisi yorumDashboardGrafikServisi = new YorumDashboardGrafikServisi();
                 YorumDashboardViewModel yorumDashboardViewModel = new YorumDashboardViewModel
@@ -67,6 +88,7 @@ namespace AxonInn.Controllers
             }
             catch (Exception)
             {
+                // 🛡️ GÜVENLİK: Information Disclosure (Tablo/Ağaç sızıntısı) önlemi
                 return View("~/Views/Error/Error.cshtml", new ErrorViewModel { RequestId = Activity.Current?.Id ?? HttpContext.TraceIdentifier });
             }
         }
@@ -190,9 +212,10 @@ namespace AxonInn.Controllers
                     return StatusCode(500, "Gemini API'den geçerli bir yanıt alınamadı. Lütfen daha sonra tekrar deneyin.");
                 }
             }
-            catch (Exception ex)
+            catch (Exception)
             {
-                return StatusCode(500, new { error = ex.Message });
+                // 🛡️ GÜVENLİK: Information Disclosure (Tablo/Ağaç sızıntısı) önlemi
+                return View("~/Views/Error/Error.cshtml", new ErrorViewModel { RequestId = Activity.Current?.Id ?? HttpContext.TraceIdentifier });
             }
         }
 

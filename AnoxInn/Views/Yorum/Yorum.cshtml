@@ -81,13 +81,6 @@
         </div>
     </div>
 
-
-
-
-
-
-
-
     <div class="row g-4 mb-4 align-items-stretch">
         <div class="col-lg-8 col-md-12">
             <div class="card dashboard-card shadow-sm h-100">
@@ -235,8 +228,18 @@ document.addEventListener("DOMContentLoaded", function() {
         }
     });
 
-    // 1. KPI KARTLARI VERİ BÖLÜMÜ
+    // PERFORMANS: Modelleri C# üzerinden sadece bir kez serialize edip JS değişkenlerine alıyoruz.
+    // Bu sayede en alttaki AI payload kısmında tekrar serialize yapmaya gerek kalmıyor ve kod boyutu hafifliyor.
     const kpiVerisi = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model?.KpiVerileri));
+    const pastaGrafikVerisi = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model?.DuyguGrafik));
+    const deptGrafikVerisi = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model?.DepartmanGrafik));
+    const polarGrafikVerisi = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model?.HisPolarGrafik));
+    const kelimeGrafikVerisi = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model?.KelimeGrafik));
+    const ulkeGrafikVerisi = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model?.UlkeGrafik));
+    const konaklamaGrafikVerisi = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model?.KonaklamaGrafik));
+    const trendGrafikVerisi = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model?.TrendGrafik));
+
+    // 1. KPI KARTLARI VERİ BÖLÜMÜ
     if (kpiVerisi) {
         let toplam = kpiVerisi.ToplamYorumAdeti ?? kpiVerisi.toplamYorumAdeti ?? 0;
         let memnuniyet = kpiVerisi.MemnuniyetOrani ?? kpiVerisi.memnuniyetOrani ?? 0;
@@ -244,41 +247,41 @@ document.addEventListener("DOMContentLoaded", function() {
         let negatif = kpiVerisi.NegatifYorumOrani ?? kpiVerisi.negatifYorumOrani ?? 0;
 
         if (toplam > 0) {
-            document.getElementById('kpiToplamYorumAdeti').innerText = toplam;
-            document.getElementById('kpiMemnuniyetOrani').innerText = "%" + memnuniyet;
-            document.getElementById('kpiPozitifYorumOrani').innerText = "%" + pozitif;
-            
-            let kpiAcilEl = document.getElementById('kpiNegatifYorumOrani');
-            if (kpiAcilEl) {
-                kpiAcilEl.innerText = "%" + negatif;
-            }
+            let elToplam = document.getElementById('kpiToplamYorumAdeti');
+            let elMemnuniyet = document.getElementById('kpiMemnuniyetOrani');
+            let elPozitif = document.getElementById('kpiPozitifYorumOrani');
+            let elNegatif = document.getElementById('kpiNegatifYorumOrani');
+            let elNegatifCard = document.getElementById('kpiNegatifYorumOraniCard');
 
-            if(negatif > 0) { 
-                let acilCard = document.getElementById('kpiNegatifYorumOraniCard');
-                if (acilCard) {
-                    acilCard.classList.add('border', 'border-4', 'border-white');
-                }
+            if(elToplam) elToplam.innerText = toplam;
+            if(elMemnuniyet) elMemnuniyet.innerText = "%" + memnuniyet;
+            if(elPozitif) elPozitif.innerText = "%" + pozitif;
+            if(elNegatif) elNegatif.innerText = "%" + negatif;
+
+            if(negatif > 0 && elNegatifCard) { 
+                elNegatifCard.classList.add('border', 'border-4', 'border-white');
             }
         }
     }
 
     // 2. DUYGU PASTA GRAFİĞİ
-    let pastaGrafikVerisi = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model?.DuyguGrafik));
-    if (pastaGrafikVerisi && pastaGrafikVerisi.CokIyiSayisi !== undefined) {
+    let canvasPasta = document.getElementById('duyguPastaGrafigi');
+    if (pastaGrafikVerisi && pastaGrafikVerisi.CokIyiSayisi !== undefined && canvasPasta) {
         let pastaAyar = getOrtakSecenekler();
         pastaAyar.cutout = '65%';
         pastaAyar.plugins.legend = { display: true, position: 'bottom', labels: { padding: 15, usePointStyle: true, pointStyle: 'circle' } };
-        pastaAyar.plugins.tooltip = {
-            callbacks: {
-                label: function(context) {
-                    let toplam = context.dataset.data.reduce((a, b) => a + b, 0);
-                    let deger = context.raw;
-                    let yuzde = toplam > 0 ? ((deger / toplam) * 100).toFixed(1) : 0;
-                    return ` ${context.label}: ${deger} (%${yuzde})`;
-                }
+        
+        // DÜZELTME: Tooltip objesini sıfırlamak yerine sadece .callbacks ataması yaparak tasarımı koruduk
+        pastaAyar.plugins.tooltip.callbacks = {
+            label: function(context) {
+                let toplam = context.dataset.data.reduce((a, b) => a + b, 0);
+                let deger = context.raw;
+                let yuzde = toplam > 0 ? ((deger / toplam) * 100).toFixed(1) : 0;
+                return ` ${context.label}: ${deger} (%${yuzde})`;
             }
         };
-        new Chart(document.getElementById('duyguPastaGrafigi').getContext('2d'), {
+        
+        new Chart(canvasPasta.getContext('2d'), {
             type: 'doughnut',
             data: {
                 labels: ['Çok İyi', 'İyi', 'Nötr', 'Kötü', 'Çok Kötü'],
@@ -299,8 +302,8 @@ document.addEventListener("DOMContentLoaded", function() {
     }
 
     // 3. DEPARTMAN BAR GRAFİĞİ
-    let deptGrafikVerisi = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model?.DepartmanGrafik));
-    if (deptGrafikVerisi && (deptGrafikVerisi.Departmanlar || deptGrafikVerisi.departmanlar)) {
+    let canvasDept = document.getElementById('departmanBarGrafigi');
+    if (deptGrafikVerisi && (deptGrafikVerisi.Departmanlar || deptGrafikVerisi.departmanlar) && canvasDept) {
         let labels = deptGrafikVerisi.Departmanlar ?? deptGrafikVerisi.departmanlar;
         let data = deptGrafikVerisi.BasariOranlari ?? deptGrafikVerisi.basariOranlari;
         
@@ -311,7 +314,7 @@ document.addEventListener("DOMContentLoaded", function() {
                 x: { grid: { display: false } } 
             };
             deptAyar.plugins.tooltip.callbacks = { label: function(context) { return ' Başarı Oranı: %' + context.parsed.y; } };
-            new Chart(document.getElementById('departmanBarGrafigi').getContext('2d'), {
+            new Chart(canvasDept.getContext('2d'), {
                 type: 'bar', 
                 data: {
                     labels: labels,
@@ -327,8 +330,8 @@ document.addEventListener("DOMContentLoaded", function() {
     }
 
     // 4. HİS POLAR GRAFİĞİ
-    let polarGrafikVerisi = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model?.HisPolarGrafik));
-    if (polarGrafikVerisi && (polarGrafikVerisi.Etiketler || polarGrafikVerisi.etiketler)) {
+    let canvasPolar = document.getElementById('hisPolarGrafigi');
+    if (polarGrafikVerisi && (polarGrafikVerisi.Etiketler || polarGrafikVerisi.etiketler) && canvasPolar) {
         let labels = polarGrafikVerisi.Etiketler ?? polarGrafikVerisi.etiketler;
         let data = polarGrafikVerisi.Oranlar ?? polarGrafikVerisi.oranlar;
 
@@ -343,7 +346,7 @@ document.addEventListener("DOMContentLoaded", function() {
             let polarAyar = getOrtakSecenekler();
             polarAyar.plugins.tooltip.callbacks = { label: function(context) { return context.label + ': %' + context.raw; } };
             polarAyar.plugins.legend = { display: true, position: 'right', labels: { padding: 15, usePointStyle: true, pointStyle: 'circle' } };
-            new Chart(document.getElementById('hisPolarGrafigi').getContext('2d'), {
+            new Chart(canvasPolar.getContext('2d'), {
                 type: 'polarArea',
                 data: {
                     labels: labels,
@@ -355,8 +358,8 @@ document.addEventListener("DOMContentLoaded", function() {
     }
 
     // 5. KELİME BAR GRAFİĞİ
-    let kelimeGrafikVerisi = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model?.KelimeGrafik));
-    if (kelimeGrafikVerisi && (kelimeGrafikVerisi.Kelimeler || kelimeGrafikVerisi.kelimeler)) {
+    let canvasKelime = document.getElementById('kelimeBarGrafigi');
+    if (kelimeGrafikVerisi && (kelimeGrafikVerisi.Kelimeler || kelimeGrafikVerisi.kelimeler) && canvasKelime) {
         let labels = kelimeGrafikVerisi.Kelimeler ?? kelimeGrafikVerisi.kelimeler;
         let data = kelimeGrafikVerisi.Oranlar ?? kelimeGrafikVerisi.oranlar;
 
@@ -368,7 +371,7 @@ document.addEventListener("DOMContentLoaded", function() {
                 y: { grid: { display: false } } 
             };
             kelimeAyar.plugins.tooltip.callbacks = { label: function(context) { return ' Yorumlarda Geçme Oranı: %' + context.parsed.x; } };
-            new Chart(document.getElementById('kelimeBarGrafigi').getContext('2d'), {
+            new Chart(canvasKelime.getContext('2d'), {
                 type: 'bar',
                 data: { labels: labels, datasets: [{ label: 'Yorumlarda Tekrar Edilme Oranı', data: data, backgroundColor: 'rgba(52, 58, 64, 0.85)', borderRadius: 4 }] },
                 options: kelimeAyar
@@ -377,8 +380,8 @@ document.addEventListener("DOMContentLoaded", function() {
     }
 
    // 6. ÜLKE GRAFİĞİ (3'LÜ BAR SİSTEMİ)
-    let ulkeGrafikVerisi = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model?.UlkeGrafik));
-    if (ulkeGrafikVerisi && (ulkeGrafikVerisi.Ulkeler || ulkeGrafikVerisi.ulkeler)) {
+    let canvasUlke = document.getElementById('ulkeGrafigi');
+    if (ulkeGrafikVerisi && (ulkeGrafikVerisi.Ulkeler || ulkeGrafikVerisi.ulkeler) && canvasUlke) {
         let labels = ulkeGrafikVerisi.Ulkeler ?? ulkeGrafikVerisi.ulkeler;
         let pozData = ulkeGrafikVerisi.PozitifOranlari ?? ulkeGrafikVerisi.pozitifOranlari;
         let notrData = ulkeGrafikVerisi.NotrOranlari ?? ulkeGrafikVerisi.notrOranlari;
@@ -391,7 +394,7 @@ document.addEventListener("DOMContentLoaded", function() {
                 y: { beginAtZero: true, max: 100, grid: { borderDash: [5, 5] }, ticks: { callback: function(value) { return '%' + value; } } } 
             };
             ulkeAyar.plugins.tooltip.callbacks = { label: function(context) { return ' ' + context.dataset.label + ' Oranı: %' + context.parsed.y; } };
-            new Chart(document.getElementById('ulkeGrafigi').getContext('2d'), {
+            new Chart(canvasUlke.getContext('2d'), {
                     type: 'bar',
                     data: {
                         labels: labels, 
@@ -407,8 +410,8 @@ document.addEventListener("DOMContentLoaded", function() {
     }
 
     // 7. KONAKLAMA TİPİ GRAFİĞİ
-    let konaklamaGrafikVerisi = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model?.KonaklamaGrafik));
-    if (konaklamaGrafikVerisi && (konaklamaGrafikVerisi.Tipler || konaklamaGrafikVerisi.tipler)) {
+    let canvasKonaklama = document.getElementById('konaklamaGrafigi');
+    if (konaklamaGrafikVerisi && (konaklamaGrafikVerisi.Tipler || konaklamaGrafikVerisi.tipler) && canvasKonaklama) {
         let labels = konaklamaGrafikVerisi.Tipler ?? konaklamaGrafikVerisi.tipler;
         let pozData = konaklamaGrafikVerisi.PozitifOranlari ?? konaklamaGrafikVerisi.pozitifOranlari;
         let notrData = konaklamaGrafikVerisi.NotrOranlari ?? konaklamaGrafikVerisi.notrOranlari;
@@ -421,7 +424,7 @@ document.addEventListener("DOMContentLoaded", function() {
                 y: { beginAtZero: true, max: 100, grid: { borderDash: [5, 5] }, ticks: { callback: function(value) { return '%' + value; } } } 
             };
             tipAyar.plugins.tooltip.callbacks = { label: function(context) { return ' ' + context.dataset.label + ' Oranı: %' + context.parsed.y; } };
-            new Chart(document.getElementById('konaklamaGrafigi').getContext('2d'), {
+            new Chart(canvasKonaklama.getContext('2d'), {
                 type: 'bar',
                 data: {
                     labels: labels, 
@@ -437,8 +440,8 @@ document.addEventListener("DOMContentLoaded", function() {
     }
 
     // 8. AYLIK TREND GRAFİĞİ
-    let trendGrafikVerisi = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model?.TrendGrafik));
-    if (trendGrafikVerisi && (trendGrafikVerisi.Aylar || trendGrafikVerisi.aylar)) {
+    let canvasTrend = document.getElementById('trendGrafigi');
+    if (trendGrafikVerisi && (trendGrafikVerisi.Aylar || trendGrafikVerisi.aylar) && canvasTrend) {
         let labels = trendGrafikVerisi.Aylar ?? trendGrafikVerisi.aylar;
         let data = trendGrafikVerisi.Yogunluklar ?? trendGrafikVerisi.yogunluklar;
 
@@ -449,7 +452,7 @@ document.addEventListener("DOMContentLoaded", function() {
                 y: { beginAtZero: true, grid: { borderDash: [5, 5] }, ticks: { stepSize: 1 } } 
             };
             trendAyar.plugins.tooltip.callbacks = { label: function(context) { return ' Tesis Yoğunluğu (Yorum Sayısı): ' + context.parsed.y; } };
-            new Chart(document.getElementById('trendGrafigi').getContext('2d'), {
+            new Chart(canvasTrend.getContext('2d'), {
                 type: 'line',
                 data: {
                     labels: labels,
@@ -461,66 +464,71 @@ document.addEventListener("DOMContentLoaded", function() {
             });
         }
     }
-});
 
-document.getElementById('btnAiTavsiye').addEventListener('click', async function() {
-    let btn = this;
-    let orijinalMetin = btn.innerHTML;
-    
-    // Butonu yükleniyor moduna al
-    btn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i> Yapay Zeka Analiz Ediyor...';
-    btn.disabled = true;
-
-    // C#'tan gelen View Model'i JSON formatında hazırlıyoruz
-    let payload = {
-        DuyguGrafik: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model?.DuyguGrafik)),
-        DepartmanGrafik: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model?.DepartmanGrafik)),
-        HisPolarGrafik: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model?.HisPolarGrafik)),
-        KelimeGrafik: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model?.KelimeGrafik)),
-        UlkeGrafik: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model?.UlkeGrafik)),
-        KonaklamaGrafik: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model?.KonaklamaGrafik)),
-        TrendGrafik: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model?.TrendGrafik))
-    };
-
-    try {
-        let response = await fetch('/Yorum/YapayZekaTavsiyesiAl', { // Controller ismi Yorum olarak düzeltildi
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload)
-        });
-
-        if (response.ok) {
-            let aiVerisi = await response.json();
+    // DÜZELTME: Buton dinleyicisi sayfa yüklendikten (DOMContentLoaded) sonraya alındı.
+    let btnAiTavsiye = document.getElementById('btnAiTavsiye');
+    if (btnAiTavsiye) {
+        btnAiTavsiye.addEventListener('click', async function() {
+            let btn = this;
+            let orijinalMetin = btn.innerHTML;
             
-            // AI tavsiyelerini Span'ların içine gömüyoruz
-            if(aiVerisi.duyguTavsiyesi) document.getElementById('ozetDuygu').innerHTML = aiVerisi.duyguTavsiyesi;
-            if(aiVerisi.departmanTavsiyesi) document.getElementById('ozetDepartman').innerHTML = aiVerisi.departmanTavsiyesi;
-            if(aiVerisi.hisPolarTavsiyesi) document.getElementById('ozetHisPolar').innerHTML = aiVerisi.hisPolarTavsiyesi;
-            if(aiVerisi.kelimeTavsiyesi) document.getElementById('ozetKelime').innerHTML = aiVerisi.kelimeTavsiyesi;
-            if(aiVerisi.ulkeTavsiyesi) document.getElementById('ozetUlke').innerHTML = aiVerisi.ulkeTavsiyesi;
-            if(aiVerisi.konaklamaTavsiyesi) document.getElementById('ozetKonaklama').innerHTML = aiVerisi.konaklamaTavsiyesi;
-            if(aiVerisi.trendTavsiyesi) document.getElementById('ozetTrend').innerHTML = aiVerisi.trendTavsiyesi;
+            // Butonu yükleniyor moduna al
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i> Yapay Zeka Analiz Ediyor...';
+            btn.disabled = true;
 
-            // Başarılı efekti
-            btn.innerHTML = '<i class="fas fa-check-circle me-2"></i> Raporlar Güncellendi';
-            btn.classList.replace('btn-primary', 'btn-success');
-            setTimeout(() => { 
-                btn.innerHTML = orijinalMetin; 
-                btn.classList.replace('btn-success', 'btn-primary'); 
-                btn.disabled = false; 
-            }, 3000);
-        } else {
-            throw new Error("Sunucu hatası");
-        }
-    } catch (error) {
-        console.error("Yapay Zeka Hatası:", error);
-        btn.innerHTML = '<i class="fas fa-exclamation-triangle me-2"></i> Bir Hata Oluştu';
-        btn.classList.replace('btn-primary', 'btn-danger');
-        setTimeout(() => { 
-            btn.innerHTML = orijinalMetin; 
-            btn.classList.replace('btn-danger', 'btn-primary'); 
-            btn.disabled = false; 
-        }, 3000);
+            // Yukarıda atadığımız JS değişkenlerini doğrudan kullanıyoruz, böylece C# modelini tekrar serileştirmiyoruz.
+            let payload = {
+                DuyguGrafik: pastaGrafikVerisi,
+                DepartmanGrafik: deptGrafikVerisi,
+                HisPolarGrafik: polarGrafikVerisi,
+                KelimeGrafik: kelimeGrafikVerisi,
+                UlkeGrafik: ulkeGrafikVerisi,
+                KonaklamaGrafik: konaklamaGrafikVerisi,
+                TrendGrafik: trendGrafikVerisi
+            };
+
+            try {
+                let response = await fetch('/Yorum/YapayZekaTavsiyesiAl', { 
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                if (response.ok) {
+                    let aiVerisi = await response.json();
+                    
+                    // AI tavsiyelerini Span'ların içine gömüyoruz
+                    if(aiVerisi.duyguTavsiyesi && document.getElementById('ozetDuygu')) document.getElementById('ozetDuygu').innerHTML = aiVerisi.duyguTavsiyesi;
+                    if(aiVerisi.departmanTavsiyesi && document.getElementById('ozetDepartman')) document.getElementById('ozetDepartman').innerHTML = aiVerisi.departmanTavsiyesi;
+                    if(aiVerisi.hisPolarTavsiyesi && document.getElementById('ozetHisPolar')) document.getElementById('ozetHisPolar').innerHTML = aiVerisi.hisPolarTavsiyesi;
+                    if(aiVerisi.kelimeTavsiyesi && document.getElementById('ozetKelime')) document.getElementById('ozetKelime').innerHTML = aiVerisi.kelimeTavsiyesi;
+                    if(aiVerisi.ulkeTavsiyesi && document.getElementById('ozetUlke')) document.getElementById('ozetUlke').innerHTML = aiVerisi.ulkeTavsiyesi;
+                    if(aiVerisi.konaklamaTavsiyesi && document.getElementById('ozetKonaklama')) document.getElementById('ozetKonaklama').innerHTML = aiVerisi.konaklamaTavsiyesi;
+                    if(aiVerisi.trendTavsiyesi && document.getElementById('ozetTrend')) document.getElementById('ozetTrend').innerHTML = aiVerisi.trendTavsiyesi;
+
+                    // Başarılı efekti
+                    btn.innerHTML = '<i class="fas fa-check-circle me-2"></i> Raporlar Güncellendi';
+                    btn.classList.replace('btn-primary', 'btn-success');
+                    setTimeout(() => { 
+                        btn.innerHTML = orijinalMetin; 
+                        btn.classList.replace('btn-success', 'btn-primary'); 
+                        btn.disabled = false; 
+                    }, 3000);
+                } else {
+                    throw new Error("Sunucu hatası");
+                }
+            } catch (error) {
+                console.error("Yapay Zeka Hatası:", error);
+                btn.innerHTML = '<i class="fas fa-exclamation-triangle me-2"></i> Bir Hata Oluştu';
+                btn.classList.replace('btn-primary', 'btn-danger');
+                setTimeout(() => { 
+                    btn.innerHTML = orijinalMetin; 
+                    btn.classList.replace('btn-danger', 'btn-primary'); 
+                    btn.disabled = false; 
+                }, 3000);
+            }
+        });
     }
-});
+
+}); // DOMContentLoaded Bitişi
 </script>

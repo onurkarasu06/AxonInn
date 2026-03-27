@@ -11,29 +11,28 @@
 
             foreach (var y in yorumlar)
             {
-                // Hiç ToLower() kullanmıyoruz, sadece etrafındaki olası boşlukları siliyoruz
-                string durum = y.GeminiAnalizDuyguDurumu?.Trim() ?? "";
+                // Null değerleri yakala ve Türkçe kültürüyle (TR-tr) güvenli bir şekilde büyük harfe çevir
+                string durum = y.GeminiAnalizDuyguDurumu?.Trim().ToUpper(new System.Globalization.CultureInfo("tr-TR")) ?? "";
 
-                // Veritabanında gördüğün o "noktasız I" ihtimallerini doğrudan ekliyoruz
-                if (durum == "Çok Iyi" || durum == "Çok İyi" || durum == "çok iyi")
+                // Artık sadece BÜYÜK HARFLİ halleriyle karşılaştırıyoruz
+                if (durum == "ÇOK İYİ" || durum == "ÇOK IYI")
                 {
                     veri.CokIyiSayisi++;
                 }
-                else if (durum == "Iyi" || durum == "İyi" || durum == "iyi")
+                else if (durum == "İYİ" || durum == "IYI")
                 {
                     veri.IyiSayisi++;
                 }
-                else if (durum == "Kötü" || durum == "kötü" || durum == "Kotu")
+                else if (durum == "KÖTÜ" || durum == "KOTU")
                 {
                     veri.KotuSayisi++;
                 }
-                else if (durum == "Çok Kötü" || durum == "çok kötü" || durum == "Çok Kotu")
+                else if (durum == "ÇOK KÖTÜ" || durum == "ÇOK KOTU")
                 {
                     veri.CokKotuSayisi++;
                 }
-                else
+                else if (durum == "NÖTR" || durum == "NOTR")
                 {
-                    // "Nötr" olanlar veya formata uymayan diğer her şey
                     veri.NotrSayisi++;
                 }
             }

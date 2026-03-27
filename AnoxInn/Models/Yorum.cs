@@ -132,7 +132,7 @@ namespace AxonInn.Models
                     this.GeminiAnalizIlgiliDepartman = MetniKirp(analizSonucu.DuyguAnalizi?.IlgiliDepartman, 100);
 
                     this.GeminiAnalizDuyguSkoru = analizSonucu.DuyguAnalizi?.Skor;
-                    this.GeminiAnalizAnahtarKelimeler = analizSonucu.AnahtarKelimeler != null ? string.Join(", ", analizSonucu.AnahtarKelimeler) : null;
+                    this.GeminiAnalizAnahtarKelimeler = MetniKirp(analizSonucu.AnahtarKelimeler != null ? string.Join(", ", analizSonucu.AnahtarKelimeler) : null, 500);
                     this.GeminiAnalizProfilBeklentisi = analizSonucu.ProfilBeklentisi;
                     this.GeminiAnalizKulturelHassasiyet = analizSonucu.KulturelHassasiyet;
                     this.GeminiAnalizSezonsalDurum = analizSonucu.SezonsalDurum;
@@ -160,6 +160,68 @@ namespace AxonInn.Models
         {
             if (string.IsNullOrEmpty(metin)) return metin;
             return metin.Length > sinir ? metin.Substring(0, sinir) : metin;
+        }
+
+
+        public static Yorum ApifyYorumOlustur(JToken jt, long hotelRef)
+        {
+            // 1. Boş bir nesne oluştur
+            Yorum yeniYorum = new Yorum();
+
+            // 2. Apify JSON formatına göre nesnenin içini doldur
+            // Veritabanında MisafirYorumId nvarchar(100)
+            yeniYorum.MisafirYorumId = MetniKirp((string)jt["id"], 100);
+
+            // Memleket ve Ülke bilgisini çözüyoruz
+            yeniYorum.MisafirMemleket = null;
+            yeniYorum.MisafirUlkesi = null;
+
+            JToken locationToken = jt.SelectToken("user.userLocation");
+            if (locationToken != null && locationToken.Type != JTokenType.Null)
+            {
+                string tamMemleket = (string)locationToken["name"];
+
+                if (!string.IsNullOrEmpty(tamMemleket))
+                {
+                    // Veritabanında MisafirMemleket nvarchar(1000)
+                    yeniYorum.MisafirMemleket = MetniKirp(tamMemleket.Trim(), 1000);
+
+                    if (yeniYorum.MisafirMemleket.Contains(","))
+                    {
+                        var parcalar = yeniYorum.MisafirMemleket.Split(',');
+                        // Veritabanında MisafirUlkesi nvarchar(1000)
+                        yeniYorum.MisafirUlkesi = MetniKirp(parcalar[parcalar.Length - 1].Trim(), 1000);
+                    }
+                }
+            }
+
+            // Başlık ve Metin
+            // Veritabanında MisafirYorumBaslik nvarchar(2000)
+            yeniYorum.MisafirYorumBaslik = MetniKirp((string)jt["title"], 2000);
+
+            // Veritabanında MisafirYorum nvarchar(MAX) - Kırpmaya gerek yok
+            yeniYorum.MisafirYorum = (string)jt["text"];
+
+            // Konaklama Tipi ve Tarihi
+            // Veritabanında MisafirKonaklamaTarihi nvarchar(50)
+            yeniYorum.MisafirKonaklamaTarihi = MetniKirp((string)jt["travelDate"], 50);
+            // Veritabanında MisafirKonaklamaTipi nvarchar(100)
+            yeniYorum.MisafirKonaklamaTipi = MetniKirp((string)jt["tripType"], 100);
+
+            // Yorum Tarihi
+            string dateStr = (string)jt["publishedDate"];
+            if (!string.IsNullOrEmpty(dateStr))
+            {
+                if (DateTime.TryParse(dateStr, out DateTime parsedDate))
+                {
+                    yeniYorum.MisafirYorumTarihi = parsedDate;
+                }
+            }
+
+            yeniYorum.HotelRef = hotelRef;
+
+            // 3. Doldurulmuş nesneyi geriye döndür
+            return yeniYorum;
         }
     }
 }

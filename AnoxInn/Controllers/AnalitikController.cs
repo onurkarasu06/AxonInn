@@ -9,12 +9,12 @@ using System;
 
 namespace AxonInn.Controllers
 {
-    public class YorumController : Controller
+    public class AnalitikController : Controller
     {
         private readonly AxonInnContext _context;
         private readonly IConfiguration _configuration;
 
-        public YorumController(AxonInnContext context, IConfiguration configuration)
+        public AnalitikController(AxonInnContext context, IConfiguration configuration)
         {
             _context = context;
             _configuration = configuration;
@@ -35,7 +35,8 @@ namespace AxonInn.Controllers
                                      .FirstOrDefault(d => d.Id == loginOlanPersonel.DepartmanRef);
         }
 
-        public async Task<IActionResult> Yorum(int? yil = null)
+        [Route("Analitik")]
+        public async Task<IActionResult> Analitik(int? yil = null)
         {
             try
             {
@@ -52,12 +53,23 @@ namespace AxonInn.Controllers
                 var tumYorumlarQuery = _context.Yorum.AsNoTracking().Where(y => y.HotelRef == aktifOtelId);
 
                 // 2. Veritabanındaki benzersiz (farklı) yılları bulup Combo Box için hazırlıyoruz
-                var yillar = await tumYorumlarQuery
-                    .Where(y => y.MisafirYorumTarihi != null)
-                    .Select(y => y.MisafirYorumTarihi.Value.Year)
-                    .Distinct()
-                    .OrderByDescending(y => y)
-                    .ToListAsync();
+                var tarihMetinleri = await tumYorumlarQuery
+      .Where(y => !string.IsNullOrEmpty(y.MisafirKonaklamaTarihi))
+      .Select(y => y.MisafirKonaklamaTarihi)
+      .Distinct()
+      .ToListAsync();
+
+                // Çekilen metinlerin içindeki 4 haneli yılları (Regex ile) bulup integer listesine çeviriyoruz
+                var yillar = tarihMetinleri
+                    .Select(t =>
+                    {
+                        var match = System.Text.RegularExpressions.Regex.Match(t, @"\d{4}");
+                        return match.Success ? int.Parse(match.Value) : 0;
+                    })
+                    .Where(bulunanYil => bulunanYil > 0)
+                    .Distinct() // Aynı yılı defalarca eklememek için
+                    .OrderByDescending(y => y) // Yeniden eskiye sıralama
+                    .ToList();
 
                 ViewBag.Yillar = yillar;
                 ViewBag.SeciliYil = yil;
@@ -84,7 +96,87 @@ namespace AxonInn.Controllers
                     TrendGrafik = yorumDashboardGrafikServisi.HesaplaAylikTrendGrafigi(yorumList)
                 };
 
+                await LogKaydet(loginOlanPersonel, "Analitik Sayfasına Giriş Yapıldı", "Analitik Sayfası");
                 return View(yorumDashboardViewModel);
+            }
+            catch (Exception)
+            {
+                // 🛡️ GÜVENLİK: Information Disclosure (Tablo/Ağaç sızıntısı) önlemi
+                return View("~/Views/Error/Error.cshtml", new ErrorViewModel { RequestId = Activity.Current?.Id ?? HttpContext.TraceIdentifier });
+            }
+        }
+
+        [HttpPost]
+        public async Task<IActionResult> YapayZekaTavsiyesiAl([FromBody] YorumDashboardViewModel panelVerisi)
+        {
+            try
+            {
+                var loginOlanPersonel = GetActiveUser();
+
+                if (loginOlanPersonel == null)
+                    return RedirectToAction("Login", "Login");
+
+                string jsonVeri = System.Text.Json.JsonSerializer.Serialize(panelVerisi);
+                string prompt = $@"Sen AxonInn otel yönetim sistemi için çalışan kıdemli bir Turizm Stratejisti ve Veri Bilimcisisin. 
+                                Aşağıda otelimizin güncel 7 farklı analiz grafiğinin verilerini JSON olarak veriyorum:
+                                {jsonVeri}
+
+                                Lütfen bu verileri detaylıca incele ve otel müdürü için aksiyon alınabilir, net ve profesyonel tavsiyeler üret.
+                                ÇOK ÖNEMLİ KURALLAR:
+                                1- Arayüzde yerimiz çok kısıtlı! Her bir tavsiye KESİNLİKLE EN FAZLA 12 KISA CÜMLE olmalı. Lafı uzatma, doğrudan sorunu söyle ve çözüm öner.
+                                2- SADECE aşağıdaki JSON formatında cevap ver. Markdown karakterleri veya ekstra açıklamalar KULLANMA.
+
+                                İstenen JSON Kalıbı:
+                                {{
+                                  ""DuyguTavsiyesi"": """",
+                                  ""DepartmanTavsiyesi"": """",
+                                  ""HisPolarTavsiyesi"": """",
+                                  ""KelimeTavsiyesi"": """",
+                                  ""UlkeTavsiyesi"": """",
+                                  ""KonaklamaTavsiyesi"": """",
+                                  ""TrendTavsiyesi"": """"
+                                }}";
+
+                string geminiApiKey = _configuration["GeminiApi:ApiKey"];
+
+                // KRİTİK HATA DÜZELTİLDİ: İçine giren "[https://...](https://...)" Markdown String yapısı saf URL'e dönüştürüldü.
+                string apiUrl = $"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={geminiApiKey}";
+
+                using (var httpClient = new System.Net.Http.HttpClient())
+                {
+                    var requestData = new
+                    {
+                        contents = new[] { new { parts = new[] { new { text = prompt } } } },
+                        generationConfig = new { temperature = 0.2, response_mime_type = "application/json" }
+                    };
+
+                    var content = new System.Net.Http.StringContent(System.Text.Json.JsonSerializer.Serialize(requestData), System.Text.Encoding.UTF8, "application/json");
+                    var response = await httpClient.PostAsync(apiUrl, content);
+
+                    if (response.IsSuccessStatusCode)
+                    {
+                        string jsonResponse = await response.Content.ReadAsStringAsync();
+                        using (System.Text.Json.JsonDocument doc = System.Text.Json.JsonDocument.Parse(jsonResponse))
+                        {
+                            var root = doc.RootElement;
+                            var candidates = root.GetProperty("candidates");
+                            if (candidates.GetArrayLength() > 0)
+                            {
+                                string aiCevabi = candidates[0].GetProperty("content").GetProperty("parts")[0].GetProperty("text").GetString();
+                                aiCevabi = aiCevabi.Replace("```json", "").Replace("```", "").Trim();
+
+                                // Güvenli Parse
+                                var sonuc = System.Text.Json.JsonSerializer.Deserialize<AiTavsiyeSonucu>(aiCevabi, new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+
+                                await LogKaydet(loginOlanPersonel, "Analitik Sayfası YapayZekaTavsiyesiAl Yapıldı", aiCevabi);
+
+                                return Json(sonuc);
+
+                            }
+                        }
+                    }
+                    return StatusCode(500, "Gemini API'den geçerli bir yanıt alınamadı. Lütfen daha sonra tekrar deneyin.");
+                }
             }
             catch (Exception)
             {
@@ -147,76 +239,6 @@ namespace AxonInn.Controllers
             await yorumIslem.YorumlariPartilerHalindeIsleAsync(dbYorumList, yorumIslem, geminiApiKey, _context);
 
             return RedirectToAction("Yorum");
-        }
-
-        [HttpPost]
-        public async Task<IActionResult> YapayZekaTavsiyesiAl([FromBody] YorumDashboardViewModel panelVerisi)
-        {
-            try
-            {
-                string jsonVeri = System.Text.Json.JsonSerializer.Serialize(panelVerisi);
-                string prompt = $@"Sen AxonInn otel yönetim sistemi için çalışan kıdemli bir Turizm Stratejisti ve Veri Bilimcisisin. 
-                                Aşağıda otelimizin güncel 7 farklı analiz grafiğinin verilerini JSON olarak veriyorum:
-                                {jsonVeri}
-
-                                Lütfen bu verileri detaylıca incele ve otel müdürü için aksiyon alınabilir, net ve profesyonel tavsiyeler üret.
-                                ÇOK ÖNEMLİ KURALLAR:
-                                1- Arayüzde yerimiz çok kısıtlı! Her bir tavsiye KESİNLİKLE EN FAZLA 8 KISA CÜMLE olmalı. Lafı uzatma, doğrudan sorunu söyle ve çözüm öner.
-                                2- SADECE aşağıdaki JSON formatında cevap ver. Markdown karakterleri veya ekstra açıklamalar KULLANMA.
-
-                                İstenen JSON Kalıbı:
-                                {{
-                                  ""DuyguTavsiyesi"": """",
-                                  ""DepartmanTavsiyesi"": """",
-                                  ""HisPolarTavsiyesi"": """",
-                                  ""KelimeTavsiyesi"": """",
-                                  ""UlkeTavsiyesi"": """",
-                                  ""KonaklamaTavsiyesi"": """",
-                                  ""TrendTavsiyesi"": """"
-                                }}";
-
-                string geminiApiKey = _configuration["GeminiApi:ApiKey"];
-
-                // KRİTİK HATA DÜZELTİLDİ: İçine giren "[https://...](https://...)" Markdown String yapısı saf URL'e dönüştürüldü.
-                string apiUrl = $"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={geminiApiKey}";
-
-                using (var httpClient = new System.Net.Http.HttpClient())
-                {
-                    var requestData = new
-                    {
-                        contents = new[] { new { parts = new[] { new { text = prompt } } } },
-                        generationConfig = new { temperature = 0.2, response_mime_type = "application/json" }
-                    };
-
-                    var content = new System.Net.Http.StringContent(System.Text.Json.JsonSerializer.Serialize(requestData), System.Text.Encoding.UTF8, "application/json");
-                    var response = await httpClient.PostAsync(apiUrl, content);
-
-                    if (response.IsSuccessStatusCode)
-                    {
-                        string jsonResponse = await response.Content.ReadAsStringAsync();
-                        using (System.Text.Json.JsonDocument doc = System.Text.Json.JsonDocument.Parse(jsonResponse))
-                        {
-                            var root = doc.RootElement;
-                            var candidates = root.GetProperty("candidates");
-                            if (candidates.GetArrayLength() > 0)
-                            {
-                                string aiCevabi = candidates[0].GetProperty("content").GetProperty("parts")[0].GetProperty("text").GetString();
-                                aiCevabi = aiCevabi.Replace("```json", "").Replace("```", "").Trim();
-
-                                // Güvenli Parse
-                                var sonuc = System.Text.Json.JsonSerializer.Deserialize<AiTavsiyeSonucu>(aiCevabi, new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true });
-                                return Json(sonuc);
-                            }
-                        }
-                    }
-                    return StatusCode(500, "Gemini API'den geçerli bir yanıt alınamadı. Lütfen daha sonra tekrar deneyin.");
-                }
-            }
-            catch (Exception)
-            {
-                // 🛡️ GÜVENLİK: Information Disclosure (Tablo/Ağaç sızıntısı) önlemi
-                return View("~/Views/Error/Error.cshtml", new ErrorViewModel { RequestId = Activity.Current?.Id ?? HttpContext.TraceIdentifier });
-            }
         }
 
         public async Task TripadvisordanAlamadigimizMisafirUlkesiniGeminiTahminEdipGuncellesinTopluAsync()
@@ -334,6 +356,55 @@ namespace AxonInn.Controllers
                     // Ne sistemi yorar, ne de hata durumunda veri kaybı yaşatır.
                     await _context.SaveChangesAsync();
                 }
+            }
+        }
+
+        // Local Loglama Metodu
+        private async Task<bool> LogKaydet(Personel? personel, string islemTipi, string yeniDeger)
+        {
+            try
+            {
+                string departmanAdi = "";
+                string hotelAdi = "";
+
+                if (personel != null && personel.DepartmanRef != 0)
+                {
+                    // ⚡ DB OPTİMİZASYONU & HATA GİDERİMİ: 
+                    // Session içindeki JSON ilişkili nesneleri (Navigation Properties) taşımaz. 
+                    // Bu yüzden Departman adını da Otel adıyla birlikte TEK bir AsNoTracking sorgusu ile anında alıyoruz.
+                    var depBilgisi = await _context.Departmen
+                        .AsNoTracking()
+                        .Where(d => d.Id == personel.DepartmanRef)
+                        .Select(d => new { d.Adi, HotelAdi = d.HotelRefNavigation != null ? d.HotelRefNavigation.Adi : "" })
+                        .FirstOrDefaultAsync();
+
+                    if (depBilgisi != null)
+                    {
+                        departmanAdi = depBilgisi.Adi;
+                        hotelAdi = depBilgisi.HotelAdi;
+                    }
+                }
+
+                var log = new AuditLog
+                {
+                    IslemTarihi = DateTime.Now,
+                    IlgiliTablo = "SayfaZiyareti",
+                    KayitRefId = personel?.Id ?? 0,
+                    IslemTipi = islemTipi,
+                    EskiDeger = "",
+                    YeniDeger = yeniDeger,
+                    YapanHotelAd = hotelAdi,
+                    YapanDepartmanAd = departmanAdi,
+                    YapanAdSoyad = personel != null ? $"{personel.Adi} {personel.Soyadi}" : "Bilinmeyen"
+                };
+
+                _context.AuditLogs.Add(log);
+                await _context.SaveChangesAsync();
+                return true;
+            }
+            catch
+            {
+                return false;
             }
         }
     }

@@ -3,8 +3,6 @@
 @{
     Layout = "~/Views/Shared/_Layout.cshtml";
     var hotelAdi = ViewBag.HotelAdi ?? "Bilinmeyen Otel";
-
-    // PERFORMANS: Modeli 8 kez çevirip boyutu büyütmek yerine 1 kez optimize edilerek JSON oluşturulur
     var jsonOptions = new System.Text.Json.JsonSerializerOptions
     {
         PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase,
@@ -40,7 +38,6 @@
 </div>
 
 <style>
-    /* TASARIMA KESİNLİKLE DOKUNULMAMIŞTIR */
     .select-modern { appearance: none; -webkit-appearance: none; -moz-appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath fill='none' stroke='%23475569' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M2 5l6 6 6-6'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 1rem center; background-size: 12px 12px; padding-right: 2.5rem !important; padding-left: 1rem; text-align: left; cursor: pointer; }
     .skeleton-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: #f8fafc; z-index: 9999; padding: 2rem; flex-direction: column; gap: 1.5rem; }
     .skeleton-box { background: #e2e8f0; border-radius: 0.5rem; animation: pulse-skeleton 1.5s infinite ease-in-out; }
@@ -165,11 +162,8 @@
 </div>
 
 <script>
-// Chart.js defer özelliğinden dolayı yüklenmesi asenkron gerçekleşir.
-// Olası nadir hataları (undefined) engellemek için listener kullanılır.
 window.addEventListener("load", function() {
     
-    // JS Yüklenene kadar bekle
     const checkChartLoaded = setInterval(() => {
         if(typeof Chart !== 'undefined') {
             clearInterval(checkChartLoaded);
@@ -187,6 +181,7 @@ window.addEventListener("load", function() {
             plugins: {
                 legend: { display: false }, 
                 tooltip: { 
+                    animation: false, 
                     backgroundColor: 'rgba(15, 23, 42, 0.95)', 
                     titleFont: { size: 13, family: "'Plus Jakarta Sans'", weight: '600' },
                     bodyFont: { size: 13, family: "'Plus Jakarta Sans'" },
@@ -196,7 +191,6 @@ window.addEventListener("load", function() {
             interaction: { mode: 'index', intersect: false }
         });
 
-        // 8 defa Deserialize çalıştırmak yerine tek JS değişkeninde toplanıldı
         const dashboardData = @Html.Raw(dashboardJson);
 
         const kpiVerisi = dashboardData.kpiVerileri;
@@ -208,7 +202,6 @@ window.addEventListener("load", function() {
         const konaklamaGrafikVerisi = dashboardData.konaklamaGrafik;
         const trendGrafikVerisi = dashboardData.trendGrafik;
 
-        // KPI Kartlarını Doldur
         if (kpiVerisi) {
             let toplam = kpiVerisi.toplamYorumAdeti ?? 0;
             let memnuniyet = kpiVerisi.memnuniyetOrani ?? 0;
@@ -234,13 +227,13 @@ window.addEventListener("load", function() {
             }
         }
 
-        // PERFORMANS: Main Thread'i (UI'yı) kilitlememek için grafikler Frame kuyruğuna dizildi. 
-        // Böylece sayfa geçişleri kasmadan/donmadan anında gerçekleşir.
         const renderQueue = [
             () => {
                 let cPasta = document.getElementById('duyguPastaGrafigi');
                 if (pastaGrafikVerisi && pastaGrafikVerisi.cokIyiSayisi !== undefined && cPasta) {
-                    let pastaAyar = getOrtakSecenekler(); pastaAyar.cutout = '75%';
+                    let pastaAyar = getOrtakSecenekler(); 
+                    pastaAyar.cutout = '75%';
+                    pastaAyar.interaction = { mode: 'nearest', intersect: true }; 
                     pastaAyar.plugins.legend = { display: true, position: 'bottom', labels: { padding: 20, usePointStyle: true, pointStyle: 'circle', font: {size: 13} } };
                     pastaAyar.plugins.tooltip.callbacks = { label: function(c) { let t = c.dataset.data.reduce((a, b) => a + b, 0); let y = t > 0 ? ((c.raw / t) * 100).toFixed(1) : 0; return ` ${c.label}: ${c.raw} Değerlendirme (%${y})`; } };
                     new Chart(cPasta.getContext('2d'), { type: 'doughnut', data: { labels: ['Mükemmel', 'İyi', 'Nötr/Kararsız', 'Kötü', 'Kritik'], datasets: [{ data: [pastaGrafikVerisi.cokIyiSayisi, pastaGrafikVerisi.iyiSayisi, pastaGrafikVerisi.notrSayisi, pastaGrafikVerisi.kotuSayisi, pastaGrafikVerisi.cokKotuSayisi], backgroundColor: ['#10b981', '#34d399', '#fbbf24', '#f43f5e', '#be123c'], borderWidth: 0, hoverOffset: 8, borderRadius: 4 }] }, options: pastaAyar });
@@ -259,14 +252,23 @@ window.addEventListener("load", function() {
                 if (polarGrafikVerisi && polarGrafikVerisi.etiketler && cPolar) {
                     const hRenk = { "Neşe": "rgba(251, 191, 36, 0.75)", "Coşku": "rgba(249, 115, 22, 0.75)", "Rahatlık": "rgba(14, 165, 233, 0.75)", "Memnuniyet": "rgba(16, 185, 129, 0.75)", "Tekrar Gelme İsteği": "rgba(5, 150, 105, 0.75)", "Harika": "rgba(139, 92, 246, 0.75)", "Rahatsızlık": "rgba(148, 163, 184, 0.75)", "Hayal Kırıklığı": "rgba(236, 72, 153, 0.75)", "Memnuniyetsizlik": "rgba(244, 63, 94, 0.75)", "Şikayet": "rgba(225, 29, 72, 0.75)", "Öfke ve Haksızlık Hissi": "rgba(159, 18, 57, 0.75)" };
                     let dinamikRenkler = polarGrafikVerisi.etiketler.map(e => hRenk[e] || "rgba(203, 213, 225, 0.7)");
-                    let pAyar = getOrtakSecenekler(); pAyar.plugins.tooltip.callbacks = { label: ctx => ctx.label + ': %' + ctx.raw }; pAyar.plugins.legend = { display: true, position: 'right', labels: { padding: 15, usePointStyle: true, pointStyle: 'circle' } }; pAyar.scales = { r: { ticks: { display: false }, grid: { color: '#f1f5f9' } } };
+                    let pAyar = getOrtakSecenekler(); 
+                    pAyar.interaction = { mode: 'nearest', intersect: true }; 
+                    pAyar.plugins.tooltip.callbacks = { label: ctx => ctx.label + ': %' + ctx.raw }; pAyar.plugins.legend = { display: true, position: 'right', labels: { padding: 15, usePointStyle: true, pointStyle: 'circle' } }; pAyar.scales = { r: { ticks: { display: false }, grid: { color: '#f1f5f9' } } };
                     new Chart(cPolar.getContext('2d'), { type: 'polarArea', data: { labels: polarGrafikVerisi.etiketler, datasets: [{ data: polarGrafikVerisi.oranlar, backgroundColor: dinamikRenkler, borderColor: '#fff', borderWidth: 2 }] }, options: pAyar });
                 }
             },
             () => {
                 let cKelime = document.getElementById('kelimeBarGrafigi');
                 if (kelimeGrafikVerisi && kelimeGrafikVerisi.kelimeler && cKelime) {
-                    let kAyar = getOrtakSecenekler(); kAyar.indexAxis = 'y'; kAyar.scales = { x: { beginAtZero: true, border: {display: false}, grid: { color: '#f1f5f9' }, ticks: { padding: 10, callback: v => '%' + v } }, y: { border: {display: false}, grid: { display: false }, ticks: { padding: 10 } } }; kAyar.plugins.tooltip.callbacks = { label: ctx => ' Gündem Yoğunluğu: %' + ctx.parsed.x };
+                    let kAyar = getOrtakSecenekler(); 
+                    kAyar.indexAxis = 'y'; 
+                    
+                    // EKLENDİ: Yatay grafikte boş alanların taranmasını engeller ve kasmayı (lag) bitirir.
+                    kAyar.interaction = { mode: 'nearest', intersect: true };
+                    
+                    kAyar.scales = { x: { beginAtZero: true, border: {display: false}, grid: { color: '#f1f5f9' }, ticks: { padding: 10, callback: v => '%' + v } }, y: { border: {display: false}, grid: { display: false }, ticks: { padding: 10 } } }; 
+                    kAyar.plugins.tooltip.callbacks = { label: ctx => ' Gündem Yoğunluğu: %' + ctx.parsed.x };
                     new Chart(cKelime.getContext('2d'), { type: 'bar', data: { labels: kelimeGrafikVerisi.kelimeler, datasets: [{ data: kelimeGrafikVerisi.oranlar, backgroundColor: '#334155', borderRadius: 6, barThickness: 15 }] }, options: kAyar });
                 }
             },
@@ -292,7 +294,6 @@ window.addEventListener("load", function() {
                     new Chart(ctx, { type: 'line', data: { labels: trendGrafikVerisi.aylar, datasets: [{ label: 'Trend', data: trendGrafikVerisi.yogunluklar, borderColor: '#f43f5e', backgroundColor: grad, borderWidth: 3, pointBackgroundColor: '#fff', pointBorderColor: '#f43f5e', pointBorderWidth: 2, pointRadius: 4, pointHoverRadius: 6, fill: true, tension: 0.4 }] }, options: trAyar });
                 }
                 
-                // Skeleton kapatılır (Çizimler tamamlanınca sayfa estetik açılır)
                 const skeleton = document.getElementById('skeletonOverlay');
                 if (skeleton) {
                     skeleton.style.transition = "opacity 0.4s ease";
@@ -302,7 +303,6 @@ window.addEventListener("load", function() {
             }
         ];
 
-        // Grafikleri birbiri ardına çizen motor
         let frameIndex = 0;
         function renderNextChart() {
             if (frameIndex < renderQueue.length) {
@@ -313,7 +313,6 @@ window.addEventListener("load", function() {
         }
         requestAnimationFrame(renderNextChart);
 
-        // AI GÜNCELLEME BUTONU
         let btnAiTavsiye = document.getElementById('btnAiTavsiye');
         if (btnAiTavsiye) {
             btnAiTavsiye.addEventListener('click', async function() {
@@ -355,7 +354,6 @@ window.addEventListener("load", function() {
     }
 });
 
-// BUG FIX: Mevcut kodda dosyanın sonuna aynı fonksiyon mükerrer olarak iki defa kopyalanmıştı, temizlendi.
 function yilDegisti() {
     let skeleton = document.getElementById("skeletonOverlay");
     if(skeleton) {

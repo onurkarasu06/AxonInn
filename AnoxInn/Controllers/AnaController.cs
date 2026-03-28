@@ -38,127 +38,122 @@ namespace AxonInn.Controllers
                 if (loginOlanPersonel == null)
                     return RedirectToAction("Login", "Login");
 
-                // ⚡ PERFORMANS: Otel Id ve Adı bilgileri ile birlikte Departman adını TEK bağlantı ile çekiyoruz.
+                // ⚡ OPTİMİZASYON: Tüm null check'leri Select içinde halledip doğrudan temiz veri alıyoruz.
                 var sessionBilgisi = await _context.Departmen
                     .AsNoTracking()
                     .Where(d => d.Id == loginOlanPersonel.DepartmanRef)
                     .Select(d => new {
-                        d.HotelRef,
-                        HotelAdi = d.HotelRefNavigation != null ? d.HotelRefNavigation.Adi : "Bilinmeyen Otel",
-                        DepartmanAdi = d.Adi
+                        HotelId = d.HotelRef, 
+                        HotelAdi = d.HotelRefNavigation.Adi ?? "Bilinmeyen Otel",
+                        DepartmanAdi = d.Adi ?? "Bilinmeyen Departman"
                     })
                     .FirstOrDefaultAsync();
 
-                if (sessionBilgisi == null || sessionBilgisi.HotelRef == null || sessionBilgisi.HotelRef == 0)
+                if (sessionBilgisi == null || sessionBilgisi.HotelId == 0)
                     return RedirectToAction("Login", "Login");
 
-                int hotelId = (int)sessionBilgisi.HotelRef;
-                string hotelAdi = sessionBilgisi.HotelAdi;
-                string departmanAdi = sessionBilgisi.DepartmanAdi ?? "Bilinmeyen Departman";
+                long hotelId = sessionBilgisi.HotelId;
 
-                // --- 🚀 SIFIR GEREKSİZ JOIN (Sorgu Optimizasyonu) ---
+                // --- 🚀 BASE QUERY TEMİZLİĞİ ---
+                // Navigation property'ler için != null kontrolü kaldırıldı (INNER JOIN'e zorlayıp SQL'i hızlandırır).
                 IQueryable<Personel> personelQuery = _context.Personels.AsNoTracking().Where(p => p.AktifMi == 1);
-                IQueryable<Gorev> gorevQuery = _context.Gorevs.AsNoTracking().Where(g => g.PersonelRefNavigation != null && g.PersonelRefNavigation.AktifMi == 1);
+                IQueryable<Gorev> gorevQuery = _context.Gorevs.AsNoTracking().Where(g => g.PersonelRefNavigation.AktifMi == 1);
                 IQueryable<Departman> departmanQuery = _context.Departmen.AsNoTracking();
 
+                // Yetki Filtrelemeleri (Daha sade)
                 if (loginOlanPersonel.Yetki == 3)
                 {
-                    // Sadece kendi verileri
                     personelQuery = personelQuery.Where(p => p.Id == loginOlanPersonel.Id);
                     gorevQuery = gorevQuery.Where(g => g.PersonelRef == loginOlanPersonel.Id);
                     departmanQuery = departmanQuery.Where(d => d.Id == loginOlanPersonel.DepartmanRef);
                 }
                 else if (loginOlanPersonel.Yetki == 2)
                 {
-                    // Sadece kendi departmanının verileri
                     personelQuery = personelQuery.Where(p => p.DepartmanRef == loginOlanPersonel.DepartmanRef);
-                    gorevQuery = gorevQuery.Where(g => g.PersonelRefNavigation != null && g.PersonelRefNavigation.DepartmanRef == loginOlanPersonel.DepartmanRef);
+                    gorevQuery = gorevQuery.Where(g => g.PersonelRefNavigation.DepartmanRef == loginOlanPersonel.DepartmanRef);
                     departmanQuery = departmanQuery.Where(d => d.Id == loginOlanPersonel.DepartmanRef);
                 }
                 else
                 {
-                    // Tüm Otel
-                    personelQuery = personelQuery.Where(p => p.DepartmanRefNavigation != null && p.DepartmanRefNavigation.HotelRef == hotelId);
-                    gorevQuery = gorevQuery.Where(g => g.PersonelRefNavigation != null && g.PersonelRefNavigation.DepartmanRefNavigation != null && g.PersonelRefNavigation.DepartmanRefNavigation.HotelRef == hotelId);
+                    personelQuery = personelQuery.Where(p => p.DepartmanRefNavigation.HotelRef == hotelId);
+                    gorevQuery = gorevQuery.Where(g => g.PersonelRefNavigation.DepartmanRefNavigation.HotelRef == hotelId);
                     departmanQuery = departmanQuery.Where(d => d.HotelRef == hotelId);
                 }
 
-                // ⚡ PERFORMANS: personelQuery'de zaten p.AktifMi == 1 koşulu olduğu için mükerrer Where kaldırıldı.
-                var departmanPersonelSayilari = await personelQuery
-                    .GroupBy(p => p.DepartmanRefNavigation != null ? p.DepartmanRefNavigation.Adi : "Belirtilmemiş")
-                    .Select(g => new {
-                        departmanAd = g.Key ?? "Belirtilmemiş",
-                        adet = g.Count()
-                    }).ToListAsync();
+                // ⚡ SQL SORGULARI 
+                var departmanPersonelSayilariDb = await personelQuery
+                    .GroupBy(p => p.DepartmanRefNavigation.Adi)
+                    .Select(g => new { departmanAd = g.Key, adet = g.Count() })
+                    .ToListAsync();
 
-                // ⚡ SQL CPU OPTİMİZASYONU: Sadece gerekli kolonları DB'den alıp, hesaplamaları/formatlamayı RAM'e bıraktık.
                 var gorevChartDataDb = await gorevQuery
                     .GroupBy(g => new {
                         pId = g.PersonelRef,
-                        ad = g.PersonelRefNavigation!.Adi,
+                        ad = g.PersonelRefNavigation.Adi,
                         soyad = g.PersonelRefNavigation.Soyadi,
-                        dept = g.PersonelRefNavigation.DepartmanRefNavigation != null ? g.PersonelRefNavigation.DepartmanRefNavigation.Adi : "Belirtilmemiş"
+                        dept = g.PersonelRefNavigation.DepartmanRefNavigation.Adi
                     })
                     .Select(g => new {
-                        pId = g.Key.pId,
-                        ad = g.Key.ad,
-                        soyad = g.Key.soyad,
-                        dept = g.Key.dept,
+                        g.Key.pId,
+                        g.Key.ad,
+                        g.Key.soyad,
+                        g.Key.dept,
                         beklemede = g.Count(x => x.Durum == 1),
                         islemde = g.Count(x => x.Durum == 2),
                         tamamlandi = g.Count(x => x.Durum == 3)
                     }).ToListAsync();
 
-                var gorevChartData = gorevChartDataDb.Select(g => new {
-                    pId = g.pId,
-                    ad = string.IsNullOrWhiteSpace(g.soyad) ? (g.ad ?? string.Empty).Trim() : string.Concat(g.ad, " ", g.soyad).Trim(),
-                    dept = g.dept ?? "Belirtilmemiş",
-                    beklemede = g.beklemede,
-                    islemde = g.islemde,
-                    tamamlandi = g.tamamlandi
-                }).ToList();
+                // ⚡ OPTİMİZASYON: !string.IsNullOrEmpty SQL'de daha performanslıdır
+                var aiKategoriDb = await gorevQuery
+                    .Where(g => !string.IsNullOrEmpty(g.AiKategori))
+                    .GroupBy(g => g.AiKategori)
+                    .Select(g => new { kategori = g.Key, adet = g.Count() })
+                    .ToListAsync();
 
                 var departmanlar = await departmanQuery
                     .Select(d => new Departman { Id = d.Id, Adi = d.Adi })
                     .ToListAsync();
 
-                // INDEX DOSTU SORGULAMA: null ve string.Empty kontrolü SQL'in dilinde uygulandı.
-                var aiKategoriDb = await gorevQuery
-                    .Where(g => g.AiKategori != null && g.AiKategori != "")
-                    .GroupBy(g => g.AiKategori)
-                    .Select(g => new {
-                        kategori = g.Key,
-                        adet = g.Count()
-                    }).ToListAsync();
+                // --- 🚀 RAM (C#) İŞLEMLERİ VE FORMATLAMA ---
+                var departmanPersonelSayilari = departmanPersonelSayilariDb.Select(x => new {
+                    departmanAd = x.departmanAd ?? "Belirtilmemiş",
+                    adet = x.adet
+                }).ToList();
+
+                var gorevChartData = gorevChartDataDb.Select(g => new {
+                    g.pId,
+                    ad = string.IsNullOrWhiteSpace(g.soyad) ? (g.ad ?? "").Trim() : $"{g.ad} {g.soyad}".Trim(),
+                    dept = g.dept ?? "Belirtilmemiş",
+                    g.beklemede,
+                    g.islemde,
+                    g.tamamlandi
+                }).ToList();
 
                 int toplamKategorizeGorev = aiKategoriDb.Sum(x => x.adet);
-
-                // Yüzde hesaplamasını SQL yerine C# RAM'inde yapıyoruz (Çok daha hızlı)
                 var aiChartData = aiKategoriDb.Select(x => new {
-                    kategori = x.kategori,
-                    adet = x.adet,
+                    x.kategori,
+                    x.adet,
                     yuzde = toplamKategorizeGorev > 0 ? Math.Round(((double)x.adet / toplamKategorizeGorev) * 100, 1) : 0
                 }).OrderByDescending(x => x.yuzde).ToList();
 
+                // --- 🚀 VIEW BAG ATAMALARI ---
                 ViewBag.AiKategoriJson = JsonSerializer.Serialize(aiChartData, _jsonOptions);
                 ViewBag.PersonelJson = JsonSerializer.Serialize(departmanPersonelSayilari, _jsonOptions);
                 ViewBag.GorevJson = JsonSerializer.Serialize(gorevChartData, _jsonOptions);
 
-                ViewBag.HotelAdi = hotelAdi;
+                ViewBag.HotelAdi = sessionBilgisi.HotelAdi;
                 ViewBag.AktifPersonelAdet = departmanPersonelSayilari.Sum(x => x.adet);
                 ViewBag.BeklemedeAdet = gorevChartData.Sum(x => x.beklemede);
                 ViewBag.IslemdeAdet = gorevChartData.Sum(x => x.islemde);
                 ViewBag.BittiAdet = gorevChartData.Sum(x => x.tamamlandi);
                 ViewBag.Departmanlar = departmanlar;
 
-                // Log metodunu UI verilerini bekletmemesi için en sona bıraktık
-                await LogKaydetAsync(loginOlanPersonel, "Ana Sayfaya Giriş Yapıldı", "Dashboard Görüntüleme", hotelAdi, departmanAdi);
+                await LogKaydetAsync(loginOlanPersonel, "Ana Sayfaya Giriş Yapıldı", "Dashboard Görüntüleme", sessionBilgisi.HotelAdi, sessionBilgisi.DepartmanAdi);
 
                 return View();
             }
             catch (Exception)
             {
-                // 🛡️ GÜVENLİK: Information Disclosure (Tablo/Ağaç sızıntısı) önlemi
                 return View("~/Views/Error/Error.cshtml", new ErrorViewModel { RequestId = Activity.Current?.Id ?? HttpContext.TraceIdentifier });
             }
         }

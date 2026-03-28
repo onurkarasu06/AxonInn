@@ -5,7 +5,10 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using System;
-using System.Net.Http; // Performans için eklendi
+using System.Net.Http;
+using System.Net.Http.Json; // Performans optimizasyonu için eklendi
+using System.Text.Json;
+using System.Text.Json.Serialization;
 using AxonInn.Models.Entities;
 using AxonInn.Models.Context;
 using AxonInn.Models.Analitik;
@@ -18,9 +21,19 @@ namespace AxonInn.Controllers
         private readonly AxonInnContext _context;
         private readonly IConfiguration _configuration;
 
-        // PERFORMANS (KRİTİK): Yüksek trafikli sayfalarda HttpClient her defasında new'lenirse
-        // Sunucunun tüm Ağ (TCP) Portları tükenir ve çöker (Socket Exhaustion). Sınıf seviyesinde tekilleştirildi.
+        // PERFORMANS: Ağ (TCP) Portları tükenmesine karşı tekilleştirildi
         private static readonly HttpClient _httpClient = new HttpClient();
+
+        // PERFORMANS: JSON Objeleri sürekli RAM'de yaratılıp silinmemesi için Static olarak önbelleklendi
+        private static readonly JsonSerializerOptions _jsonOptions = new JsonSerializerOptions
+        {
+            PropertyNameCaseInsensitive = true,
+            DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
+        };
+        private static readonly JsonSerializerOptions _jsonRelaxedOptions = new JsonSerializerOptions
+        {
+            Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping
+        };
 
         public AnalitikController(AxonInnContext context, IConfiguration configuration)
         {
@@ -30,21 +43,18 @@ namespace AxonInn.Controllers
 
         private Personel? GetActiveUser()
         {
-            // Request-Level Cache: Aynı sayfa yüklenmesinde aynı fonksiyonu defalarca çağırırsanız
-            // JSON serileştirme döngüsü yorulmaz, RAM'den direkt çeker.
             if (HttpContext.Items["CachedUser"] is Personel cachedUser) return cachedUser;
 
             var personelJson = HttpContext.Session.GetString("GirisYapanPersonel");
             if (string.IsNullOrEmpty(personelJson)) return null;
 
-            var user = System.Text.Json.JsonSerializer.Deserialize<Personel>(personelJson);
+            var user = JsonSerializer.Deserialize<Personel>(personelJson, _jsonOptions);
             HttpContext.Items["CachedUser"] = user;
             return user;
         }
 
         private Departman? GetSessionBilgisi(Personel loginOlanPersonel)
         {
-            // Request-Level Cache: Veritabanına tekrar tekrar sorgu gitmesini engeller.
             if (HttpContext.Items["CachedSessionData"] is Departman cachedSession) return cachedSession;
 
             var sessionBilgisi = _context.Departmen.AsNoTracking()
@@ -71,14 +81,8 @@ namespace AxonInn.Controllers
 
                 var tumYorumlarQuery = _context.Yorum.AsNoTracking().Where(y => y.HotelRef == aktifOtelId);
 
-                // DB VE RAM PERFORMANS: Eskiden veritabanındaki on binlerce metni RAM'e çekip
-                // foreach ile "Regex" atıp yılları buluyordunuz. Veri arttıkça C#'ı kilitlerdi.
-                // Bu kod doğrudan SQL'e "Git sadece yılları (YEAR) al, tekrar edenleri sil (DISTINCT) ve ver" der. 
-                // Ağdan 10MB yerine 1KB veri geçer.
                 var yillar = await tumYorumlarQuery
-                   // Boş veya 4 karakterden kısa olan hatalı kayıtları filtreliyoruz
                    .Where(y => !string.IsNullOrEmpty(y.MisafirKonaklamaTarihi) && y.MisafirKonaklamaTarihi.Length >= 4)
-                   // İlk 4 karakteri (YYYY kısmını) alıyoruz
                    .Select(y => y.MisafirKonaklamaTarihi.Substring(0, 4))
                    .Distinct()
                    .OrderByDescending(y => y)
@@ -127,21 +131,18 @@ namespace AxonInn.Controllers
                 if (loginOlanPersonel == null)
                     return RedirectToAction("Login", "Login");
 
-
-
-
-                ////////////////////////////////////////////////////////////////////////////////////////////////////
-                string jsonVeri = System.Text.Json.JsonSerializer.Serialize(panelVerisi);
+                string jsonVeri = JsonSerializer.Serialize(panelVerisi, _jsonOptions);
                 string prompt = "";
-                string icindeBulunanYil = DateTime.Now.Year.ToString(); // Sistemden bulunduğumuz yılı alıyoruz
+                string icindeBulunanYil = DateTime.Now.Year.ToString();
 
-                // SADECE SEÇİLİ YIL "BU YIL" İSE KRİTİK YORUMLARI ÇEK VE DETAYLI PROMPT OLUŞTUR
-                if (panelVerisi.Yil == icindeBulunanYil )
+                if (panelVerisi.Yil == icindeBulunanYil)
                 {
+                    // PERFORMANS: Read-Only (Okunabilir) veri olduğu için EF Core'da AsNoTracking() belleği korur
                     var trendYorumlarListesi = await _context.Yorum
+                                                 .AsNoTracking()
                                                  .Where(y => y.HotelRef == loginOlanPersonel.DepartmanRefNavigation.HotelRef)
                                                  .OrderByDescending(y => y.MisafirKonaklamaTarihi)
-                                                 .Take(50) // Daha geniş ve doğru bir trend analizi için 50'ye çıkardık
+                                                 .Take(50)
                                                  .Select(y => new
                                                  {
                                                      Departman = y.GeminiAnalizIlgiliDepartman,
@@ -149,87 +150,78 @@ namespace AxonInn.Controllers
                                                  })
                                                  .ToListAsync();
 
-                    // Çektiğimiz listeyi JSON formatına dönüştürüyoruz
-                    string jsonKritikYorumlar = System.Text.Json.JsonSerializer.Serialize(trendYorumlarListesi);
+                    string jsonKritikYorumlar = JsonSerializer.Serialize(trendYorumlarListesi, _jsonOptions);
 
                     prompt = $@"Sen AxonInn otel yönetim sistemi için çalışan kıdemli bir Turizm Stratejisti ve Veri Bilimcisisin.
 
-                            Aşağıda otelimizin genel gidişatını gösteren 7 farklı analiz grafiğinin verilerini (GrafikVerileri) ve misafirlerin yaşadığı spesifik sorunları/durumları gösteren son kritik misafir yorumlarının özetlerini (KritikYorumlar) JSON olarak veriyorum:
+Aşağıda otelimizin genel gidişatını gösteren 7 farklı analiz grafiğinin verilerini (GrafikVerileri) ve misafirlerin yaşadığı spesifik sorunları/durumları gösteren son kritik misafir yorumlarının özetlerini (KritikYorumlar) JSON olarak veriyorum:
 
-                            GrafikVerileri:
-                            {jsonVeri}
+GrafikVerileri:
+{jsonVeri}
 
-                            KritikYorumlar (Sorunların kök nedenini anlamak için bu gerçek verileri kullan):
-                            {jsonKritikYorumlar}
+KritikYorumlar (Sorunların kök nedenini anlamak için bu gerçek verileri kullan):
+{jsonKritikYorumlar}
 
-                            Lütfen bu iki veri setini detaylıca sentezle. Sadece grafiklerdeki düşüşleri/çıkışları söyleme, 'KritikYorumlar' verisine bakarak bu trendlerin NEDEN yaşandığını tespit et ve otel müdürü için aksiyon alınabilir, net, profesyonel tavsiyeler üret.
+Lütfen bu iki veri setini detaylıca sentezle. Sadece grafiklerdeki düşüşleri/çıkışları söyleme, 'KritikYorumlar' verisine bakarak bu trendlerin NEDEN yaşandığını tespit et ve otel müdürü için aksiyon alınabilir, net, profesyonel tavsiyeler üret.
 
-                            ÇOK ÖNEMLİ KURALLAR:
-                            1- Arayüzde yerimiz çok kısıtlı! Her bir tavsiye KESİNLİKLE EN FAZLA 6 CÜMLE olmalı. Lafı uzatma, tespit ettiğin spesifik sorunu söyle ve doğrudan çözüm öner.
-                            2- Tavsiyelerini havada bırakma, mutlaka 'KritikYorumlar'da gördüğün gerçek misafir şikayetlerine veya beklentilerine dayandır.
-                            3- SADECE aşağıdaki JSON formatında cevap ver. Markdown karakterleri (```json vb.) veya ekstra açıklamalar KESİNLİKLE KULLANMA.
+ÇOK ÖNEMLİ KURALLAR:
+1- Arayüzde yerimiz çok kısıtlı! Her bir tavsiye KESİNLİKLE EN FAZLA 6 CÜMLE olmalı. Lafı uzatma, tespit ettiğin spesifik sorunu söyle ve doğrudan çözüm öner.
+2- Tavsiyelerini havada bırakma, mutlaka 'KritikYorumlar'da gördüğün gerçek misafir şikayetlerine veya beklentilerine dayandır.
+3- SADECE aşağıdaki JSON formatında cevap ver. Markdown karakterleri (```json vb.) veya ekstra açıklamalar KESİNLİKLE KULLANMA.
 
-                            İstenen JSON Kalıbı:
-                            {{
-                              ""DuyguTavsiyesi"": """",
-                              ""DepartmanTavsiyesi"": """",
-                              ""HisPolarTavsiyesi"": """",
-                              ""KelimeTavsiyesi"": """",
-                              ""UlkeTavsiyesi"": """",
-                              ""KonaklamaTavsiyesi"": """",
-                              ""TrendTavsiyesi"": """"
-                            }}";
+İstenen JSON Kalıbı:
+{{
+  ""DuyguTavsiyesi"": """",
+  ""DepartmanTavsiyesi"": """",
+  ""HisPolarTavsiyesi"": """",
+  ""KelimeTavsiyesi"": """",
+  ""UlkeTavsiyesi"": """",
+  ""KonaklamaTavsiyesi"": """",
+  ""TrendTavsiyesi"": """"
+}}";
                 }
-                 
-                                            // "TÜM YILLAR" VEYA "ESKİ YILLAR" SEÇİLİYSE YORUMLARI HİÇ ÇEKME VE SADECE GRAFİK PROMPTU VER
-                                            else
-                                            {
-                                                prompt = $@"Sen AxonInn otel yönetim sistemi için çalışan kıdemli bir Turizm Stratejisti ve Veri Bilimcisisin.
+                else
+                {
+                    prompt = $@"Sen AxonInn otel yönetim sistemi için çalışan kıdemli bir Turizm Stratejisti ve Veri Bilimcisisin.
 
-                            Aşağıda otelimizin genel gidişatını gösteren 7 farklı analiz grafiğinin verilerini JSON olarak veriyorum:
+Aşağıda otelimizin genel gidişatını gösteren 7 farklı analiz grafiğinin verilerini JSON olarak veriyorum:
 
-                            GrafikVerileri:
-                            {jsonVeri}
+GrafikVerileri:
+{jsonVeri}
 
-                            Lütfen bu verileri detaylıca incele ve otel müdürü için aksiyon alınabilir, net ve profesyonel tavsiyeler üret.
+Lütfen bu verileri detaylıca incele ve otel müdürü için aksiyon alınabilir, net ve profesyonel tavsiyeler üret.
 
-                            ÇOK ÖNEMLİ KURALLAR:
-                            1- Arayüzde yerimiz çok kısıtlı! Her bir tavsiye KESİNLİKLE EN FAZLA 6 CÜMLE olmalı. Lafı uzatma, doğrudan sorunu söyle ve çözüm öner.
-                            2- SADECE aşağıdaki JSON formatında cevap ver. Markdown karakterleri veya ekstra açıklamalar KULLANMA.
+ÇOK ÖNEMLİ KURALLAR:
+1- Arayüzde yerimiz çok kısıtlı! Her bir tavsiye KESİNLİKLE EN FAZLA 6 CÜMLE olmalı. Lafı uzatma, doğrudan sorunu söyle ve çözüm öner.
+2- SADECE aşağıdaki JSON formatında cevap ver. Markdown karakterleri veya ekstra açıklamalar KULLANMA.
 
-                            İstenen JSON Kalıbı:
-                            {{
-                              ""DuyguTavsiyesi"": """",
-                              ""DepartmanTavsiyesi"": """",
-                              ""HisPolarTavsiyesi"": """",
-                              ""KelimeTavsiyesi"": """",
-                              ""UlkeTavsiyesi"": """",
-                              ""KonaklamaTavsiyesi"": """",
-                              ""TrendTavsiyesi"": """"
-                            }}";
+İstenen JSON Kalıbı:
+{{
+  ""DuyguTavsiyesi"": """",
+  ""DepartmanTavsiyesi"": """",
+  ""HisPolarTavsiyesi"": """",
+  ""KelimeTavsiyesi"": """",
+  ""UlkeTavsiyesi"": """",
+  ""KonaklamaTavsiyesi"": """",
+  ""TrendTavsiyesi"": """"
+}}";
                 }
-                ////////////////////////////////////////////////////////////////////////////////////////////////////
-
-
 
                 string geminiApiKey = _configuration["GeminiApi:ApiKey"];
                 string apiUrl = $"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={geminiApiKey}";
-
                 var requestData = new
                 {
                     contents = new[] { new { parts = new[] { new { text = prompt } } } },
                     generationConfig = new { temperature = 0.2, response_mime_type = "application/json" }
                 };
 
-                var content = new System.Net.Http.StringContent(System.Text.Json.JsonSerializer.Serialize(requestData), System.Text.Encoding.UTF8, "application/json");
+                // PERFORMANS: StringContent ile devasa metinler oluşturup RAM şişirmek yerine PostAsJsonAsync ile doğrudan stream akışına yazılır.
+                var response = await _httpClient.PostAsJsonAsync(apiUrl, requestData, _jsonOptions);
 
-                // Statik Client'dan çağrı yapıyoruz (Tıkanmayı Engeller)
-                var response = await _httpClient.PostAsync(apiUrl, content);
-
-                 if (response.IsSuccessStatusCode)
+                if (response.IsSuccessStatusCode)
                 {
                     string jsonResponse = await response.Content.ReadAsStringAsync();
-                    using (System.Text.Json.JsonDocument doc = System.Text.Json.JsonDocument.Parse(jsonResponse))
+                    using (JsonDocument doc = JsonDocument.Parse(jsonResponse))
                     {
                         var root = doc.RootElement;
                         var candidates = root.GetProperty("candidates");
@@ -238,7 +230,7 @@ namespace AxonInn.Controllers
                             string aiCevabi = candidates[0].GetProperty("content").GetProperty("parts")[0].GetProperty("text").GetString() ?? "";
                             aiCevabi = aiCevabi.Replace("```json", "").Replace("```", "").Trim();
 
-                            var sonuc = System.Text.Json.JsonSerializer.Deserialize<AiTavsiyeSonucu>(aiCevabi, new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+                            var sonuc = JsonSerializer.Deserialize<AiTavsiyeSonucu>(aiCevabi, _jsonOptions);
 
                             await LogKaydet(loginOlanPersonel, "Analitik Sayfası YapayZekaTavsiyesiAl Yapıldı", aiCevabi);
 
@@ -266,7 +258,9 @@ namespace AxonInn.Controllers
 
             YorumIslem yorumIslem = new YorumIslem();
             List<Yorum> yorumList = await yorumIslem.TripadvisorYorumGetirApifyApiAsync(hotelID, getirilecekKayitAdeti, apiToken);
-            yorumIslem.TripadvisorYorumKaydet(hotelID, yorumList, _context);
+
+            // PERFORMANS: İşlem asenkron yapılarak thread (I/O) kilitlenmesi önlendi
+            await yorumIslem.TripadvisorYorumKaydetAsync(hotelID, yorumList, _context);
 
             return RedirectToAction("Yorum");
         }
@@ -284,7 +278,9 @@ namespace AxonInn.Controllers
 
             YorumIslem yorumIslem = new YorumIslem();
             List<Yorum> yorumList = await yorumIslem.TripadvisorYorumGetirRapidApiAsync(hotelID, tripadvisorHotelID, getirilecekKayitAdeti, apiToken);
-            yorumIslem.TripadvisorYorumKaydet(hotelID, yorumList, _context);
+
+            // PERFORMANS: Asenkron işlem
+            await yorumIslem.TripadvisorYorumKaydetAsync(hotelID, yorumList, _context);
 
             return RedirectToAction("Yorum");
         }
@@ -301,7 +297,7 @@ namespace AxonInn.Controllers
             YorumIslem yorumIslem = new YorumIslem();
             List<Yorum> dbYorumList = await yorumIslem.GeminiAnaliziOlmayanVeritabaniYorumListGetirAsync(hotelID, _context);
 
-            if (dbYorumList == null || !dbYorumList.Any())
+            if (dbYorumList == null || dbYorumList.Count == 0)
                 return Ok("Analiz edilecek yeni yorum bulunamadı.");
 
             await yorumIslem.YorumlariPartilerHalindeIsleAsync(dbYorumList, yorumIslem, geminiApiKey, _context);
@@ -319,34 +315,29 @@ namespace AxonInn.Controllers
             string geminiApiKey = _configuration["GeminiApi:ApiKey"];
             string apiUrl = $"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={geminiApiKey}";
 
-            // PERFORMANS (Memory Leak Koruması): Veritabanındaki bütün yorumları aynı anda objeleriyle RAM'e çekip
-            // ForEach ile "Tracker" (İzleyici) üzerinde tutmak OutOfMemory (Bellek yetersizliği) çöküşlerine neden olur.
-            // Sadece Yorum ID'sini ve Ülke sütunlarını takipsiz (AsNoTracking) çekip gereksiz yükü sildik.
             var adayYorumlar = await _context.Yorum
                 .AsNoTracking()
                 .Where(y => y.HotelRef == session.HotelRefNavigation.Id && !string.IsNullOrEmpty(y.MisafirYorum))
                 .Select(y => new { y.Id, y.MisafirUlkesi })
                 .ToListAsync();
 
-            var haricUlkeler = new HashSet<string> { "türkiye", "almanya", "rusya", "ingiltere", "kazakistan", "ukrayna" };
+            // CPU OPTİMİZASYONU: "ToLower()" kullanmak her satırda hafızada geçici string üretir.
+            // StringComparer.OrdinalIgnoreCase kullanılarak en yüksek doğruluk ve hız elde edildi.
+            var haricUlkeler = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "türkiye", "almanya", "rusya", "ingiltere", "kazakistan", "ukrayna" };
 
-            // Veritabanı (Collation) harf duyarlılığı hatalarına girmemek adına Trim ve Lower RAM'de yapılır.
             var filtrelenmisIdler = adayYorumlar
-                .Where(y => string.IsNullOrWhiteSpace(y.MisafirUlkesi) || !haricUlkeler.Contains(y.MisafirUlkesi.Trim().ToLower()))
+                .Where(y => string.IsNullOrWhiteSpace(y.MisafirUlkesi) || !haricUlkeler.Contains(y.MisafirUlkesi.Trim()))
                 .Select(y => y.Id)
                 .ToList();
 
-            if (!filtrelenmisIdler.Any()) return;
+            if (filtrelenmisIdler.Count == 0) return;
 
             var gruplar = filtrelenmisIdler.Chunk(20).ToList();
 
             foreach (var idGrup in gruplar)
             {
-                // Chunk (Dilimleme): Sadece işlem yapılacak 20 kayıt EF Core ChangeTracker izleyicisine alınır.
                 var grupEntity = await _context.Yorum.Where(y => idGrup.Contains(y.Id)).ToListAsync();
 
-                // GÜVENLİK (JSON Injection): Elle String.Replace() ile JSON oluşturmak, \n \r " \t gibi görünmez
-                // karakterlerde API'nin patlamasına (Bad Request) sebep olur. Anonymous Type üzerinden güvenle geçirildi.
                 var promptIcinYorumlar = grupEntity.Select((y, i) => new
                 {
                     id = i,
@@ -354,11 +345,7 @@ namespace AxonInn.Controllers
                     yorum = y.MisafirYorum
                 }).ToList();
 
-                // UnsafeRelaxedJsonEscaping kullanılarak Türkçe/Özel karakterlerin Unicode (\\u0000) yerine temiz metinle gitmesi sağlandı
-                string jsonVeri = System.Text.Json.JsonSerializer.Serialize(promptIcinYorumlar, new System.Text.Json.JsonSerializerOptions
-                {
-                    Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping
-                });
+                string jsonVeri = JsonSerializer.Serialize(promptIcinYorumlar, _jsonRelaxedOptions);
 
                 string prompt = $@"Sen uzman bir dilbilimci ve çevirmensin. Sana JSON formatında {grupEntity.Count} adet otel yorumu veriyorum.
 Her bir kayıt için şu işlemi yap:
@@ -377,14 +364,13 @@ Kesin Kurallar:
                 try
                 {
                     var requestData = new { contents = new[] { new { parts = new[] { new { text = prompt } } } }, generationConfig = new { temperature = 0.1 } };
-                    var content = new System.Net.Http.StringContent(System.Text.Json.JsonSerializer.Serialize(requestData), System.Text.Encoding.UTF8, "application/json");
 
-                    var response = await _httpClient.PostAsync(apiUrl, content);
+                    var response = await _httpClient.PostAsJsonAsync(apiUrl, requestData, _jsonOptions);
 
                     if (response.IsSuccessStatusCode)
                     {
                         string jsonResponse = await response.Content.ReadAsStringAsync();
-                        using (System.Text.Json.JsonDocument doc = System.Text.Json.JsonDocument.Parse(jsonResponse))
+                        using (JsonDocument doc = JsonDocument.Parse(jsonResponse))
                         {
                             var root = doc.RootElement;
                             var candidates = root.GetProperty("candidates");
@@ -395,7 +381,7 @@ Kesin Kurallar:
 
                                 if (!string.IsNullOrEmpty(aiCevabi))
                                 {
-                                    using (System.Text.Json.JsonDocument cevapDoc = System.Text.Json.JsonDocument.Parse(aiCevabi))
+                                    using (JsonDocument cevapDoc = JsonDocument.Parse(aiCevabi))
                                     {
                                         foreach (var eleman in cevapDoc.RootElement.EnumerateArray())
                                         {
@@ -415,13 +401,10 @@ Kesin Kurallar:
                 }
                 catch (Exception)
                 {
-                    // Herhangi bir Rate Limit (Kotalama) veya Timeout hatasında sistemi patlatmadan döngü diğer 20'li gruba geçer.
+                    // İstisna durumlarda patlamadan sıradaki bloğa geçecek.
                 }
 
                 await _context.SaveChangesAsync();
-
-                // EF CORE RAM TEMİZLİĞİ: Bu kod on binlerce yorumun sunucuyu şişirmesini kesin olarak durdurur. 
-                // Yapılan işlemler Update edildikten sonra izleme mekanizması RAM'den boşaltılır.
                 _context.ChangeTracker.Clear();
             }
         }
@@ -443,7 +426,8 @@ Kesin Kurallar:
 
                     if (depBilgisi != null)
                     {
-                        departmanAdi = departmanAdi;
+                        // BUG FIX: Mevcut kodda yer alan departmanAdi = departmanAdi ataması düzeltildi.
+                        departmanAdi = depBilgisi.Adi;
                         hotelAdi = depBilgisi.HotelAdi;
                     }
                 }
@@ -461,7 +445,7 @@ Kesin Kurallar:
                     YapanAdSoyad = personel != null ? $"{personel.Adi} {personel.Soyadi}" : "Bilinmeyen"
                 };
 
-                _context.AuditLogs.Add(log);
+                await _context.AuditLogs.AddAsync(log); // Add yerine AddAsync
                 await _context.SaveChangesAsync();
                 return true;
             }

@@ -204,7 +204,7 @@
                 overflow-y: auto; 
                 padding: 1rem; 
                 align-items: flex-start;  
-                padding-top: 5vh;  
+                padding-top: 6vh;  
             }
             .login-wrapper { height: auto; max-height: none; padding: 0; margin-bottom: 0; }
             .login-card { flex-direction: column; border-radius: 1.5rem; }
@@ -323,8 +323,16 @@
                             <div id="loginBtnSpinner" class="spinner-border spinner-border-sm ms-2 d-none" role="status" aria-hidden="true"></div>
                         </button>
                     </form>
-                    <div class="text-center text-xl-end mt-3">
-                        <a href="#" data-bs-toggle="modal" data-bs-target="#forgotPasswordModal" class="text-decoration-none small fw-bold brand-gradient transition-hover d-inline-block" style="font-size: 0.75rem;">Şifremi Unuttum?</a>
+                  <div class="d-flex justify-content-between align-items-center mt-3 px-1">
+                       <a href="#" data-bs-toggle="modal" data-bs-target="#iletisimModal" class="text-decoration-none fw-bold d-inline-flex align-items-center transition-hover" style="font-size: 0.75rem; color: #6c757d;">
+                            <span class="d-flex align-items-center justify-content-center rounded-circle me-2 shadow-sm" style="width: 26px; height: 26px; background: rgba(13, 110, 253, 0.08); color: #0d6efd;">
+                                <i class="fas fa-headset" style="font-size: 0.7rem;"></i>
+                            </span>
+                            İletişim & Destek
+                        </a>
+                        <a href="#" data-bs-toggle="modal" data-bs-target="#forgotPasswordModal" class="text-decoration-none small fw-bold brand-gradient transition-hover d-inline-block" style="font-size: 0.75rem;">
+                            Şifremi Unuttum?
+                        </a>
                     </div>
                 </div>
                 <div class="text-center mt-3 pt-3 border-top animate__animated animate__fadeIn" style="border-color: rgba(0,0,0,0.05) !important;">
@@ -336,6 +344,56 @@
             </div>
         </div>
     </div>
+
+
+
+
+   <div class="modal fade" id="iletisimModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg rounded-4">
+            <div class="modal-header border-0 pb-0 pt-3">
+                <h5 class="modal-title brand-gradient" style="font-weight: 900;">İletişim Bilgileri</h5>
+                <button type="button" class="btn-close shadow-none" data-bs-dismiss="modal" aria-label="Kapat"></button>
+            </div>
+            <div class="modal-body pt-4 pb-4 px-4">
+                
+                <div class="d-flex align-items-center mb-4 p-3 bg-light rounded-4 border-0 shadow-sm transition-hover">
+                    <div class="tech-icon-box bg-white text-primary me-3 shadow-sm" style="width: 45px; height: 45px;">
+                        <i class="fas fa-at fs-5"></i>
+                    </div>
+                    <div>
+                        <span class="d-block text-secondary small text-uppercase fw-bold" style="letter-spacing: 1px; font-size: 0.65rem;">AxonINN Mail</span>
+                        <a href="mailto:info@axoninn.com.tr" class="text-dark text-decoration-none fw-semibold">info@axoninn.com.tr</a>
+                    </div>
+                </div>
+
+                <div class="d-flex align-items-center mb-4 p-3 bg-light rounded-4 border-0 shadow-sm transition-hover">
+                    <div class="tech-icon-box bg-white text-primary me-3 shadow-sm" style="width: 45px; height: 45px;">
+                        <i class="fas fa-envelope fs-5"></i>
+                    </div>
+                    <div>
+                        <span class="d-block text-secondary small text-uppercase fw-bold" style="letter-spacing: 1px; font-size: 0.65rem;">E-Posta Desteği</span>
+                        <a href="mailto:onurkarasu06@gmail.com" class="text-dark text-decoration-none fw-semibold">onurkarasu06@gmail.com</a>
+                    </div>
+                </div>
+
+                <div class="d-flex align-items-center p-3 bg-light rounded-4 border-0 shadow-sm transition-hover">
+                    <div class="tech-icon-box bg-white text-primary me-3 shadow-sm" style="width: 45px; height: 45px;">
+                        <i class="fas fa-phone-alt fs-5"></i>
+                    </div>
+                    <div>
+                        <span class="d-block text-secondary small text-uppercase fw-bold" style="letter-spacing: 1px; font-size: 0.65rem;">Telefon Desteği</span>
+                        <a href="tel:+905327780022" class="text-dark text-decoration-none fw-semibold">0532 778 00 22</a>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+</div>
+
+
+
     <div class="modal fade" id="forgotPasswordModal" tabindex="-1" aria-hidden="true">
         <div class="modal-dialog modal-dialog-centered">
             <div class="modal-content border-0 shadow-lg rounded-4">

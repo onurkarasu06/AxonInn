@@ -9,9 +9,7 @@
     var departmanListesi = Model?.Departmen ?? Enumerable.Empty<AxonInn.Models.Entities.Departman>();
 }
 
-<script> 
-  gtag('event', 'conversion', {'send_to': 'AW-18020925402/73hECN6-9okcENr_hZFD'}); 
-</script>
+
 
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css" media="print" onload="this.media='all'" />
 <noscript>
@@ -303,7 +301,8 @@
                                             data-bs-toggle="modal" 
                                             data-bs-target="#personelEkleModal" 
                                             onclick="setDepartmanId(@departman.Id, '@departman.Adi')"
-                                            disabled="@(girisYapanPersonel?.Yetki != 1 ? "disabled" : null)">
+                                            disabled="@(girisYapanPersonel?.Yetki != 1 ? "disabled" : null)"
+                                            aria-label="Personel Ekle">
                                         <i class="fas fa-user-plus me-1"></i> <span class="d-none d-sm-inline">EKLE</span>
                                     </button>
                                 </div>
@@ -378,10 +377,10 @@
                                                 </td>
                                                 <td data-label="İŞLEM">
                                                     <div class="btn-group shadow-none @(girisYapanPersonel?.Yetki != 1 ? "opacity-50" : null)">
-                                                        <button class="btn btn-outline-primary btn-sm border-0" onclick="openPersonelEditModal(@personel.Id, '@personel.Adi', '@personel.Soyadi', @departman.Id, '@personel.TelefonNumarasi', '@personel.MailAdresi', @(personel.MedenHali ?? 2), @(personel.Yetki), @(personel.AktifMi))" data-bs-toggle="modal" data-bs-target="#personelGuncelleModal" disabled="@(girisYapanPersonel?.Yetki != 1 ? "disabled" : null)" title="Düzenle">
+                                                        <button class="btn btn-outline-primary btn-sm border-0" onclick="openPersonelEditModal(@personel.Id, '@personel.Adi', '@personel.Soyadi', @departman.Id, '@personel.TelefonNumarasi', '@personel.MailAdresi', @(personel.MedenHali ?? 2), @(personel.Yetki), @(personel.AktifMi))" data-bs-toggle="modal" data-bs-target="#personelGuncelleModal" disabled="@(girisYapanPersonel?.Yetki != 1 ? "disabled" : null)" title="Düzenle" aria-label="Personel Düzenle">
                                                             <i class="fas fa-edit"></i>
                                                         </button>
-                                                        <button class="btn btn-outline-danger btn-sm border-0" onclick="setSilId(@personel.Id, '@personel.Adi @personel.Soyadi', '@uniqueRowId')" data-bs-toggle="modal" data-bs-target="#silOnayModal" disabled="@(girisYapanPersonel?.Yetki != 1 ? "disabled" : null)" title="Sil">
+                                                        <button class="btn btn-outline-danger btn-sm border-0" onclick="setSilId(@personel.Id, '@personel.Adi @personel.Soyadi', '@uniqueRowId')" data-bs-toggle="modal" data-bs-target="#silOnayModal" disabled="@(girisYapanPersonel?.Yetki != 1 ? "disabled" : null)" title="Sil" aria-label="Personel Sil">
                                                             <i class="fas fa-trash-alt"></i>
                                                         </button>
                                                     </div>
@@ -404,7 +403,7 @@
         <div class="modal-content border-0 shadow-lg rounded-4">
             <div class="modal-header bg-primary text-white py-2">
                 <h6 class="modal-title fw-bold" id="modalTitle">Yeni Personel Tanımla</h6>
-                <button type="button" class="btn-close btn-close-white shadow-none" data-bs-dismiss="modal"></button>
+                <button type="button" class="btn-close btn-close-white shadow-none" data-bs-dismiss="modal" aria-label="Kapat"></button>
             </div>
             <form asp-controller="Departman" asp-action="PersonelEkle" method="post" enctype="multipart/form-data">
                 <div class="modal-body p-4">
@@ -472,25 +471,14 @@
     </div>
 </div>
 
-<script>
-    document.addEventListener('DOMContentLoaded', function () {
-        var personelModal = document.getElementById('personelEkleModal');
-        personelModal.addEventListener('hidden.bs.modal', function () {
-            // Modalın içindeki formu bul ve sıfırla
-            var form = this.querySelector('form');
-            if (form) {
-                form.reset();
-            }
-        });
-    });
-</script>
+
 
 <div class="modal fade" id="personelGuncelleModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered" style="max-width: 500px;">
         <div class="modal-content border-0 shadow-lg rounded-4">
             <div class="modal-header bg-warning py-2">
                 <h6 class="modal-title fw-bold text-dark">Bilgileri Güncelle</h6>
-                <button type="button" class="btn-close shadow-none" data-bs-dismiss="modal"></button>
+                <button type="button" class="btn-close shadow-none" data-bs-dismiss="modal" aria-label="Kapat"></button>
             </div>
             <form asp-controller="Departman" asp-action="PersonelGuncelle" method="post" enctype="multipart/form-data">
                 <div class="modal-body p-4 pb-1">
@@ -643,78 +631,77 @@
     </div>
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11" defer></script>
-
 @section Scripts {
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11" defer></script>
+
     <script>
+        // 2. Google Ads dönüşüm kodu (Çökme riskine karşı güvenli hale getirildi)
+        window.dataLayer = window.dataLayer || [];
+        function gtag(){dataLayer.push(arguments);}
+        gtag('event', 'conversion', {'send_to': 'AW-18020925402/73hECN6-9okcENr_hZFD'});
+
         document.addEventListener("DOMContentLoaded", function () {
+            // Skeleton Loader Kapatma
             const loader = document.getElementById('skeletonLoader');
             if(loader) loader.classList.add('d-none');
 
             const mainContent = document.getElementById('mainContent');
             if(mainContent) mainContent.classList.remove('d-none');
             
-            // 🚀 PERFORMANS & GÜVENLİK (Çoklu Buton Zekası): Formun içinde hangi submit butonuna basıldığını (e.submitter) yakalayıp SADECE onu kilitler.
+            // 3. Formu Sıfırlama Kodu (Ortadan alınıp buraya dahil edildi)
+            var personelModal = document.getElementById('personelEkleModal');
+            if(personelModal) {
+                personelModal.addEventListener('hidden.bs.modal', function () {
+                    var form = this.querySelector('form');
+                    if (form) form.reset();
+                });
+            }
+
+            // PERFORMANS & GÜVENLİK (Çoklu Buton Zekası)
             document.querySelectorAll('form').forEach(form => {
                 form.addEventListener('submit', function (e) {
-                    
                     const submitBtn = e.submitter || this.querySelector('button[type="submit"]');
-                    
                     if (submitBtn) {
-                        // Eğer buton hali hazırda kilitliyse (Çift tıklama, Enter spam vb.) işlemi reddet
                         if (submitBtn.disabled || submitBtn.classList.contains('btn-loading')) {
                             e.preventDefault();
                             return;
                         }
-
-                        // Form kurallarına uygun mu veya "formnovalidate" attribute'u (Örn: Mail gönder) var mı kontrol et
                         if (!this.checkValidity() && !submitBtn.hasAttribute('formnovalidate')) {
                             return; 
                         }
-
                         submitBtn.classList.add('btn-loading');
-                        
-                        // Tarayıcının, butonu disable edince form action'ı iptal etmemesi için asenkron (0ms gecikme) veriyoruz
                         setTimeout(() => submitBtn.disabled = true, 0);
-
+                        
                         const textSpan = submitBtn.querySelector('.btn-text');
                         const spinner = submitBtn.querySelector('.btn-spinner');
                         
                         if(textSpan) {
                             submitBtn.setAttribute('data-original-text', textSpan.innerText);
-                            
                             if (submitBtn.id === 'btnAktivasyonGonder') {
                                 textSpan.innerText = 'Gönderiliyor...';
                             } else {
                                 textSpan.innerText = 'İşleniyor...';
                             }
                         }
-                        
-                        if(spinner) {
-                            spinner.classList.remove('d-none');
-                        }
+                        if(spinner) spinner.classList.remove('d-none');
                     }
                 });
             });
         });
 
-        // 🚀 BFCache (Geri Tuşu) Kurtarıcı: Kullanıcı tarayıcıda geri tuşu ile sayfaya gelirse kilitli ve "işleniyor" kalan butonları açar
+        // BFCache (Geri Tuşu) Kurtarıcı
         window.addEventListener('pageshow', function (event) {
             if (event.persisted) {
                 document.querySelectorAll('.btn-loading').forEach(btn => {
                     btn.classList.remove('btn-loading');
                     btn.disabled = false;
-                    
                     const textSpan = btn.querySelector('.btn-text');
                     const spinner = btn.querySelector('.btn-spinner');
                     
                     if (textSpan && btn.hasAttribute('data-original-text')) {
                         textSpan.innerText = btn.getAttribute('data-original-text');
                     }
-                    
-                    if (spinner) {
-                        spinner.classList.add('d-none');
-                    }
+                    if (spinner) spinner.classList.add('d-none');
                 });
             }
         });
@@ -767,7 +754,6 @@
             }
         }
 
-        // 🚀 MEMORY LEAK (Bellek Sızıntısı) FİXLENDİ: Her tıklandığında "new bootstrap.Modal" yaratarak RAM'in dolup tarayıcının çökmesi engellendi.
         function personelFotoGoster(src, ad) {
             const resimElem = document.getElementById('modalPersonelResim');
             const isimElem = document.getElementById('modalPersonelIsim');
@@ -775,9 +761,7 @@
             
             if (resimElem) resimElem.src = src;
             if (isimElem) isimElem.innerText = ad;
-            
             if (modalElem) {
-                // Eğer daha önce açılmış bir modal bellekte varsa onu getirir, yoksa 1 kez yaratır.
                 const myModal = bootstrap.Modal.getOrCreateInstance(modalElem);
                 myModal.show();
             }

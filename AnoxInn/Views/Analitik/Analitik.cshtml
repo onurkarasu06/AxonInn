@@ -3,12 +3,6 @@
 @{
     Layout = "~/Views/Shared/_Layout.cshtml";
     var hotelAdi = ViewBag.HotelAdi ?? "Bilinmeyen Otel";
-    var jsonOptions = new System.Text.Json.JsonSerializerOptions
-    {
-        PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase,
-        DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull
-    };
-    string dashboardJson = System.Text.Json.JsonSerializer.Serialize(Model ?? new AxonInn.Models.Analitik.YorumDashboardViewModel(), jsonOptions);
 }
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -202,7 +196,7 @@ window.addEventListener("load", function() {
             interaction: { mode: 'index', intersect: false }
         });
 
-        const dashboardData = @Html.Raw(dashboardJson);
+   const dashboardData = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model ?? new AxonInn.Models.Analitik.YorumDashboardViewModel(), new System.Text.Json.JsonSerializerOptions { PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase }));
 
         const kpiVerisi = dashboardData.kpiVerileri;
         const pastaGrafikVerisi = dashboardData.duyguGrafik;

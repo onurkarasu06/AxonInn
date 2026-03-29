@@ -16,8 +16,8 @@
 
 
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css" media="print" onload="this.media='all'" />
-<link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/dataTables.bootstrap5.min.css">
-<noscript><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css" /></noscript>
+<link rel="preload" href="https://cdn.datatables.net/1.13.6/css/dataTables.bootstrap5.min.css" as="style" onload="this.onload=null;this.rel='stylesheet'">
+<noscript><link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/dataTables.bootstrap5.min.css"></noscript>
 
 <style>
     /* Kaydırma Çubuğu Optimizasyonu */
@@ -140,7 +140,7 @@
     <div class="row mb-4">
         <div class="col-12">
             <div class="d-flex align-items-center justify-content-center shadow-sm w-100 py-3" style="background-color: #f8faff; border-radius: 12px; border: 1px solid rgba(92, 124, 250, 0.1);">
-                <h6 class="mb-0 text-uppercase fw-bold" style="letter-spacing: 4px; color: #5c7cfa; font-size: 0.8rem;">
+                <h6 class="mb-0 text-uppercase fw-bold" style="letter-spacing: 4px; color: #3730a3; font-size: 0.8rem;">
                     <i class="fas fa-hotel me-2 opacity-75"></i>
                     @(Model?.Adi ?? "AxonInn Otel")
                 </h6>
@@ -275,9 +275,9 @@
                                     </div>
                                     @if (!string.IsNullOrEmpty(item.PersonelNotu))
                                     {
-                                        <div class="mt-1 opacity-50" style="font-size: 0.6rem;">
-                                            <span class="text-muted fw-normal" style="font-style: italic;">(Personel notu mevcut)</span>
-                                        </div>
+                                                                <div class="mt-1" style="font-size: 0.65rem;">
+                                                                    <span class="text-secondary fw-medium" style="font-style: italic;">(Personel notu mevcut)</span>
+                                                                </div>
                                     }
                                 </td>
 
@@ -635,317 +635,313 @@
 </div>
 
 @section Scripts {
-<script>
-    document.addEventListener("DOMContentLoaded", function () {
-        let korumaKilidi = setTimeout(() => {
+    <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js" defer></script>
+    <script src="https://cdn.datatables.net/1.13.6/js/dataTables.bootstrap5.min.js" defer></script>
+
+    <script>
+        // Google Ads dönüşüm kodu geciktirildi
+        setTimeout(function() {
+            window.dataLayer = window.dataLayer || [];
+            function gtag(){dataLayer.push(arguments);}
+            gtag('event', 'conversion', {'send_to': 'AW-18020925402/73hECN6-9okcENr_hZFD'});
+        }, 2000);
+
+        document.addEventListener("DOMContentLoaded", function () {
+            // 2. LCP ÇÖZÜMÜ: Sayfa HTML'i okunur okunmaz tabloyu göster, JS dosyalarını bekleme!
             const loader = document.getElementById('skeletonLoader');
             if(loader) loader.classList.add('d-none');
             const mainContent = document.getElementById('mainContent');
             if(mainContent) mainContent.classList.remove('d-none');
-        }, 500);
 
-        let jQueryBekle = setInterval(function() {
-            if (window.jQuery) {
-                clearInterval(jQueryBekle);
-                
-                $.getScript("https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js", function() {
-                    $.getScript("https://cdn.datatables.net/1.13.6/js/dataTables.bootstrap5.min.js", function() {
-                        $.getScript("https://cdn.jsdelivr.net/npm/sweetalert2@11", function() {
-                            clearTimeout(korumaKilidi);
-                            baslatDataTables();
-                            olaylariAta(); 
-                        });
-                    });
+            // 3. DataTables dosyalarının defer ile yüklenmesini bekle ve tabloyu formatla
+            let jsBekle = setInterval(function() {
+                if (window.jQuery && $.fn.DataTable) {
+                    clearInterval(jsBekle);
+                    baslatDataTables();
+                    olaylariAta();
+                }
+            }, 50);
+        });
+
+        let currentDurum = "";
+        let currentDept = "";
+        let currentArama = ""; 
+        let gorevTablosu;
+
+        function baslatDataTables() {
+            document.querySelectorAll('form').forEach(form => {
+                form.addEventListener('submit', function () {
+                    const submitBtn = this.querySelector('button[type="submit"]');
+                    if (submitBtn) {
+                        const textSpan = submitBtn.querySelector('.btn-text');
+                        const spinner = submitBtn.querySelector('.btn-spinner');
+                        submitBtn.classList.add('btn-loading');
+                        if(textSpan && spinner) {
+                            textSpan.innerText = 'Bekleyin...';
+                            spinner.classList.remove('d-none');
+                        }
+                    }
                 });
+            });
+
+            $.fn.dataTable.ext.search.push(function (settings, data, dataIndex) {
+                if (settings.nTable.id !== 'gorevTablosu') return true;
+                
+                var tr = settings.aoData[dataIndex].nTr;
+                if (!tr) return true;
+
+                var metinData = tr.getAttribute('data-search') || "";
+                var durumData = tr.getAttribute('data-durum') || "";
+                var deptData = tr.getAttribute('data-dept') || "";
+
+                var metinVar = currentArama === "" || metinData.includes(currentArama);
+                var durumVar = currentDurum === "" || durumData === currentDurum;
+                var depVar = currentDept === "" || deptData === currentDept;
+
+                return metinVar && durumVar && depVar;
+            });
+
+            gorevTablosu = $('#gorevTablosu').DataTable({
+                "pageLength": 5,
+                "lengthMenu": [5, 10, 25, 50, 100],
+                "ordering": true,
+                "order": [],
+                "info": true,
+                "deferRender": true, 
+                "language": {
+                    "url": "//cdn.datatables.net/plug-ins/1.13.6/i18n/tr.json",
+                    "info": "_TOTAL_ kayıttan _START_ - _END_ arasındaki kayıtlar gösteriliyor",
+                    "infoEmpty": "Gösterilecek kayıt yok",
+                    "infoFiltered": "(_MAX_ kayıt içerisinden filtrelendi)",
+                    "lengthMenu": "Sayfada _MENU_ kayıt göster",
+                    "search": "Ara:",
+                    "zeroRecords": "Eşleşen kayıt bulunamadı",
+                    "paginate": { 
+                        "next": "Sonraki",
+                        "previous": "Önceki",
+                        "first": "İlk",
+                        "last": "Son"
+                    }
+                },
+                "columnDefs": [
+                    { "orderable": false, "targets": [4, 5] } 
+                ],
+                "dom": "<'row px-4 pt-4'<'col-sm-12 col-md-6 text-muted small fw-medium'l><'col-sm-12 col-md-6'>>" +
+                       "<'row'<'col-sm-12 p-0'<'table-responsive custom-table-scroll'tr>>>" +
+                       "<'row px-4 pb-4 pt-3 align-items-center bg-light-subtle border-top'<'col-sm-12 col-md-5 small text-muted fw-medium'i><'col-sm-12 col-md-7 d-flex justify-content-md-end justify-content-center'p>>",
+            });
+
+            $('.custom-table-scroll').css({
+                'max-height': '600px',
+                'overflow-y': 'auto'
+            });
+
+            function debounce(func, wait) {
+                let timeout;
+                return function (e) {
+                    clearTimeout(timeout);
+                    timeout = setTimeout(() => func(e), wait);
+                };
             }
-        }, 50);
-    });
 
-    let currentDurum = "";
-    let currentDept = "";
-    let currentArama = ""; 
-    let gorevTablosu; 
+            var aramaKutusuEl = document.getElementById("tabloAra");
+            if(aramaKutusuEl) {
+                aramaKutusuEl.addEventListener("input", debounce(function(e) {
+                    currentArama = e.target.value.toLocaleLowerCase('tr-TR').trim();
+                    if (gorevTablosu) gorevTablosu.draw();
+                }, 250));
+            }
 
-    function baslatDataTables() {
-        const loader = document.getElementById('skeletonLoader');
-        if(loader) loader.classList.add('d-none');
-        const mainContent = document.getElementById('mainContent');
-        if(mainContent) mainContent.classList.remove('d-none');
+            document.querySelectorAll('.durum-filter-item').forEach(item => {
+                item.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    document.querySelectorAll('.durum-filter-item').forEach(i => { i.classList.remove('active'); i.style.backgroundColor = ''; });
+                    this.classList.add('active');
+                    this.style.backgroundColor = '#e0e7ff';
+                    this.style.color = '#3730a3';
+                    document.getElementById('selectedDurumText').innerText = this.innerText;
+                    
+                    currentDurum = this.getAttribute('data-value');
+                    if(gorevTablosu) gorevTablosu.draw();
+                });
+            });
 
-        document.querySelectorAll('form').forEach(form => {
-            form.addEventListener('submit', function () {
-                const submitBtn = this.querySelector('button[type="submit"]');
-                if (submitBtn) {
-                    const textSpan = submitBtn.querySelector('.btn-text');
-                    const spinner = submitBtn.querySelector('.btn-spinner');
-                    submitBtn.classList.add('btn-loading');
-                    if(textSpan && spinner) {
-                        textSpan.innerText = 'Bekleyin...';
-                        spinner.classList.remove('d-none');
+            document.querySelectorAll('.dept-filter-item').forEach(item => {
+                item.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    document.querySelectorAll('.dept-filter-item').forEach(i => { i.classList.remove('active'); i.style.backgroundColor = ''; });
+                    this.classList.add('active');
+                    this.style.backgroundColor = '#e0e7ff';
+                    this.style.color = '#3730a3';
+                    document.getElementById('selectedDeptText').innerText = this.innerText;
+                    
+                    currentDept = this.getAttribute('data-value'); 
+                    if(gorevTablosu) gorevTablosu.draw();
+                });
+            });
+        }
+
+        function olaylariAta() {
+            $('#gorevTablosu tbody').on('click', '.btn-gorev-duzenle', function() {
+                let btn = $(this);
+                document.getElementById('editGorevID').value = btn.attr('data-id');
+                document.getElementById('editPersonelID').value = btn.attr('data-pid');
+                document.getElementById('editGorevAciklama').value = btn.attr('data-aciklama');
+                let notText = btn.attr('data-not');
+                document.getElementById('editGorevNotu').value = (notText === 'null' || !notText) ? '' : notText;
+                document.getElementById('editGorevDurumu').value = btn.attr('data-durum');
+            });
+
+            $('#gorevTablosu tbody').on('click', '.btn-detay-goster', function() {
+                let btn = $(this);
+                document.getElementById('detayGorevAciklama').innerText = btn.attr('data-aciklama');
+                const notBolumu = document.getElementById('notBolumu');
+                let notText = btn.attr('data-not');
+                if (notText && notText !== 'null' && String(notText).trim() !== '') {
+                    document.getElementById('detayGorevNotu').innerText = notText;
+                    notBolumu.style.display = 'block';
+                } else {
+                    notBolumu.style.display = 'none';
+                }
+            });
+
+            $('#gorevTablosu tbody').on('click', '.btn-gorev-sil', function() {
+                let btn = $(this);
+                let gorevId = btn.attr('data-id');
+                document.getElementById('silFormu').setAttribute('action', '/Gorev/Sil?id=' + gorevId);
+                document.getElementById('gorevSilModalIsim').innerText = btn.attr('data-isim');
+                const tabloFoto = document.getElementById('tabloFoto_' + gorevId);
+                const modalIcon = document.getElementById('gorevSilModalDefaultIcon');
+                const modalImg = document.getElementById('gorevSilModalFoto');
+
+                if (tabloFoto && modalImg && modalIcon) {
+                    modalImg.src = tabloFoto.src;
+                    modalImg.style.display = 'block';
+                    modalIcon.style.display = 'none';
+                } else if (modalImg && modalIcon) {
+                    modalImg.src = '';
+                    modalImg.style.display = 'none';
+                    modalIcon.style.display = 'block';
+                }
+            });
+
+            $('#gorevTablosu tbody').on('click', '.btn-personel-foto', function() {
+                let btn = $(this);
+                document.getElementById('modalPersonelResim').src = btn.attr('data-src');
+                document.getElementById('modalPersonelIsim').innerText = btn.attr('data-isim');
+                new bootstrap.Modal(document.getElementById('merkeziPersonelFotoModal')).show();
+            });
+
+            $('#gorevTablosu tbody').on('click', '.btn-kanit-goster', function() {
+                let fotos = $(this).attr('data-fotolar');
+                if(!fotos) return;
+                
+                const icerikContainer = document.getElementById('carouselIcerik');
+                icerikContainer.innerHTML = '';
+                const fotoIdListesi = String(fotos).split(',');
+                
+                fotoIdListesi.forEach((fotoId, index) => {
+                    if(!fotoId) return;
+                    const activeClass = index === 0 ? 'active' : '';
+                    icerikContainer.insertAdjacentHTML('beforeend',
+                        `<div class="carousel-item ${activeClass}">
+                            <img src="/Gorev/KanitFotoGetir?id=${fotoId}" class="d-block w-100" loading="lazy" decoding="async" alt="Büyük Kanıt Görseli"/>
+                        </div>`
+                    );
+                });
+                
+                new bootstrap.Modal(document.getElementById('merkeziKanitModal')).show();
+            });
+        }
+
+        function yeniGorevPersonelFiltrele(selectElement) {
+            var secilenDept = selectElement.value;
+            var personelSelect = document.querySelector('.modal-pers-select');
+            personelSelect.value = "";
+            
+            var options = personelSelect.querySelectorAll('.pers-item');
+            options.forEach(opt => {
+                if (secilenDept === "all") {
+                    opt.style.display = "";
+                    opt.disabled = false;
+                } else {
+                    if(opt.classList.contains(secilenDept)) {
+                        opt.style.display = "";
+                        opt.disabled = false;
+                    } else {
+                        opt.style.display = "none";
+                        opt.disabled = true;
                     }
                 }
             });
-        });
+        }
 
-        $.fn.dataTable.ext.search.push(function (settings, data, dataIndex) {
-            if (settings.nTable.id !== 'gorevTablosu') return true;
-            
-            var tr = settings.aoData[dataIndex].nTr;
-            if (!tr) return true;
-
-            var metinData = tr.getAttribute('data-search') || "";
-            var durumData = tr.getAttribute('data-durum') || "";
-            var deptData = tr.getAttribute('data-dept') || "";
-
-            var metinVar = currentArama === "" || metinData.includes(currentArama);
-            var durumVar = currentDurum === "" || durumData === currentDurum;
-            var depVar = currentDept === "" || deptData === currentDept;
-
-            return metinVar && durumVar && depVar;
-        });
-
-        var $disKapsayici = $('#gorevTablosu').closest('.table-responsive');
-        $disKapsayici.removeClass('table-responsive').removeAttr('style');
-
-        gorevTablosu = $('#gorevTablosu').DataTable({
-            "pageLength": 5,
-            "lengthMenu": [5, 10, 25, 50, 100],
-            "ordering": true,
-            "order": [],
-            "info": true,
-            "deferRender": false, 
-            "language": {
-                "url": "//cdn.datatables.net/plug-ins/1.13.6/i18n/tr.json",
-                "info": "_TOTAL_ kayıttan _START_ - _END_ arasındaki kayıtlar gösteriliyor",
-                "infoEmpty": "Gösterilecek kayıt yok",
-                "infoFiltered": "(_MAX_ kayıt içerisinden filtrelendi)",
-                "lengthMenu": "Sayfada _MENU_ kayıt göster",
-                "search": "Ara:",
-                "zeroRecords": "Eşleşen kayıt bulunamadı",
-                "paginate": { 
-                    "next": "Sonraki",
-                    "previous": "Önceki",
-                    "first": "İlk",
-                    "last": "Son"
+        function guncellePersonelFiltrele(selectElement) {
+            var secilenDept = selectElement.value;
+            var personelSelect = document.querySelector('.edit-pers-select');
+            var options = personelSelect.querySelectorAll('.edit-pers-item');
+            var ilkUygun = null;
+            options.forEach(opt => {
+                if (secilenDept === "all") {
+                    opt.style.display = "";
+                    opt.disabled = false;
+                } else {
+                    if(opt.classList.contains(secilenDept)) {
+                        opt.style.display = "";
+                        opt.disabled = false;
+                        if(!ilkUygun) ilkUygun = opt;
+                    } else {
+                        opt.style.display = "none";
+                        opt.disabled = true;
+                    }
                 }
-            },
-            "columnDefs": [
-                { "orderable": false, "targets": [4, 5] } 
-            ],
-            "dom": "<'row px-4 pt-4'<'col-sm-12 col-md-6 text-muted small fw-medium'l><'col-sm-12 col-md-6'>>" +
-                   "<'row'<'col-sm-12 p-0'<'table-responsive custom-table-scroll'tr>>>" +
-                   "<'row px-4 pb-4 pt-3 align-items-center bg-light-subtle border-top'<'col-sm-12 col-md-5 small text-muted fw-medium'i><'col-sm-12 col-md-7 d-flex justify-content-md-end justify-content-center'p>>",
-        });
-
-        $('.custom-table-scroll').css({
-            'max-height': '600px',
-            'overflow-y': 'auto'
-        });
-
-        function debounce(func, wait) {
-            let timeout;
-            return function (e) {
-                clearTimeout(timeout);
-                timeout = setTimeout(() => func(e), wait);
-            };
+            });
+            var selectedOpt = personelSelect.options[personelSelect.selectedIndex];
+            if (secilenDept !== "all" && selectedOpt && selectedOpt.style.display === "none" && ilkUygun) {
+                personelSelect.value = ilkUygun.value;
+            }
         }
 
-        var aramaKutusuEl = document.getElementById("tabloAra");
-        if(aramaKutusuEl) {
-            aramaKutusuEl.addEventListener("input", debounce(function(e) {
-                currentArama = e.target.value.toLocaleLowerCase('tr-TR').trim();
-                if (gorevTablosu) gorevTablosu.draw();
-            }, 250));
-        }
-
-        document.querySelectorAll('.durum-filter-item').forEach(item => {
-            item.addEventListener('click', function(e) {
-                e.preventDefault();
-                document.querySelectorAll('.durum-filter-item').forEach(i => { i.classList.remove('active'); i.style.backgroundColor = ''; });
-                this.classList.add('active');
-                this.style.backgroundColor = '#e0e7ff';
-                this.style.color = '#3730a3';
-                document.getElementById('selectedDurumText').innerText = this.innerText;
-                
-                currentDurum = this.getAttribute('data-value');
-                if(gorevTablosu) gorevTablosu.draw();
-            });
-        });
-
-        document.querySelectorAll('.dept-filter-item').forEach(item => {
-            item.addEventListener('click', function(e) {
-                e.preventDefault();
-                document.querySelectorAll('.dept-filter-item').forEach(i => { i.classList.remove('active'); i.style.backgroundColor = ''; });
-                this.classList.add('active');
-                this.style.backgroundColor = '#e0e7ff';
-                this.style.color = '#3730a3';
-                document.getElementById('selectedDeptText').innerText = this.innerText;
-                
-                currentDept = this.getAttribute('data-value'); 
-                if(gorevTablosu) gorevTablosu.draw();
-            });
-        });
-
-        @if (TempData["Mesaj"] != null)
-        {
-            <text>
+        function imleciSonaVeYeniSatiraAl(element) {
+            if (element.value && !element.value.endsWith('\n')) {
+                element.value += '\n';
+            }
+            
             setTimeout(() => {
-                if (typeof Swal !== 'undefined') {
-                    Swal.fire({
-                        icon: '@(TempData["MesajTipi"] ?? "warning")',
-                        title: 'Bilgilendirme',
-                        text: '@Html.Raw(TempData["Mesaj"])',
-                        confirmButtonText: 'Tamam',
-                        confirmButtonColor: '#5c7cfa',
-                        customClass: { confirmButton: 'rounded-pill px-5 py-2' }
-                    });
-                }
-            }, 100);
-            </text>
+                element.selectionStart = element.value.length;
+                element.selectionEnd = element.value.length;
+                element.scrollTop = element.scrollHeight;
+            }, 10);
         }
-    }
 
-    function olaylariAta() {
-        $('#gorevTablosu tbody').on('click', '.btn-gorev-duzenle', function() {
-            let btn = $(this);
-            document.getElementById('editGorevID').value = btn.attr('data-id');
-            document.getElementById('editPersonelID').value = btn.attr('data-pid');
-            document.getElementById('editGorevAciklama').value = btn.attr('data-aciklama');
-            let notText = btn.attr('data-not');
-            document.getElementById('editGorevNotu').value = (notText === 'null' || !notText) ? '' : notText;
-            document.getElementById('editGorevDurumu').value = btn.attr('data-durum');
+        document.getElementById('editGorevAciklama')?.addEventListener('focus', function() {
+            imleciSonaVeYeniSatiraAl(this);
         });
 
-        $('#gorevTablosu tbody').on('click', '.btn-detay-goster', function() {
-            let btn = $(this);
-            document.getElementById('detayGorevAciklama').innerText = btn.attr('data-aciklama');
-            const notBolumu = document.getElementById('notBolumu');
-            let notText = btn.attr('data-not');
-            if (notText && notText !== 'null' && String(notText).trim() !== '') {
-                document.getElementById('detayGorevNotu').innerText = notText;
-                notBolumu.style.display = 'block';
-            } else {
-                notBolumu.style.display = 'none';
-            }
+        document.getElementById('editGorevNotu')?.addEventListener('focus', function() {
+            imleciSonaVeYeniSatiraAl(this);
         });
+    </script>
 
-        $('#gorevTablosu tbody').on('click', '.btn-gorev-sil', function() {
-            let btn = $(this);
-            let gorevId = btn.attr('data-id');
-            document.getElementById('silFormu').setAttribute('action', '/Gorev/Sil?id=' + gorevId);
-            document.getElementById('gorevSilModalIsim').innerText = btn.attr('data-isim');
-            const tabloFoto = document.getElementById('tabloFoto_' + gorevId);
-            const modalIcon = document.getElementById('gorevSilModalDefaultIcon');
-            const modalImg = document.getElementById('gorevSilModalFoto');
-
-            if (tabloFoto && modalImg && modalIcon) {
-                modalImg.src = tabloFoto.src;
-                modalImg.style.display = 'block';
-                modalIcon.style.display = 'none';
-            } else if (modalImg && modalIcon) {
-                modalImg.src = '';
-                modalImg.style.display = 'none';
-                modalIcon.style.display = 'block';
-            }
-        });
-
-        $('#gorevTablosu tbody').on('click', '.btn-personel-foto', function() {
-            let btn = $(this);
-            document.getElementById('modalPersonelResim').src = btn.attr('data-src');
-            document.getElementById('modalPersonelIsim').innerText = btn.attr('data-isim');
-            new bootstrap.Modal(document.getElementById('merkeziPersonelFotoModal')).show();
-        });
-
-        $('#gorevTablosu tbody').on('click', '.btn-kanit-goster', function() {
-            let fotos = $(this).attr('data-fotolar');
-            if(!fotos) return;
-            
-            const icerikContainer = document.getElementById('carouselIcerik');
-            icerikContainer.innerHTML = '';
-            const fotoIdListesi = String(fotos).split(',');
-            
-            fotoIdListesi.forEach((fotoId, index) => {
-                if(!fotoId) return;
-                const activeClass = index === 0 ? 'active' : '';
-                icerikContainer.insertAdjacentHTML('beforeend',
-                    `<div class="carousel-item ${activeClass}">
-                        <img src="/Gorev/KanitFotoGetir?id=${fotoId}" class="d-block w-100" loading="lazy" decoding="async" alt="Büyük Kanıt Görseli"/>
-                    </div>`
-                );
+    @if (TempData["Mesaj"] != null)
+    {
+        <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11" defer></script>
+        <script>
+            document.addEventListener("DOMContentLoaded", function () {
+                let swalBekle = setInterval(function() {
+                    if (typeof Swal !== 'undefined') {
+                        clearInterval(swalBekle);
+                        Swal.fire({
+                            icon: '@(TempData["MesajTipi"] ?? "warning")',
+                            title: 'Bilgilendirme',
+                            text: '@Html.Raw(TempData["Mesaj"])',
+                            confirmButtonText: 'Tamam',
+                            confirmButtonColor: '#5c7cfa',
+                            customClass: { confirmButton: 'rounded-pill px-5 py-2' }
+                        });
+                    }
+                }, 50);
             });
-            
-            new bootstrap.Modal(document.getElementById('merkeziKanitModal')).show();
-        });
+        </script>
     }
-
-    function yeniGorevPersonelFiltrele(selectElement) {
-        var secilenDept = selectElement.value;
-        var personelSelect = document.querySelector('.modal-pers-select');
-        personelSelect.value = "";
-        
-        var options = personelSelect.querySelectorAll('.pers-item');
-        options.forEach(opt => {
-            if (secilenDept === "all") {
-                opt.style.display = "";
-                opt.disabled = false;
-            } else {
-                if(opt.classList.contains(secilenDept)) {
-                    opt.style.display = "";
-                    opt.disabled = false;
-                } else {
-                    opt.style.display = "none";
-                    opt.disabled = true;
-                }
-            }
-        });
-    }
-
-    function guncellePersonelFiltrele(selectElement) {
-        var secilenDept = selectElement.value;
-        var personelSelect = document.querySelector('.edit-pers-select');
-        var options = personelSelect.querySelectorAll('.edit-pers-item');
-        var ilkUygun = null;
-        
-        options.forEach(opt => {
-            if (secilenDept === "all") {
-                opt.style.display = "";
-                opt.disabled = false;
-            } else {
-                if(opt.classList.contains(secilenDept)) {
-                    opt.style.display = "";
-                    opt.disabled = false;
-                    if(!ilkUygun) ilkUygun = opt;
-                } else {
-                    opt.style.display = "none";
-                    opt.disabled = true;
-                }
-            }
-        });
-        
-        var selectedOpt = personelSelect.options[personelSelect.selectedIndex];
-        if (secilenDept !== "all" && selectedOpt && selectedOpt.style.display === "none" && ilkUygun) {
-            personelSelect.value = ilkUygun.value;
-        }
-    }
-
-    function imleciSonaVeYeniSatiraAl(element) {
-        if (element.value && !element.value.endsWith('\n')) {
-            element.value += '\n';
-        }
-        
-        setTimeout(() => {
-            element.selectionStart = element.value.length;
-            element.selectionEnd = element.value.length;
-            element.scrollTop = element.scrollHeight;
-        }, 10);
-    }
-
-    document.getElementById('editGorevAciklama')?.addEventListener('focus', function() {
-        imleciSonaVeYeniSatiraAl(this);
-    });
-
-    document.getElementById('editGorevNotu')?.addEventListener('focus', function() {
-        imleciSonaVeYeniSatiraAl(this);
-    });
-</script>
 }

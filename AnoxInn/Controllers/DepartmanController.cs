@@ -488,5 +488,25 @@ namespace AxonInn.Controllers
                 return View("~/Views/Error/Error.cshtml", new ErrorViewModel { RequestId = Activity.Current?.Id ?? HttpContext.TraceIdentifier });
             }
         }
+
+        [HttpGet]
+        public async Task<IActionResult> PersonelFotoGetir(long id)
+        {
+            // Sadece resmi çekerek RAM tasarrufu yapıyoruz
+            var foto = await _context.PersonelFotografs
+                .AsNoTracking()
+                .Where(f => f.PersonelRef == id)
+                .Select(f => f.Fotograf)
+                .FirstOrDefaultAsync();
+
+            if (foto != null && foto.Length > 0)
+            {
+                // Tarayıcıya byte dizisini resim formatında döndürür
+                return File(foto, "image/jpeg");
+            }
+
+            // Eğer resim yoksa 404 döndürür (Böylece HTML'deki onerror tetiklenir ve default ikon çıkar)
+            return NotFound();
+        }
     }
 }

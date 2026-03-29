@@ -94,36 +94,9 @@
 
 
 
-<div id="skeletonLoader" class="container compact-container py-2">
-    <div class="text-center mb-4">
-        <div class="skeleton-box rounded-circle mb-2" style="width: 50px; height: 50px;"></div><br />
-        <div class="skeleton-box mb-2" style="width: 200px; height: 28px; border-radius: 8px;"></div><br />
-        <div class="skeleton-box w-50" style="height: 12px;"></div>
-    </div>
-    
-    <div class="row g-3">
-        <div class="col-12">
-            <div class="card border-0 shadow-sm rounded-4 p-3 bg-white">
-                <div class="skeleton-box w-25 mb-3" style="height: 18px;"></div>
-                <div class="skeleton-box w-100 mb-2" style="height: 10px;"></div>
-                <div class="skeleton-box w-100 mb-2" style="height: 10px;"></div>
-                <div class="skeleton-box w-100" style="height: 45px; border-radius: 8px;"></div>
-            </div>
-        </div>
-        <div class="col-12">
-            <div class="card border-0 shadow-sm rounded-4 p-3 bg-white">
-                <div class="skeleton-box w-25 mb-3" style="height: 18px;"></div>
-                <div class="skeleton-box w-100 mb-2" style="height: 10px;"></div>
-                <div class="skeleton-box w-100" style="height: 10px;"></div>
-            </div>
-        </div>
-    </div>
-    <div class="text-center mt-4">
-        <div class="skeleton-box w-25" style="height: 8px;"></div>
-    </div>
-</div>
 
-<div id="mainContent" class="container compact-container py-2 d-none animate__animated animate__fadeIn" style="font-family: 'Inter', sans-serif;">
+
+<div id="mainContent" class="container compact-container py-2 animate__animated animate__fadeIn" style="font-family: 'Inter', sans-serif;">
 
     <div class="text-center mb-4 animate__animated animate__fadeInDown">
         <div class="d-inline-flex align-items-center justify-content-center bg-primary bg-opacity-10 text-primary rounded-circle mb-2 shadow-sm"
@@ -147,7 +120,7 @@
                     AxonInn olarak, otel operasyonlarınızı kolaylaştırmak adına topladığımız veriler sadece sistemin işleyişi ve size daha iyi hizmet sunmak amacıyla kullanılır. Kişisel verileriniz asla reklam veya pazarlama amaçlı üçüncü taraflarla paylaşılmaz.
                 </p>
                 <div class="bg-light rounded-3 p-2 border border-light-subtle shadow-inner">
-                    <ul class="list-unstyled mb-0 text-secondary d-flex flex-wrap justify-content-center justify-content-sm-start gap-3" style="font-size: 0.75rem;">
+                    <ul class="list-unstyled mb-0 text-dark fw-medium d-flex flex-wrap justify-content-center justify-content-sm-start gap-3" style="font-size: 0.75rem;">
                         <li class="d-flex align-items-center"><i class="fas fa-lock text-success me-1"></i> 256-bit SSL</li>
                         <li class="d-flex align-items-center"><i class="fas fa-server text-success me-1"></i> Günlük Yedekleme</li>
                         <li class="d-flex align-items-center"><i class="fas fa-user-shield text-success me-1"></i> KVKK Uyumlu</li>
@@ -166,25 +139,11 @@
         </div>
     </div>
 
-    <div class="text-center mt-4 opacity-50">
-        <hr class="w-25 mx-auto mb-2 border-secondary" />
-        <p style="font-size: 0.6rem; letter-spacing: 0.5px; font-weight: 600;" class="text-uppercase mb-0">
+    <div class="text-center mt-4">
+        <hr class="w-25 mx-auto mb-2 border-secondary opacity-25" />
+        <p style="font-size: 0.65rem; letter-spacing: 0.5px; font-weight: 700; color: #495057;" class="text-uppercase mb-0">
             AxonInn Güvenlik Protokolü v2.0
         </p>
     </div>
 </div>
 
-@section Scripts {
-    <script>
-        document.addEventListener("DOMContentLoaded", function () {
-            // 150 milisaniye iskelet görünümü (sayfalar arası akıcı geçiş hissi için)
-            setTimeout(function() {
-                const loader = document.getElementById('skeletonLoader');
-                if(loader) loader.classList.add('d-none');
-
-                const mainContent = document.getElementById('mainContent');
-                if(mainContent) mainContent.classList.remove('d-none');
-            }, 150);
-        });
-    </script>
-}

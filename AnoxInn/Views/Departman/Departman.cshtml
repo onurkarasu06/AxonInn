@@ -276,127 +276,113 @@
         </div>
     </div>
 
-    <div class="d-flex align-items-center justify-content-center shadow-sm w-100 mb-3 py-2" style="background-color: #f0f4ff; border-radius: 10px; border: 1px solid rgba(92, 124, 250, 0.1);">
+       <div class="d-flex align-items-center justify-content-center shadow-sm w-100 mb-3 py-2" style="background-color: #f0f4ff; border-radius: 10px; border: 1px solid rgba(92, 124, 250, 0.1);">
         <h6 class="mb-0 text-uppercase fw-900" style="letter-spacing: 4px; color: #5c7cfa; font-size: 0.75rem;">
             <i class="fas fa-hotel me-2 small"></i>@(Model?.Adi ?? "AxonInn")
         </h6>
-    </div>
+      </div>
 
-    @foreach (var departman in departmanListesi)
-    {
-        <div class="table-container shadow-sm p-2 mb-4 bg-white rounded-4 border-0">
-            <table class="table table-bordered mb-0 border-0">
-                <thead>
-                    <tr>
-                        <th colspan="7" class="p-0 border-0">
-                            <div class="d-flex align-items-center justify-content-center px-3 py-2 position-relative" style="min-height: 46px; background: linear-gradient(90deg, #0d6efd 0%, #0a58ca 100%); border-radius: 12px 12px 0 0;">
-                                <div class="text-center" style="width: 100%; padding-right: 80px; padding-left: 20px;">
-                                    <span class="text-white fw-bold text-uppercase responsive-dept-text" style="letter-spacing: 1px; display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
-                                        <i class="fas fa-building me-2"></i>@departman.Adi
-                                    </span>
+   @foreach (var departman in departmanListesi)
+                {
+                    <div class="table-container shadow-sm p-2 mb-4 bg-white rounded-4 border-0">
+            
+                                <div class="d-flex align-items-center justify-content-center px-3 py-2 position-relative mb-2" style="min-height: 46px; background: linear-gradient(90deg, #0d6efd 0%, #0a58ca 100%); border-radius: 12px 12px 0 0;">
+                                    <div class="text-center" style="width: 100%; padding-right: 80px; padding-left: 20px;">
+                                        <span class="text-white fw-bold text-uppercase responsive-dept-text" style="letter-spacing: 1px; display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                                            <i class="fas fa-building me-2"></i>@departman.Adi
+                                        </span>
+                                    </div>
+                                    <div class="position-absolute end-0 me-2">
+                                        <button class="btn btn-light btn-sm fw-bold @(girisYapanPersonel?.Yetki != 1 ? "opacity-50" : null)" 
+                                                style="border-radius: 30px; font-size: 0.65rem; padding: 4px 10px;" 
+                                                data-bs-toggle="modal" 
+                                                data-bs-target="#personelEkleModal" 
+                                                onclick="setDepartmanId(@departman.Id, '@departman.Adi')"
+                                                disabled="@(girisYapanPersonel?.Yetki != 1 ? "disabled" : null)"
+                                                aria-label="Personel Ekle">
+                                            <i class="fas fa-user-plus me-1"></i> <span class="d-none d-sm-inline">EKLE</span>
+                                        </button>
+                                    </div>
                                 </div>
-                                <div class="position-absolute end-0 me-2">
-                                    <button class="btn btn-light btn-sm fw-bold @(girisYapanPersonel?.Yetki != 1 ? "opacity-50" : null)" 
-                                            style="border-radius: 30px; font-size: 0.65rem; padding: 4px 10px;" 
-                                            data-bs-toggle="modal" 
-                                            data-bs-target="#personelEkleModal" 
-                                            onclick="setDepartmanId(@departman.Id, '@departman.Adi')"
-                                            disabled="@(girisYapanPersonel?.Yetki != 1 ? "disabled" : null)"
-                                            aria-label="Personel Ekle">
-                                        <i class="fas fa-user-plus me-1"></i> <span class="d-none d-sm-inline">EKLE</span>
-                                    </button>
+
+                                <div class="table-responsive px-1">
+                                            <table class="table table-sm inner-table mb-0 align-middle text-center">
+                                                <thead class="bg-light">
+                                                    <tr class="text-muted text-uppercase" style="font-size: 0.7rem; font-weight: 700;">
+                                                        <th style="width: 50px;">Sıra</th>
+                                                        <th>Ad Soyad</th>
+                                                        <th>İletişim Bilgileri</th>
+                                                        <th>Yetki Seviyesi</th>
+                                                        <th>Medeni Hal</th>
+                                                        <th style="width: 80px;">Foto</th>
+                                                        <th style="width: 100px;">İşlem</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    @{ int s = 0; }
+                                                    @foreach (var personel in departman.Personels)
+                                                    {
+                                                        s++;
+                                                        string uniqueRowId = $"dep{departman.Id}_pers{personel.Id}_{s}";
+                                                        string fotoVersiyon = DepartmanController.PersonelFotoVersiyonlari.TryGetValue(personel.Id, out var v) ? v : DepartmanController.AppStartVersion;
+                                                        <tr style="font-size: 0.85rem;">
+                                                            <td data-label="SIRA" class="text-muted">
+                                                                <span>@s @Html.Raw(personel.AktifMi == 2 ? "<span class='text-danger fw-bold ms-1'>(Pasif)</span>" : "")</span>
+                                                            </td>
+                                                            <td data-label="AD SOYAD" class="fw-bold text-dark">@personel.Adi @personel.Soyadi</td>
+                                                            <td data-label="İLETİŞİM">
+                                                                <div class="d-flex flex-column lh-sm">
+                                                                    <a href="tel:@personel.TelefonNumarasi" class="text-primary fw-bold text-decoration-none" style="font-size: 0.8rem;">
+                                                                        <i class="fas fa-phone-alt me-1 small"></i>@(personel.TelefonNumarasi ?? "-")
+                                                                    </a>
+                                                                    <small class="text-muted" style="font-size: 0.7rem;">@personel.MailAdresi</small>
+                                                                </div>
+                                                            </td>
+                                                            <td data-label="YETKİ SEVİYESİ" class="text-center">
+                                                                @if (personel.Yetki == 1)
+                                                                {
+                                                                    <div class="d-inline-flex align-items-center text-danger fw-bold" style="font-size: 0.7rem; letter-spacing: 0.5px;"><i class="fas fa-user-shield me-1"></i>YÖNETİCİ</div>
+                                                                }
+                                                                else if (personel.Yetki == 2)
+                                                                {
+                                                                    <div class="d-inline-flex align-items-center text-warning fw-bold" style="font-size: 0.7rem; letter-spacing: 0.5px; filter: brightness(0.85);"><i class="fas fa-star me-1"></i>ŞEF</div>
+                                                                }
+                                                                else
+                                                                {
+                                                                    <div class="d-inline-flex align-items-center text-secondary fw-semibold" style="font-size: 0.7rem; opacity: 0.8;"><i class="fas fa-user me-1"></i>PERSONEL</div>
+                                                                }
+                                                            </td>
+                                                            <td data-label="MEDENİ HAL" class="text-muted">@(personel.MedenHali == 1 ? "Evli" : "Bekar")</td>
+                                                            <td data-label="FOTO">
+                                                                <div class="avatar-container d-inline-block text-center" style="width:32px; height:32px;">
+                                                                    <img id="tabloFoto_@uniqueRowId" 
+                                                                         src="/Departman/PersonelFotoGetir?id=@personel.Id&v=@fotoVersiyon"
+                                                                         width="32" height="32" loading="lazy" decoding="async" 
+                                                                         class="rounded-circle border shadow-sm avatar-img pointer" 
+                                                                         style="width: 32px; height: 32px; object-fit: cover;" 
+                                                                         onerror="this.style.display='none'; document.getElementById('fallbackIcon_@uniqueRowId').style.display='inline-block';" 
+                                                                         onclick="personelFotoGoster(this.src, '@personel.Adi @personel.Soyadi')" />
+                                                                    <i id="fallbackIcon_@uniqueRowId" class="fas fa-user-circle text-secondary fs-4" style="display: none; line-height: 32px;"></i>
+                                                                </div>
+                                                            </td>
+                                                            <td data-label="İŞLEM">
+                                                                <div class="btn-group shadow-none @(girisYapanPersonel?.Yetki != 1 ? "opacity-50" : null)">
+                                                                    <button class="btn btn-outline-primary btn-sm border-0" onclick="openPersonelEditModal(@personel.Id, '@personel.Adi', '@personel.Soyadi', @departman.Id, '@personel.TelefonNumarasi', '@personel.MailAdresi', @(personel.MedenHali ?? 2), @(personel.Yetki), @(personel.AktifMi))" data-bs-toggle="modal" data-bs-target="#personelGuncelleModal" disabled="@(girisYapanPersonel?.Yetki != 1 ? "disabled" : null)" title="Düzenle" aria-label="Personel Düzenle">
+                                                                        <i class="fas fa-edit"></i>
+                                                                    </button>
+                                                                    <button class="btn btn-outline-danger btn-sm border-0" onclick="setSilId(@personel.Id, '@personel.Adi @personel.Soyadi', '@uniqueRowId')" data-bs-toggle="modal" data-bs-target="#silOnayModal" disabled="@(girisYapanPersonel?.Yetki != 1 ? "disabled" : null)" title="Sil" aria-label="Personel Sil">
+                                                                        <i class="fas fa-trash-alt"></i>
+                                                                    </button>
+                                                                </div>
+                                                            </td>
+                                                        </tr>
+                                                    }
+                                                </tbody>
+                                            </table>
                                 </div>
-                            </div>
-                        </th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr>
-                        <td colspan="7" class="p-0 border-0">
-                            <div class="table-responsive">
-                                <table class="table table-sm inner-table mb-0 align-middle text-center">
-                                    <thead class="bg-light">
-                                        <tr class="text-muted text-uppercase" style="font-size: 0.7rem; font-weight: 700;">
-                                            <th style="width: 50px;">Sıra</th>
-                                            <th>Ad Soyad</th>
-                                            <th>İletişim Bilgileri</th>
-                                            <th>Yetki Seviyesi</th>
-                                            <th>Medeni Hal</th>
-                                            <th style="width: 80px;">Foto</th>
-                                            <th style="width: 100px;">İşlem</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        @{ int s = 0; }
-                                        @foreach (var personel in departman.Personels)
-                                        {
-                                            s++;
-                                            string uniqueRowId = $"dep{departman.Id}_pers{personel.Id}_{s}";
-                                            string fotoVersiyon = DepartmanController.PersonelFotoVersiyonlari.TryGetValue(personel.Id, out var v) ? v : DepartmanController.AppStartVersion;
-                                            
-                                            <tr style="font-size: 0.85rem;">
-                                           <td data-label="SIRA" class="text-muted">
-                                                <span>@s @Html.Raw(personel.AktifMi == 2 ? "<span class='text-danger fw-bold ms-1'>(Pasif)</span>" : "")</span>
-                                            </td>
-                                                <td data-label="AD SOYAD" class="fw-bold text-dark">@personel.Adi @personel.Soyadi</td>
-                                                <td data-label="İLETİŞİM">
-                                                    <div class="d-flex flex-column lh-sm">
-                                                        <a href="tel:@personel.TelefonNumarasi" class="text-primary fw-bold text-decoration-none" style="font-size: 0.8rem;">
-                                                            <i class="fas fa-phone-alt me-1 small"></i>@(personel.TelefonNumarasi ?? "-")
-                                                        </a>
-                                                        <small class="text-muted" style="font-size: 0.7rem;">@personel.MailAdresi</small>
-                                                    </div>
-                                                </td>
-                                                <td data-label="YETKİ SEVİYESİ" class="text-center">
-                                                    @if (personel.Yetki == 1)
-                                                    {
-                                                        <div class="d-inline-flex align-items-center text-danger fw-bold" style="font-size: 0.7rem; letter-spacing: 0.5px;"><i class="fas fa-user-shield me-1"></i>YÖNETİCİ</div>
-                                                    }
-                                                    else if (personel.Yetki == 2)
-                                                    {
-                                                        <div class="d-inline-flex align-items-center text-warning fw-bold" style="font-size: 0.7rem; letter-spacing: 0.5px; filter: brightness(0.85);"><i class="fas fa-star me-1"></i>ŞEF</div>
-                                                    }
-                                                    else
-                                                    {
-                                                        <div class="d-inline-flex align-items-center text-secondary fw-semibold" style="font-size: 0.7rem; opacity: 0.8;"><i class="fas fa-user me-1"></i>PERSONEL</div>
-                                                    }
-                                                </td>
-                                                <td data-label="MEDENİ HAL" class="text-muted">@(personel.MedenHali == 1 ? "Evli" : "Bekar")</td>
-                                                <td data-label="FOTO">
-                                                    <div class="avatar-container d-inline-block text-center" style="width:32px; height:32px;">
-                                                        <img id="tabloFoto_@uniqueRowId" 
-                                                             src="/Gorev/PersonelFotoGetir?id=@personel.Id&v=@fotoVersiyon" 
-                                                             width="32" height="32" loading="lazy" decoding="async" 
-                                                             class="rounded-circle border shadow-sm avatar-img pointer" 
-                                                             style="width: 32px; height: 32px; object-fit: cover;" 
-                                                             onerror="this.style.display='none'; document.getElementById('fallbackIcon_@uniqueRowId').style.display='inline-block';" 
-                                                             onclick="personelFotoGoster(this.src, '@personel.Adi @personel.Soyadi')" />
-                                                             
-                                                        <i id="fallbackIcon_@uniqueRowId" class="fas fa-user-circle text-secondary fs-4" style="display: none; line-height: 32px;"></i>
-                                                    </div>
-                                                </td>
-                                                <td data-label="İŞLEM">
-                                                    <div class="btn-group shadow-none @(girisYapanPersonel?.Yetki != 1 ? "opacity-50" : null)">
-                                                        <button class="btn btn-outline-primary btn-sm border-0" onclick="openPersonelEditModal(@personel.Id, '@personel.Adi', '@personel.Soyadi', @departman.Id, '@personel.TelefonNumarasi', '@personel.MailAdresi', @(personel.MedenHali ?? 2), @(personel.Yetki), @(personel.AktifMi))" data-bs-toggle="modal" data-bs-target="#personelGuncelleModal" disabled="@(girisYapanPersonel?.Yetki != 1 ? "disabled" : null)" title="Düzenle" aria-label="Personel Düzenle">
-                                                            <i class="fas fa-edit"></i>
-                                                        </button>
-                                                        <button class="btn btn-outline-danger btn-sm border-0" onclick="setSilId(@personel.Id, '@personel.Adi @personel.Soyadi', '@uniqueRowId')" data-bs-toggle="modal" data-bs-target="#silOnayModal" disabled="@(girisYapanPersonel?.Yetki != 1 ? "disabled" : null)" title="Sil" aria-label="Personel Sil">
-                                                            <i class="fas fa-trash-alt"></i>
-                                                        </button>
-                                                    </div>
-                                                </td>
-                                            </tr>
-                                        }
-                                    </tbody>
-                                </table>
-                            </div>
-                        </td>
-                    </tr>
-                </tbody>
-            </table>
-        </div>
+                      </div>
     }
-</div>
+   </div>
 
               <div class="modal fade" id="personelEkleModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered" style="max-width: 450px;">
@@ -632,13 +618,13 @@
 </div>
 
 @section Scripts {
-    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11" defer></script>
-
     <script>
-        // 2. Google Ads dönüşüm kodu (Çökme riskine karşı güvenli hale getirildi)
-        window.dataLayer = window.dataLayer || [];
-        function gtag(){dataLayer.push(arguments);}
-        gtag('event', 'conversion', {'send_to': 'AW-18020925402/73hECN6-9okcENr_hZFD'});
+        // 1. Google Ads dönüşüm kodu geciktirildi (Tarayıcı rahatlatıldı)
+        setTimeout(function() {
+            window.dataLayer = window.dataLayer || [];
+            function gtag(){dataLayer.push(arguments);}
+            gtag('event', 'conversion', {'send_to': 'AW-18020925402/73hECN6-9okcENr_hZFD'});
+        }, 2000);
 
         document.addEventListener("DOMContentLoaded", function () {
             // Skeleton Loader Kapatma
@@ -648,7 +634,7 @@
             const mainContent = document.getElementById('mainContent');
             if(mainContent) mainContent.classList.remove('d-none');
             
-            // 3. Formu Sıfırlama Kodu (Ortadan alınıp buraya dahil edildi)
+            // Formu Sıfırlama Kodu
             var personelModal = document.getElementById('personelEkleModal');
             if(personelModal) {
                 personelModal.addEventListener('hidden.bs.modal', function () {
@@ -663,18 +649,16 @@
                     const submitBtn = e.submitter || this.querySelector('button[type="submit"]');
                     if (submitBtn) {
                         if (submitBtn.disabled || submitBtn.classList.contains('btn-loading')) {
-                            e.preventDefault();
-                            return;
+                            e.preventDefault(); return;
                         }
                         if (!this.checkValidity() && !submitBtn.hasAttribute('formnovalidate')) {
-                            return; 
+                            return;
                         }
                         submitBtn.classList.add('btn-loading');
                         setTimeout(() => submitBtn.disabled = true, 0);
                         
                         const textSpan = submitBtn.querySelector('.btn-text');
                         const spinner = submitBtn.querySelector('.btn-spinner');
-                        
                         if(textSpan) {
                             submitBtn.setAttribute('data-original-text', textSpan.innerText);
                             if (submitBtn.id === 'btnAktivasyonGonder') {
@@ -697,7 +681,6 @@
                     btn.disabled = false;
                     const textSpan = btn.querySelector('.btn-text');
                     const spinner = btn.querySelector('.btn-spinner');
-                    
                     if (textSpan && btn.hasAttribute('data-original-text')) {
                         textSpan.innerText = btn.getAttribute('data-original-text');
                     }
@@ -770,6 +753,7 @@
 
     @if (TempData["Mesaj"] != null)
     {
+        <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
         <script>
             document.addEventListener("DOMContentLoaded", function () {
                 var tip = '@(TempData["MesajTipi"] ?? "warning")';

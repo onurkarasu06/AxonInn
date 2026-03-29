@@ -277,13 +277,35 @@ window.addEventListener("load", function() {
                     new Chart(cKelime.getContext('2d'), { type: 'bar', data: { labels: kelimeGrafikVerisi.kelimeler, datasets: [{ data: kelimeGrafikVerisi.oranlar, backgroundColor: '#334155', borderRadius: 6, barThickness: 15 }] }, options: kAyar });
                 }
             },
-            () => {
-                let cUlke = document.getElementById('ulkeGrafigi');
-                if (ulkeGrafikVerisi && ulkeGrafikVerisi.ulkeler && cUlke) {
-                    let uAyar = getOrtakSecenekler(); uAyar.plugins.legend = { display: true, position: 'top', labels: { padding: 15, usePointStyle: true, pointStyle: 'circle' } }; uAyar.scales = { x: { border: {display: false}, grid: { display: false } }, y: { beginAtZero: true, max: 100, border: {display: false}, grid: { color: '#f1f5f9' }, ticks: { callback: v => '%' + v } } }; uAyar.plugins.tooltip.callbacks = { label: ctx => ' ' + ctx.dataset.label + ': %' + ctx.parsed.y };
-                    new Chart(cUlke.getContext('2d'), { type: 'bar', data: { labels: ulkeGrafikVerisi.ulkeler, datasets: [ { label: 'Pozitif', data: ulkeGrafikVerisi.pozitifOranlari, backgroundColor: '#10b981', borderRadius: 4, barPercentage: 0.9, categoryPercentage: 0.7, minBarLength: 5 }, { label: 'Nötr', data: ulkeGrafikVerisi.notrOranlari, backgroundColor: '#cbd5e1', borderRadius: 4, barPercentage: 0.9, categoryPercentage: 0.7, minBarLength: 5 }, { label: 'Negatif', data: ulkeGrafikVerisi.negatifOranlari, backgroundColor: '#f43f5e', borderRadius: 4, barPercentage: 0.9, categoryPercentage: 0.7, minBarLength: 5 } ] }, options: uAyar });
-                }
-            },
+                              () => {
+                                let cUlke = document.getElementById('ulkeGrafigi');
+                                if (ulkeGrafikVerisi && ulkeGrafikVerisi.ulkeler && cUlke) {
+                                    let uAyar = getOrtakSecenekler(); 
+                                    uAyar.plugins.legend = { display: true, position: 'top', labels: { padding: 15, usePointStyle: true, pointStyle: 'circle' } }; 
+            
+                                    // EKSENLERE STACKED: TRUE EKLENDİ
+                                    uAyar.scales = { 
+                                        x: { stacked: true, border: {display: false}, grid: { display: false } }, 
+                                        y: { stacked: true, beginAtZero: true, max: 100, border: {display: false}, grid: { color: '#f1f5f9' }, ticks: { callback: v => '%' + v } } 
+                                    }; 
+            
+                                    uAyar.plugins.tooltip.callbacks = { label: ctx => ' ' + ctx.dataset.label + ': %' + ctx.parsed.y };
+            
+                                    new Chart(cUlke.getContext('2d'), { 
+                                        type: 'bar', 
+                                        data: { 
+                                            labels: ulkeGrafikVerisi.ulkeler, 
+                                            datasets: [ 
+                                                // Barlar üst üste bineceği için aralardaki kırılmaları önlemek adına borderRadius kaldırıldı
+                                                { label: 'Pozitif', data: ulkeGrafikVerisi.pozitifOranlari, backgroundColor: '#10b981', barPercentage: 0.9, categoryPercentage: 0.7, minBarLength: 5 }, 
+                                                { label: 'Nötr', data: ulkeGrafikVerisi.notrOranlari, backgroundColor: '#cbd5e1', barPercentage: 0.9, categoryPercentage: 0.7, minBarLength: 5 }, 
+                                                { label: 'Negatif', data: ulkeGrafikVerisi.negatifOranlari, backgroundColor: '#f43f5e', barPercentage: 0.9, categoryPercentage: 0.7, minBarLength: 5 } 
+                                            ] 
+                                        }, 
+                                        options: uAyar 
+                                    });
+                                }
+                            },
             () => {
                 let cKonaklama = document.getElementById('konaklamaGrafigi');
                 if (konaklamaGrafikVerisi && konaklamaGrafikVerisi.tipler && cKonaklama) {

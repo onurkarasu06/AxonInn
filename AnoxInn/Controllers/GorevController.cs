@@ -9,6 +9,7 @@ using AxonInn.Models.Analitik;
 
 namespace AxonInn.Controllers
 {
+    [AutoValidateAntiforgeryToken]
     public class GorevController : Controller
     {
         private readonly AxonInnContext _context;

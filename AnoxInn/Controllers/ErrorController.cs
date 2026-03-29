@@ -4,6 +4,7 @@ using System.Diagnostics; // ⚡ YENİ: RAM dostu hata izleme kimliği (TraceIde
 
 namespace AxonInn.Controllers
 {
+    [AutoValidateAntiforgeryToken]
     public class ErrorController : Controller
     {
         // ⚡ GÜVENLİK & PERFORMANS: Hata sayfalarının tarayıcı (Browser) tarafından önbelleğe alınmasını kesin olarak engeller.

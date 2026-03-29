@@ -6,6 +6,7 @@ using System.Text.Json; // ⚡ Yüksek Hızlı Yeni Nesil JSON kütüphanesine g
 
 namespace AxonInn.Controllers
 {
+    [AutoValidateAntiforgeryToken]
     public class GizlilikController : Controller
     {
         private readonly AxonInnContext _context;

@@ -16,6 +16,7 @@ using AxonInn.Models;
 
 namespace AxonInn.Controllers
 {
+    [AutoValidateAntiforgeryToken]
     public class AnalitikController : Controller
     {
         private readonly AxonInnContext _context;

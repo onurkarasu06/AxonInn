@@ -8,6 +8,7 @@ using AxonInn.Models.Context; // ⚡ Yüksek Hızlı Yeni Nesil JSON
 
 namespace AxonInn.Controllers
 {
+    [AutoValidateAntiforgeryToken]
     public class IletisimController : Controller
     {
         private readonly AxonInnContext _context;

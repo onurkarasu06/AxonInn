@@ -10,6 +10,7 @@ using AxonInn.Models.Context;
 
 namespace AxonInn.Controllers
 {
+    [AutoValidateAntiforgeryToken]
     public class DepartmanController : Controller
     {
         private readonly AxonInnContext _context;

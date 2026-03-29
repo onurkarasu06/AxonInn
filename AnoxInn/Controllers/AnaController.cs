@@ -7,6 +7,7 @@ using System.Text.Json;
 
 namespace AxonInn.Controllers
 {
+    [AutoValidateAntiforgeryToken]
     public class AnaController : Controller
     {
         private readonly AxonInnContext _context;

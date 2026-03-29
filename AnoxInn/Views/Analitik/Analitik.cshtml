@@ -161,6 +161,8 @@
 
 </div>
 
+@Html.AntiForgeryToken()
+
 <script>
 window.addEventListener("load", function() {
     
@@ -323,9 +325,16 @@ window.addEventListener("load", function() {
                 btn.disabled = true;
 
                 try {
-                    let response = await fetch('/Analitik/YapayZekaTavsiyesiAl', { 
-                        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(dashboardData)
-                    });
+                  let securityToken = document.querySelector('input[name="__RequestVerificationToken"]').value;
+
+                        let response = await fetch('/Analitik/YapayZekaTavsiyesiAl', { 
+                            method: 'POST', 
+                            headers: { 
+                                'Content-Type': 'application/json',
+                                'RequestVerificationToken': securityToken // <-- Token'ı sunucuya gönderiyoruz
+                            }, 
+                            body: JSON.stringify(dashboardData)
+                        });
 
                     if (response.ok) {
                         let aiVerisi = await response.json();

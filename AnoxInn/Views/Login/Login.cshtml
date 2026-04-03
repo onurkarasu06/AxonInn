@@ -52,8 +52,12 @@
         <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css" />
     </noscript>
 
+
+
+
+
     <style>
-        body {
+     body {
             font-family: 'Inter', sans-serif;
             background-color: #f0f4f8; 
             height: 100vh; 
@@ -62,7 +66,7 @@
             justify-content: center;
             margin: 0;
             padding: 0;
-            overflow: hidden; 
+            overflow: hidden;
         }
 
         .login-wrapper {
@@ -84,18 +88,31 @@
             background-color: #ffffff;
             border-radius: 1.5rem;
             box-shadow: 0 20px 50px rgba(13, 110, 253, 0.12);
-            overflow: hidden;  
+            overflow: hidden;
         }
  
+        /* --- GÜNCELLENEN SOL PANEL ARKAPLANI --- */
         .left-panel {
             flex: 0 0 60%;
             width: 60%;
-            background: linear-gradient(135deg, #0d6efd 0%, #0dcaf0 100%);
+            background: radial-gradient(circle at top right, #113a71 0%, #061831 100%);
             padding: 3.5rem 4rem;
             position: relative;
             display: flex;
             flex-direction: column;
             justify-content: space-between;
+            overflow: hidden;
+        }
+
+        /* Arkaplana hafif bir teknolojik doku (noktalı ağ hissi) */
+        .left-panel::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background-image: radial-gradient(rgba(255, 255, 255, 0.04) 1px, transparent 1px);
+            background-size: 30px 30px;
+            pointer-events: none;
+            z-index: 0;
         }
       
         .vision-glass-circle {
@@ -108,40 +125,66 @@
             z-index: 0;
         }
       
+        /* --- 3D GLASSMORPHISM KARTLAR --- */
         .glass-card {
-            background: rgba(255, 255, 255, 0.1);
-            border: 1px solid rgba(255, 255, 255, 0.2);
-            border-radius: 14px;
-            padding: 1rem 1.25rem;
-            backdrop-filter: blur(8px);
-            -webkit-backdrop-filter: blur(8px);
-            transition: all 0.3s ease;
+            background: linear-gradient(135deg, rgba(255, 255, 255, 0.08) 0%, rgba(255, 255, 255, 0.02) 100%);
+            border-top: 1px solid rgba(255, 255, 255, 0.4);
+            border-left: 1px solid rgba(255, 255, 255, 0.2);
+            border-right: 1px solid rgba(255, 255, 255, 0.05);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+            border-radius: 20px;
+            padding: 1.5rem;
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3), inset 0 2px 5px rgba(255, 255, 255, 0.1);
+            transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
             cursor: default;
             position: relative;
             z-index: 1;
-        }
-        .glass-card:hover {
-            background: rgba(255, 255, 255, 0.2);
-            transform: translateX(8px);
-            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
         }
 
+        /* Kartların üzerinden geçen cam parlaması animasyonu */
+        .glass-card::after {
+            content: '';
+            position: absolute;
+            top: 0; left: -150%;
+            width: 50%; height: 100%;
+            background: linear-gradient(to right, rgba(255,255,255,0) 0%, rgba(255,255,255,0.15) 50%, rgba(255,255,255,0) 100%);
+            transform: skewX(-25deg);
+            transition: all 0.7s ease;
+        }
+
+        .glass-card:hover {
+            transform: translateY(-5px) scale(1.02);
+            box-shadow: 0 25px 50px rgba(0, 0, 0, 0.4), inset 0 2px 5px rgba(255, 255, 255, 0.2);
+            background: linear-gradient(135deg, rgba(255, 255, 255, 0.12) 0%, rgba(255, 255, 255, 0.04) 100%);
+        }
+
+        .glass-card:hover::after {
+            left: 150%;
+        }
+
+        /* --- 3D İKON KUTULARI --- */
         .tech-icon-box {
-            width: 48px; height: 48px;
+            width: 55px;
+            height: 55px;
             display: flex; align-items: center; justify-content: center;
-            border-radius: 12px;
-            background: rgba(255, 255, 255, 0.2);
+            border-radius: 16px;
+            background: linear-gradient(135deg, rgba(255, 255, 255, 0.15) 0%, rgba(255, 255, 255, 0.02) 100%);
             color: #ffffff;
-            transition: all 0.3s ease;
+            transition: all 0.4s ease;
             flex-shrink: 0;
-            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-top: 1px solid rgba(255, 255, 255, 0.4);
+            border-left: 1px solid rgba(255, 255, 255, 0.2);
+            box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2), inset 0 2px 4px rgba(255, 255, 255, 0.1);
         }
 
         .glass-card:hover .tech-icon-box {
-            background: #ffffff;
-            color: #0d6efd;
-            box-shadow: 0 0 15px rgba(255, 255, 255, 0.6);
-            transform: scale(1.1) rotate(5deg);
+            background: linear-gradient(135deg, #ffffff 0%, #f0f0f0 100%);
+            color: #061831;
+            box-shadow: 0 0 25px rgba(255, 255, 255, 0.3);
+            transform: scale(1.15) translateY(-2px) rotate(5deg);
         }
         
         .aphorism-box {
@@ -171,7 +214,8 @@
         }
 
         .brand-logo {
-            width: 75px; height: 75px;
+            width: 75px;
+            height: 75px;
             border-radius: 18px;
             box-shadow: 0 10px 25px rgba(13, 110, 253, 0.15);
             object-fit: contain;
@@ -190,28 +234,53 @@
         .transition-focus input { background-color: transparent !important; }
 
         .transition-hover { transition: transform 0.2s ease, box-shadow 0.2s ease; }
+        
         .transition-hover:hover {
             transform: translateY(-2px);
             box-shadow: 0 10px 20px rgba(13, 110, 253, 0.3) !important;
         }
 
-        .btn-loading { opacity: 0.8; pointer-events: none; cursor: not-allowed; }
+        .btn-loading { 
+            opacity: 0.8;
+            pointer-events: none; 
+            cursor: not-allowed; 
+        }
          
         @@media (max-width: 991px) {
             body { 
-                height: auto; 
+                height: auto;
                 min-height: 100vh; 
                 overflow-y: auto; 
                 padding: 1rem; 
                 align-items: flex-start;  
-                padding-top: 6vh;  
+                padding-top: 6vh;
             }
-            .login-wrapper { height: auto; max-height: none; padding: 0; margin-bottom: 0; }
-            .login-card { flex-direction: column; border-radius: 1.5rem; }
-            .left-panel { display: none !important; }
-            .right-panel { flex: 0 0 100%; width: 100% !important; padding: 2.5rem 2rem !important; }
+            .login-wrapper { 
+                height: auto; 
+                max-height: none; 
+                padding: 0;
+                margin-bottom: 0; 
+            }
+            .login-card { 
+                flex-direction: column; 
+                border-radius: 1.5rem;
+            }
+            .left-panel { 
+                display: none !important;
+            }
+            .right-panel { 
+                flex: 0 0 100%;
+                width: 100% !important; 
+                padding: 2.5rem 2rem !important; 
+            }
         }
     </style>
+
+
+
+
+
+
 </head>
 
 
@@ -269,15 +338,25 @@
             </div>
             <div class="right-panel">
                 <div class="flex-grow-1 d-flex flex-column justify-content-center mx-auto w-100" style="max-width: 360px;">
-                    <div class="text-center mb-4 animate__animated animate__fadeInDown">
-                        <img src="/AxonInn.png" alt="AxonInn Logo" class="brand-logo mb-3" fetchpriority="high" />
-                        <h1 class="mb-1 brand-gradient" style="font-size: 2.3rem; letter-spacing: -1.5px; line-height: 1; font-weight: 900;">
-                            Axon<span style="font-weight: 300; letter-spacing: 0;">INN</span>
-                        </h1>
-                        <p class="text-secondary mb-0" style="font-size: 0.85rem;">
-                            Akıllı Yönetim İş zekası<br /> Otelinizin dijital sinir sistemi 
-                        </p>
-                    </div>
+                   
+                    
+                    
+               <div class="text-center mb-4 animate__animated animate__fadeInDown">
+    <img src="/AxonInn.png" alt="AxonInn Logo" class="brand-logo mb-3" fetchpriority="high" />
+    <h1 class="mb-1 brand-gradient" style="font-size: 2.3rem; letter-spacing: -1.5px; line-height: 1; font-weight: 900;">
+        Axon<span style="font-weight: 300; letter-spacing: 0;">INN</span>
+    </h1>
+    
+    <p class="mb-0 mt-2" style="font-size: 0.95rem; font-weight: 600; font-style: italic; color: #495057;">
+        "Duyguyla ağırlayın, mühendislikle yönetin."
+    </p>
+    <span class="d-block mt-1 text-muted text-uppercase fw-bold" style="font-size: 0.65rem; letter-spacing: 1px;">
+        Dijital Sinir Sisteminiz
+    </span>
+</div>
+                    
+                    
+                    
                     <form id="loginForm" method="post" asp-controller="Login" asp-action="Login">
                         @Html.AntiForgeryToken()
                         <div class="mb-3">

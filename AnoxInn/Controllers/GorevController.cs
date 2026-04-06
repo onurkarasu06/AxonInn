@@ -316,51 +316,72 @@ namespace AxonInn.Controllers
                         catch { /* API Hata verirse eski kategori kalır. */ }
                     }
 
-                    // ⚡ SQL BYPASS: ChangeTracker'ı atlayıp doğrudan veritabanında UPDATE gönderiyoruz
-                    var updateQuery = _context.Gorevs.Where(g => g.Id == model.Id);
+                    // 🛡️ TRANSACTION BAŞLANGICI: Veri bütünlüğü için DB işlemlerini sarıyoruz
+                    await using var transaction = await _context.Database.BeginTransactionAsync();
 
-                    if (metinDegisti)
+                    try
                     {
-                        await updateQuery.ExecuteUpdateAsync(s => s
-                            .SetProperty(g => g.PersonelRef, yeniPersonelRef)
-                            .SetProperty(g => g.Aciklama, yeniAciklama)
-                            .SetProperty(g => g.PersonelNotu, yeniNot)
-                            .SetProperty(g => g.Durum, yeniDurumDegeri)
-                            .SetProperty(g => g.CozumBaslamaTarihi, yeniBaslamaTarihi)
-                            .SetProperty(g => g.CozumBitisTarihi, yeniBitisTarihi)
-                            .SetProperty(g => g.AiKategori, g => yeniAiKategori ?? g.AiKategori));
-                    }
-                    else
-                    {
-                        await updateQuery.ExecuteUpdateAsync(s => s
-                           .SetProperty(g => g.PersonelRef, yeniPersonelRef)
-                           .SetProperty(g => g.Durum, yeniDurumDegeri)
-                           .SetProperty(g => g.CozumBaslamaTarihi, yeniBaslamaTarihi)
-                           .SetProperty(g => g.CozumBitisTarihi, yeniBitisTarihi));
-                    }
+                        // ⚡ SQL BYPASS: ChangeTracker'ı atlayıp doğrudan veritabanında UPDATE gönderiyoruz
+                        var updateQuery = _context.Gorevs.Where(g => g.Id == model.Id);
 
-                    // --- Yeni Fotoğraf Kaydı ---
-                    if (YeniFotograflar != null && YeniFotograflar.Count > 0)
-                    {
-                        foreach (var dosya in YeniFotograflar)
+                        if (metinDegisti)
                         {
-                            if (dosya.Length > 0 && dosya.Length <= 5 * 1024 * 1024 && dosya.ContentType.StartsWith("image/"))
-                            {
-                                using var ms = new MemoryStream((int)dosya.Length);
-                                await dosya.CopyToAsync(ms);
-                                _context.GorevFotografs.Add(new GorevFotograf
-                                {
-                                    GorevRef = model.Id,
-                                    Fotograf = ms.ToArray()
-                                });
-                            }
+                            await updateQuery.ExecuteUpdateAsync(s => s
+                                .SetProperty(g => g.PersonelRef, yeniPersonelRef)
+                                .SetProperty(g => g.Aciklama, yeniAciklama)
+                                .SetProperty(g => g.PersonelNotu, yeniNot)
+                                .SetProperty(g => g.Durum, yeniDurumDegeri)
+                                .SetProperty(g => g.CozumBaslamaTarihi, yeniBaslamaTarihi)
+                                .SetProperty(g => g.CozumBitisTarihi, yeniBitisTarihi)
+                                .SetProperty(g => g.AiKategori, g => yeniAiKategori ?? g.AiKategori));
                         }
-                        await _context.SaveChangesAsync(); // Sadece yeni Insert fotoğraflar için SaveChanges atılır
-                    }
+                        else
+                        {
+                            await updateQuery.ExecuteUpdateAsync(s => s
+                               .SetProperty(g => g.PersonelRef, yeniPersonelRef)
+                               .SetProperty(g => g.Durum, yeniDurumDegeri)
+                               .SetProperty(g => g.CozumBaslamaTarihi, yeniBaslamaTarihi)
+                               .SetProperty(g => g.CozumBitisTarihi, yeniBitisTarihi));
+                        }
 
-                    // LogKaydet DB'ye gitmemesi için sanal bir nesne üretiyoruz
-                    var tempPersonel = new Personel { Id = loginOlanPersonel.Id, Adi = loginOlanPersonel.Adi, Soyadi = loginOlanPersonel.Soyadi, DepartmanRef = loginOlanPersonel.DepartmanRef };
-                    await LogKaydetAsync(tempPersonel, "Görev Güncellendi", $"Görev ID: {model.Id} güncellendi.", null);
+                        // --- Yeni Fotoğraf Kaydı ---
+                        if (YeniFotograflar != null && YeniFotograflar.Count > 0)
+                        {
+                            foreach (var dosya in YeniFotograflar)
+                            {
+                                if (dosya.Length > 0 && dosya.Length <= 5 * 1024 * 1024 && dosya.ContentType.StartsWith("image/"))
+                                {
+                                    using var ms = new MemoryStream((int)dosya.Length);
+                                    await dosya.CopyToAsync(ms);
+                                    _context.GorevFotografs.Add(new GorevFotograf
+                                    {
+                                        GorevRef = model.Id,
+                                        Fotograf = ms.ToArray()
+                                    });
+                                }
+                            }
+                            await _context.SaveChangesAsync(); // Sadece yeni Insert fotoğraflar için SaveChanges atılır
+                        }
+
+                        // LogKaydet DB'ye gitmemesi için sanal bir nesne üretiyoruz
+                        var tempPersonel = new Personel { Id = loginOlanPersonel.Id, Adi = loginOlanPersonel.Adi, Soyadi = loginOlanPersonel.Soyadi, DepartmanRef = loginOlanPersonel.DepartmanRef };
+
+                        bool logBasarili = await LogKaydetAsync(tempPersonel, "Görev Güncellendi", $"Görev ID: {model.Id} güncellendi.", null);
+
+                        if (!logBasarili)
+                        {
+                            throw new Exception("Log kaydı oluşturulamadığı için işlem geri alınıyor.");
+                        }
+
+                        // Tüm DB işlemleri başarılıysa onaylıyoruz
+                        await transaction.CommitAsync();
+                    }
+                    catch (Exception)
+                    {
+                        // Hata anında işlemleri geri al ve Error sayfasına yönlendirilmesi için hatayı dışarı fırlat
+                        await transaction.RollbackAsync();
+                        throw;
+                    }
                 }
 
                 return RedirectToAction(nameof(Gorev));

@@ -7,6 +7,7 @@ using System.Net.Mail;
 using System.Diagnostics;
 using AxonInn.Models.Entities;
 using AxonInn.Models.Context;
+using Microsoft.Extensions.Caching.Memory;
 
 namespace AxonInn.Controllers
 {
@@ -14,17 +15,20 @@ namespace AxonInn.Controllers
     public class DepartmanController : Controller
     {
         private readonly AxonInnContext _context;
+        private readonly IConfiguration _configuration;
+        private readonly IMemoryCache _memoryCache; // EKLENDİ
 
-        // ⚡ AKILLI ÖNBELLEK KIRICI: Değişkeni RAM'de korumalı ve thread-safe tutuyoruz.
-        public static readonly ConcurrentDictionary<long, string> PersonelFotoVersiyonlari = new();
+        // ⚡ AKILLI ÖNBELLEK KIRICI: AppStartVersion sabit kalabilir.
         public static readonly string AppStartVersion = DateTime.Now.Ticks.ToString();
 
-        // ⚡ PERFORMANS: JsonSerializerOptions'ı static readonly yaparak her HTTP isteğinde yeniden yaratılmasını engelledik.
         private static readonly JsonSerializerOptions _jsonOptions = new() { PropertyNamingPolicy = JsonNamingPolicy.CamelCase };
 
-        public DepartmanController(AxonInnContext context)
+        // Constructor'a IMemoryCache eklendi
+        public DepartmanController(AxonInnContext context, IConfiguration configuration, IMemoryCache memoryCache)
         {
             _context = context;
+            _configuration = configuration;
+            _memoryCache = memoryCache;
         }
 
         // ⚡ KOD TEKRARINI ÖNLEME (DRY): Session okuma işlemleri tek merkeze bağlandı.
@@ -55,16 +59,19 @@ namespace AxonInn.Controllers
 
                 if (loginOlanPersonel.Yetki == 1)
                 {
+                    // ⚡ SIRALAMA EKLENDİ: Önce ID, sonra Ad, sonra Soyad sırasına göre SQL'den çekilir.
                     query = query.Include(h => h.Departmen)
-                                 .ThenInclude(d => d.Personels);
+                                 .ThenInclude(d => d.Personels.OrderBy(p => p.Adi).ThenBy(p => p.Soyadi));
                 }
                 else if (loginOlanPersonel.Yetki == 2)
                 {
+                    // ⚡ SIRALAMA EKLENDİ
                     query = query.Include(h => h.Departmen.Where(d => d.Id == loginOlanPersonel.DepartmanRef))
-                                 .ThenInclude(d => d.Personels);
+                                 .ThenInclude(d => d.Personels.OrderBy(p => p.Adi).ThenBy(p => p.Soyadi));
                 }
                 else if (loginOlanPersonel.Yetki == 3)
                 {
+                    // Personel kendi ekranını görüyorsa zaten 1 kişi döneceği için sıralamaya gerek yok
                     query = query.Include(h => h.Departmen.Where(d => d.Id == loginOlanPersonel.DepartmanRef))
                                  .ThenInclude(d => d.Personels.Where(p => p.Id == loginOlanPersonel.Id));
                 }
@@ -144,7 +151,11 @@ namespace AxonInn.Controllers
                         });
 
                         await _context.SaveChangesAsync();
-                        PersonelFotoVersiyonlari[yeniPersonel.Id] = DateTime.Now.Ticks.ToString();
+                        // 2 saat boyunca erişilmezse RAM'den otomatik temizlenir.
+                        _memoryCache.Set($"FotoVersiyon_{yeniPersonel.Id}", DateTime.Now.Ticks.ToString(), new MemoryCacheEntryOptions
+                        {
+                            SlidingExpiration = TimeSpan.FromHours(2)
+                        });
                     }
 
                     await transaction.CommitAsync();
@@ -209,8 +220,8 @@ namespace AxonInn.Controllers
                 await _context.PersonelFotografs.Where(f => f.PersonelRef == id).ExecuteDeleteAsync();
                 await _context.Personels.Where(p => p.Id == id).ExecuteDeleteAsync();
 
-                // 🧹 RAM TEMİZLİĞİ: Silinen personelin Cache versiyonunu Sözlükten sil
-                PersonelFotoVersiyonlari.TryRemove(id, out _);
+                // 🧹 RAM TEMİZLİĞİ: Silinen personelin Cache versiyonunu IMemoryCache'den sil
+                _memoryCache.Remove($"FotoVersiyon_{id}");
 
                 await LogKaydetAsync(loginOlanPersonel, "Personel Silindi", $"Personel ID: {id} başarıyla silindi.", null);
 
@@ -281,7 +292,11 @@ namespace AxonInn.Controllers
                         await _context.SaveChangesAsync();
                     }
 
-                    PersonelFotoVersiyonlari[p.Id] = DateTime.Now.Ticks.ToString();
+                    // Versiyon bilgisini önbellekte günceller ve süresini sıfırlar
+                    _memoryCache.Set($"FotoVersiyon_{p.Id}", DateTime.Now.Ticks.ToString(), new MemoryCacheEntryOptions
+                    {
+                        SlidingExpiration = TimeSpan.FromHours(2)
+                    });
                 }
 
                 // Log atmak için veritabanına sorgu atmayıp elimizdeki veriden sanal bir kopya üretiyoruz.
@@ -302,10 +317,16 @@ namespace AxonInn.Controllers
 
             try
             {
+                // ⚡ appsettings.json'dan ayarları okuyoruz
+                string smtpServer = _configuration["EmailSettings:SmtpServer"]!;
+                int port = int.Parse(_configuration["EmailSettings:Port"] ?? "587");
+                string senderEmail = _configuration["EmailSettings:SenderEmail"]!;
+                string password = _configuration["EmailSettings:Password"]!;
+                bool enableSsl = bool.Parse(_configuration["EmailSettings:EnableSsl"] ?? "false");
+
                 string baseUrl = $"{Request.Scheme}://{Request.Host}";
                 string verificationLink = $"{baseUrl}/Login/VerifyEmail?token={token}";
 
-                // ⚡ TEMİZ KOD (Clean Code): C# 11 "Raw String Literals" ile (+) koymadan temiz HTML dizilimi eklendi.
                 string mailBody = $"""
                     <div style='font-family: Arial, sans-serif; max-width: 600px; margin: auto; border: 1px solid #ddd; padding: 20px; border-radius: 10px;'>
                         <h2 style='color: #2c3e50; text-align: center;'>AxonInn'e Hoş Geldiniz!</h2>
@@ -323,7 +344,7 @@ namespace AxonInn.Controllers
 
                 using var mailMessage = new MailMessage
                 {
-                    From = new MailAddress("info@axoninn.com.tr", "AxonInn Otomasyon"),
+                    From = new MailAddress(senderEmail, "AxonInn Otomasyon"), // Dinamik e-posta
                     Subject = "AxonInn - Hesabınızı Doğrulayın",
                     Body = mailBody,
                     IsBodyHtml = true,
@@ -331,11 +352,11 @@ namespace AxonInn.Controllers
 
                 mailMessage.To.Add(toEmail);
 
-                using var smtpClient = new SmtpClient("mail.axoninn.com.tr")
+                using var smtpClient = new SmtpClient(smtpServer) // Dinamik sunucu
                 {
-                    Port = 587,
-                    Credentials = new NetworkCredential("info@axoninn.com.tr", "12345+pl"),
-                    EnableSsl = false
+                    Port = port, // Dinamik port
+                    Credentials = new NetworkCredential(senderEmail, password), // Dinamik kimlik bilgileri
+                    EnableSsl = enableSsl // Dinamik SSL ayarı
                 };
 
                 await smtpClient.SendMailAsync(mailMessage);

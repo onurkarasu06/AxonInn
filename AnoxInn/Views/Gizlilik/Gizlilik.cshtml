@@ -3,25 +3,23 @@
     Layout = "~/Views/Shared/_Layout.cshtml";
 }
 
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css" media="print" onload="this.media='all'" />
-<noscript>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css" />
-</noscript>
-
 <style>
     /* --- ASP.NET STANDART FOOTER BOŞLUĞUNU VE SABİTLEMESİNİ EZME --- */
-    body {
-        margin-bottom: 0 !important;
-    }
-    
-    main {
-        padding-bottom: 0 !important;
-    }
+    body { margin-bottom: 0 !important; }
+    main { padding-bottom: 0 !important; }
+    footer { position: static !important; margin-top: 1rem !important; }
 
-    footer {
-        position: static !important;
-        margin-top: 1rem !important;
+    /* --- SADELEŞTİRİLMİŞ MİKRO ANİMASYONLAR (Animate.css yerine) --- */
+    @@keyframes fadeIn {
+        from { opacity: 0; }
+        to { opacity: 1; }
     }
+    @@keyframes fadeInDown {
+        from { opacity: 0; transform: translate3d(0, -20px, 0); }
+        to { opacity: 1; transform: translate3d(0, 0, 0); }
+    }
+    .animate__fadeIn { animation: fadeIn 0.8s ease-out both; }
+    .animate__fadeInDown { animation: fadeInDown 0.8s ease-out both; }
 
     /* --- 1. SKELETON LOADER ANİMASYONU --- */
     .skeleton-box {
@@ -33,22 +31,17 @@
         border-radius: 8px;
     }
 
-        .skeleton-box::after {
-            position: absolute;
-            top: 0;
-            right: 0;
-            bottom: 0;
-            left: 0;
-            transform: translateX(-100%);
-            background-image: linear-gradient(90deg, rgba(255, 255, 255, 0) 0, rgba(255, 255, 255, 0.4) 20%, rgba(255, 255, 255, 0.6) 60%, rgba(255, 255, 255, 0));
-            animation: shimmer 1.5s infinite;
-            content: '';
-        }
+    .skeleton-box::after {
+        position: absolute;
+        top: 0; right: 0; bottom: 0; left: 0;
+        transform: translateX(-100%);
+        background-image: linear-gradient(90deg, rgba(255, 255, 255, 0) 0, rgba(255, 255, 255, 0.4) 20%, rgba(255, 255, 255, 0.6) 60%, rgba(255, 255, 255, 0));
+        animation: shimmer 1.5s infinite;
+        content: '';
+    }
 
     @@keyframes shimmer {
-        100% {
-            transform: translateX(100%);
-        }
+        100% { transform: translateX(100%); }
     }
 
     /* --- 2. TEK EKRAN UYUMLULUK VE EFEKTLER --- */
@@ -61,44 +54,26 @@
         margin: 0 auto;
     }
 
-    /* --- BOŞLUK AYARLARI (ARTIRILDI) --- */
-    
-    /* Üst başlık bölmesi ile ilk kart arasındaki boşluk */
-    #mainContent .mb-4 {
-        margin-bottom: 2rem !important;
-    }
-    
-    /* İki kart (Veri Toplama ve Güvenlik) arasındaki boşluk */
-    #mainContent .g-3 {
-        --bs-gutter-y: 1.75rem !important;
-    }
-    
-    /* Kartlar ile en alttaki "AxonInn Güvenlik Protokolü" yazısı arasındaki boşluk */
-    #mainContent .mt-4 {
-        margin-top: 2rem !important;
-    }
+    /* --- BOŞLUK AYARLARI --- */
+    #mainContent .mb-4 { margin-bottom: 2rem !important; }
+    #mainContent .g-3 { --bs-gutter-y: 1.75rem !important; }
+    #mainContent .mt-4 { margin-top: 2rem !important; }
 
     .transition-hover {
         transition: transform 0.3s ease, box-shadow 0.3s ease;
     }
-
-        .transition-hover:hover {
-            transform: translateY(-3px);
-            box-shadow: 0 8px 20px rgba(13, 110, 253, 0.08) !important;
-        }
-
+    .transition-hover:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 8px 20px rgba(13, 110, 253, 0.08) !important;
+    }
     .shadow-inner {
         box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.03) !important;
     }
 </style>
 
+<div id="mainContent" class="container compact-container py-2 animate__fadeIn" style="font-family: 'Inter', sans-serif;">
 
-
-
-
-<div id="mainContent" class="container compact-container py-2 animate__animated animate__fadeIn" style="font-family: 'Inter', sans-serif;">
-
-    <div class="text-center mb-4 animate__animated animate__fadeInDown">
+    <div class="text-center mb-4 animate__fadeInDown">
         <div class="d-inline-flex align-items-center justify-content-center bg-primary bg-opacity-10 text-primary rounded-circle mb-2 shadow-sm"
              style="width: 55px; height: 55px; border: 2px solid rgba(13, 110, 253, 0.05);">
             <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="currentColor" class="bi bi-shield-check" viewBox="0 0 16 16">
@@ -106,6 +81,7 @@
                 <path d="M10.854 6.146a.5.5 0 0 1 0 .708l-3 3a.5.5 0 0 1-.708 0l-1.5-1.5a.5.5 0 1 1 .708-.708L7.5 8.793l2.646-2.647a.5.5 0 0 1 .708 0z" />
             </svg>
         </div>
+ 
         <h1 class="fw-bolder text-dark h4 mb-1" style="letter-spacing: -0.5px;">Gizlilik Politikası</h1>
         <p class="text-secondary mb-0 mx-auto" style="max-width: 450px; font-size: 0.8rem;">
             Verileriniz <span class="text-primary fw-bold">AxonInn</span> altyapısı ile global güvenlik standartlarında korunmaktadır.
@@ -146,4 +122,3 @@
         </p>
     </div>
 </div>
-

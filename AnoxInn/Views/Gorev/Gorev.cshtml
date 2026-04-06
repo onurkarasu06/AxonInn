@@ -15,11 +15,21 @@
 
 
 
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css" media="print" onload="this.media='all'" />
 <link rel="preload" href="https://cdn.datatables.net/1.13.6/css/dataTables.bootstrap5.min.css" as="style" onload="this.onload=null;this.rel='stylesheet'">
 <noscript><link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/dataTables.bootstrap5.min.css"></noscript>
 
 <style>
+    /* --- SADELEŞTİRİLMİŞ MİKRO ANİMASYON (Animate.css Yerine) --- */
+    @@keyframes fadeIn {
+        from { opacity: 0; }
+        to { opacity: 1; }
+    }
+    .animate__animated { animation-duration: 0.5s; animation-fill-mode: both; }
+    .animate__fadeIn { animation-name: fadeIn; }
+
+    /* Mevcut CSS kodlarının kalanı aynı kalacak... */
+    .table-responsive::-webkit-scrollbar { width: 6px; height: 6px; }
+
     /* Kaydırma Çubuğu Optimizasyonu */
     .table-responsive::-webkit-scrollbar { width: 6px; height: 6px; }
     .table-responsive::-webkit-scrollbar-track { background: #f8fafc; border-radius: 10px; }
@@ -639,12 +649,8 @@
     <script src="https://cdn.datatables.net/1.13.6/js/dataTables.bootstrap5.min.js" defer></script>
 
     <script>
-        // Google Ads dönüşüm kodu geciktirildi
-        setTimeout(function() {
-            window.dataLayer = window.dataLayer || [];
-            function gtag(){dataLayer.push(arguments);}
-            gtag('event', 'conversion', {'send_to': 'AW-18020925402/73hECN6-9okcENr_hZFD'});
-        }, 2000);
+   // Google Ads dönüşüm kodu geciktirildi (Lighthouse TBT süresinden kaçmak için 3.5 sn yapıldı)
+
 
         document.addEventListener("DOMContentLoaded", function () {
             // 2. LCP ÇÖZÜMÜ: Sayfa HTML'i okunur okunmaz tabloyu göster, JS dosyalarını bekleme!

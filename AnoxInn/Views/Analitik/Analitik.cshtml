@@ -8,17 +8,9 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
 
-<script>
-    // FCP Hızlandırıcı: Chart.js'i sadece sayfa tasarımı yüklendikten SONRA indirir
-    window.addEventListener("load", function() {
-        var script = document.createElement('script');
-        script.src = "https://cdn.jsdelivr.net/npm/chart.js";
-        script.defer = true;
-        document.body.appendChild(script);
-    });
-</script>
+<link rel="preload" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" as="style" onload="this.onload=null;this.rel='stylesheet'">
+<noscript><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" /></noscript>
 
 <div id="skeletonOverlay" class="skeleton-overlay" style="display: flex;">
     <div class="skeleton-header-row">
@@ -165,7 +157,13 @@
 
 @Html.AntiForgeryToken()
 
+<script type="application/json" id="dashboardDataJson">
+    @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model ?? new AxonInn.Models.Analitik.YorumDashboardViewModel(), new System.Text.Json.JsonSerializerOptions { PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase }))
+</script>
+
 @section Scripts {
+<script src="https://cdn.jsdelivr.net/npm/chart.js" defer></script>
+
 <script>
 window.addEventListener("load", function() {
     
@@ -177,6 +175,7 @@ window.addEventListener("load", function() {
     }, 50);
 
     function initializeDashboard() {
+      
         Chart.defaults.font.family = "'Plus Jakarta Sans', sans-serif";
         Chart.defaults.color = '#64748b';
 
@@ -196,7 +195,9 @@ window.addEventListener("load", function() {
             interaction: { mode: 'index', intersect: false }
         });
 
-   const dashboardData = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model ?? new AxonInn.Models.Analitik.YorumDashboardViewModel(), new System.Text.Json.JsonSerializerOptions { PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase }));
+        // 🚀 MUAZZAM HIZ ARTIŞI: JSON verisini DOM'dan saniyede parse eder.
+        const jsonDataText = document.getElementById('dashboardDataJson').textContent;
+        const dashboardData = JSON.parse(jsonDataText);
 
         const kpiVerisi = dashboardData.kpiVerileri;
         const pastaGrafikVerisi = dashboardData.duyguGrafik;
@@ -212,7 +213,7 @@ window.addEventListener("load", function() {
             let memnuniyet = kpiVerisi.memnuniyetOrani ?? 0;
             let pozitif = kpiVerisi.pozitifYorumOrani ?? 0;
             let negatif = kpiVerisi.negatifYorumOrani ?? 0;
-
+            
             if (toplam > 0) {
                 let eTop = document.getElementById('kpiToplamYorumAdeti');
                 let eMem = document.getElementById('kpiMemnuniyetOrani');
@@ -236,19 +237,24 @@ window.addEventListener("load", function() {
             () => {
                 let cPasta = document.getElementById('duyguPastaGrafigi');
                 if (pastaGrafikVerisi && pastaGrafikVerisi.cokIyiSayisi !== undefined && cPasta) {
-                    let pastaAyar = getOrtakSecenekler(); 
+                    let pastaAyar = getOrtakSecenekler();
                     pastaAyar.cutout = '75%';
-                    pastaAyar.interaction = { mode: 'nearest', intersect: true }; 
+                    pastaAyar.interaction = { mode: 'nearest', intersect: true };
                     pastaAyar.plugins.legend = { display: true, position: 'bottom', labels: { padding: 20, usePointStyle: true, pointStyle: 'circle', font: {size: 13} } };
-                    pastaAyar.plugins.tooltip.callbacks = { label: function(c) { let t = c.dataset.data.reduce((a, b) => a + b, 0); let y = t > 0 ? ((c.raw / t) * 100).toFixed(1) : 0; return ` ${c.label}: ${c.raw} Değerlendirme (%${y})`; } };
+                    pastaAyar.plugins.tooltip.callbacks = { label: function(c) { let t = c.dataset.data.reduce((a, b) => a + b, 0);
+                    let y = t > 0 ? ((c.raw / t) * 100).toFixed(1) : 0; return ` ${c.label}: ${c.raw} Değerlendirme (%${y})`;
+                    } };
                     new Chart(cPasta.getContext('2d'), { type: 'doughnut', data: { labels: ['Mükemmel', 'İyi', 'Nötr/Kararsız', 'Kötü', 'Kritik'], datasets: [{ data: [pastaGrafikVerisi.cokIyiSayisi, pastaGrafikVerisi.iyiSayisi, pastaGrafikVerisi.notrSayisi, pastaGrafikVerisi.kotuSayisi, pastaGrafikVerisi.cokKotuSayisi], backgroundColor: ['#10b981', '#34d399', '#fbbf24', '#f43f5e', '#be123c'], borderWidth: 0, hoverOffset: 8, borderRadius: 4 }] }, options: pastaAyar });
                 }
             },
             () => {
                 let cDept = document.getElementById('departmanBarGrafigi');
                 if (deptGrafikVerisi && deptGrafikVerisi.departmanlar && cDept) {
-                    let deptAyar = getOrtakSecenekler(); deptAyar.scales = { y: { beginAtZero: true, max: 100, border: {display: false}, grid: { color: '#f1f5f9' }, ticks: { padding: 10, callback: v => '%' + v } }, x: { border: {display: false}, grid: { display: false }, ticks: { padding: 10 } } }; deptAyar.plugins.tooltip.callbacks = { label: ctx => ' Başarı Skoru: %' + ctx.parsed.y };
-                    let ctx = cDept.getContext('2d'); let gradient = ctx.createLinearGradient(0, 0, 0, 350); gradient.addColorStop(0, '#8b5cf6'); gradient.addColorStop(1, '#c4b5fd');
+                    let deptAyar = getOrtakSecenekler();
+                    deptAyar.scales = { y: { beginAtZero: true, max: 100, border: {display: false}, grid: { color: '#f1f5f9' }, ticks: { padding: 10, callback: v => '%' + v } }, x: { border: {display: false}, grid: { display: false }, ticks: { padding: 10 } } };
+                    deptAyar.plugins.tooltip.callbacks = { label: ctx => ' Başarı Skoru: %' + ctx.parsed.y };
+                    let ctx = cDept.getContext('2d');
+                    let gradient = ctx.createLinearGradient(0, 0, 0, 350); gradient.addColorStop(0, '#8b5cf6'); gradient.addColorStop(1, '#c4b5fd');
                     new Chart(ctx, { type: 'bar', data: { labels: deptGrafikVerisi.departmanlar, datasets: [{ label: 'Başarı Oranı', data: deptGrafikVerisi.basariOranlari, backgroundColor: gradient, borderRadius: 8, barPercentage: 0.5 }] }, options: deptAyar });
                 }
             },
@@ -257,67 +263,66 @@ window.addEventListener("load", function() {
                 if (polarGrafikVerisi && polarGrafikVerisi.etiketler && cPolar) {
                     const hRenk = { "Neşe": "rgba(251, 191, 36, 0.75)", "Coşku": "rgba(249, 115, 22, 0.75)", "Rahatlık": "rgba(14, 165, 233, 0.75)", "Memnuniyet": "rgba(16, 185, 129, 0.75)", "Tekrar Gelme İsteği": "rgba(5, 150, 105, 0.75)", "Harika": "rgba(139, 92, 246, 0.75)", "Rahatsızlık": "rgba(148, 163, 184, 0.75)", "Hayal Kırıklığı": "rgba(236, 72, 153, 0.75)", "Memnuniyetsizlik": "rgba(244, 63, 94, 0.75)", "Şikayet": "rgba(225, 29, 72, 0.75)", "Öfke ve Haksızlık Hissi": "rgba(159, 18, 57, 0.75)" };
                     let dinamikRenkler = polarGrafikVerisi.etiketler.map(e => hRenk[e] || "rgba(203, 213, 225, 0.7)");
-                    let pAyar = getOrtakSecenekler(); 
+                    let pAyar = getOrtakSecenekler();
                     pAyar.interaction = { mode: 'nearest', intersect: true }; 
-                    pAyar.plugins.tooltip.callbacks = { label: ctx => ctx.label + ': %' + ctx.raw }; pAyar.plugins.legend = { display: true, position: 'right', labels: { padding: 15, usePointStyle: true, pointStyle: 'circle' } }; pAyar.scales = { r: { ticks: { display: false }, grid: { color: '#f1f5f9' } } };
+                    pAyar.plugins.tooltip.callbacks = { label: ctx => ctx.label + ': %' + ctx.raw };
+                    pAyar.plugins.legend = { display: true, position: 'right', labels: { padding: 15, usePointStyle: true, pointStyle: 'circle' } };
+                    pAyar.scales = { r: { ticks: { display: false }, grid: { color: '#f1f5f9' } } };
                     new Chart(cPolar.getContext('2d'), { type: 'polarArea', data: { labels: polarGrafikVerisi.etiketler, datasets: [{ data: polarGrafikVerisi.oranlar, backgroundColor: dinamikRenkler, borderColor: '#fff', borderWidth: 2 }] }, options: pAyar });
                 }
             },
             () => {
                 let cKelime = document.getElementById('kelimeBarGrafigi');
                 if (kelimeGrafikVerisi && kelimeGrafikVerisi.kelimeler && cKelime) {
-                    let kAyar = getOrtakSecenekler(); 
+                    let kAyar = getOrtakSecenekler();
                     kAyar.indexAxis = 'y'; 
-                    
-                    // EKLENDİ: Yatay grafikte boş alanların taranmasını engeller ve kasmayı (lag) bitirir.
                     kAyar.interaction = { mode: 'nearest', intersect: true };
-                    
-                    kAyar.scales = { x: { beginAtZero: true, border: {display: false}, grid: { color: '#f1f5f9' }, ticks: { padding: 10, callback: v => '%' + v } }, y: { border: {display: false}, grid: { display: false }, ticks: { padding: 10 } } }; 
+                    kAyar.scales = { x: { beginAtZero: true, border: {display: false}, grid: { color: '#f1f5f9' }, ticks: { padding: 10, callback: v => '%' + v } }, y: { border: {display: false}, grid: { display: false }, ticks: { padding: 10 } } };
                     kAyar.plugins.tooltip.callbacks = { label: ctx => ' Gündem Yoğunluğu: %' + ctx.parsed.x };
                     new Chart(cKelime.getContext('2d'), { type: 'bar', data: { labels: kelimeGrafikVerisi.kelimeler, datasets: [{ data: kelimeGrafikVerisi.oranlar, backgroundColor: '#334155', borderRadius: 6, barThickness: 15 }] }, options: kAyar });
                 }
             },
-                              () => {
-                                let cUlke = document.getElementById('ulkeGrafigi');
-                                if (ulkeGrafikVerisi && ulkeGrafikVerisi.ulkeler && cUlke) {
-                                    let uAyar = getOrtakSecenekler(); 
-                                    uAyar.plugins.legend = { display: true, position: 'top', labels: { padding: 15, usePointStyle: true, pointStyle: 'circle' } }; 
-            
-                                    // EKSENLERE STACKED: TRUE EKLENDİ
-                                    uAyar.scales = { 
-                                        x: { stacked: true, border: {display: false}, grid: { display: false } }, 
-                                        y: { stacked: true, beginAtZero: true, max: 100, border: {display: false}, grid: { color: '#f1f5f9' }, ticks: { callback: v => '%' + v } } 
-                                    }; 
-            
-                                    uAyar.plugins.tooltip.callbacks = { label: ctx => ' ' + ctx.dataset.label + ': %' + ctx.parsed.y };
-            
-                                    new Chart(cUlke.getContext('2d'), { 
-                                        type: 'bar', 
-                                        data: { 
-                                            labels: ulkeGrafikVerisi.ulkeler, 
-                                            datasets: [ 
-                                                // Barlar üst üste bineceği için aralardaki kırılmaları önlemek adına borderRadius kaldırıldı
-                                                { label: 'Pozitif', data: ulkeGrafikVerisi.pozitifOranlari, backgroundColor: '#10b981', barPercentage: 0.9, categoryPercentage: 0.7, minBarLength: 5 }, 
-                                                { label: 'Nötr', data: ulkeGrafikVerisi.notrOranlari, backgroundColor: '#cbd5e1', barPercentage: 0.9, categoryPercentage: 0.7, minBarLength: 5 }, 
-                                                { label: 'Negatif', data: ulkeGrafikVerisi.negatifOranlari, backgroundColor: '#f43f5e', barPercentage: 0.9, categoryPercentage: 0.7, minBarLength: 5 } 
-                                            ] 
-                                        }, 
-                                        options: uAyar 
-                                    });
-                                }
-                            },
+            () => {
+                let cUlke = document.getElementById('ulkeGrafigi');
+                if (ulkeGrafikVerisi && ulkeGrafikVerisi.ulkeler && cUlke) {
+                    let uAyar = getOrtakSecenekler();
+                    uAyar.plugins.legend = { display: true, position: 'top', labels: { padding: 15, usePointStyle: true, pointStyle: 'circle' } };
+                    uAyar.scales = { 
+                        x: { stacked: true, border: {display: false}, grid: { display: false } }, 
+                        y: { stacked: true, beginAtZero: true, max: 100, border: {display: false}, grid: { color: '#f1f5f9' }, ticks: { callback: v => '%' + v } } 
+                    };
+                    uAyar.plugins.tooltip.callbacks = { label: ctx => ' ' + ctx.dataset.label + ': %' + ctx.parsed.y };
+                    new Chart(cUlke.getContext('2d'), { 
+                        type: 'bar', 
+                        data: { 
+                            labels: ulkeGrafikVerisi.ulkeler, 
+                            datasets: [ 
+                                { label: 'Pozitif', data: ulkeGrafikVerisi.pozitifOranlari, backgroundColor: '#10b981', barPercentage: 0.9, categoryPercentage: 0.7, minBarLength: 5 }, 
+                                { label: 'Nötr', data: ulkeGrafikVerisi.notrOranlari, backgroundColor: '#cbd5e1', barPercentage: 0.9, categoryPercentage: 0.7, minBarLength: 5 }, 
+                                { label: 'Negatif', data: ulkeGrafikVerisi.negatifOranlari, backgroundColor: '#f43f5e', barPercentage: 0.9, categoryPercentage: 0.7, minBarLength: 5 } 
+                            ] 
+                        }, 
+                        options: uAyar 
+                    });
+                }
+            },
             () => {
                 let cKonaklama = document.getElementById('konaklamaGrafigi');
                 if (konaklamaGrafikVerisi && konaklamaGrafikVerisi.tipler && cKonaklama) {
-                    let tAyar = getOrtakSecenekler(); tAyar.plugins.legend = { display: true, position: 'top', labels: { padding: 15, usePointStyle: true, pointStyle: 'circle' } }; tAyar.scales = { x: { border: {display: false}, grid: { display: false } }, y: { beginAtZero: true, max: 100, border: {display: false}, grid: { color: '#f1f5f9' }, ticks: { callback: v => '%' + v } } }; tAyar.plugins.tooltip.callbacks = { label: ctx => ' ' + ctx.dataset.label + ': %' + ctx.parsed.y };
+                    let tAyar = getOrtakSecenekler();
+                    tAyar.plugins.legend = { display: true, position: 'top', labels: { padding: 15, usePointStyle: true, pointStyle: 'circle' } };
+                    tAyar.scales = { x: { border: {display: false}, grid: { display: false } }, y: { beginAtZero: true, max: 100, border: {display: false}, grid: { color: '#f1f5f9' }, ticks: { callback: v => '%' + v } } };
+                    tAyar.plugins.tooltip.callbacks = { label: ctx => ' ' + ctx.dataset.label + ': %' + ctx.parsed.y };
                     new Chart(cKonaklama.getContext('2d'), { type: 'bar', data: { labels: konaklamaGrafikVerisi.tipler, datasets: [ { label: 'Pozitif', data: konaklamaGrafikVerisi.pozitifOranlari, backgroundColor: '#0ea5e9', borderRadius: 4, barPercentage: 0.7 }, { label: 'Nötr', data: konaklamaGrafikVerisi.notrOranlari, backgroundColor: '#cbd5e1', borderRadius: 4, barPercentage: 0.7 }, { label: 'Negatif', data: konaklamaGrafikVerisi.negatifOranlari, backgroundColor: '#f43f5e', borderRadius: 4, barPercentage: 0.7 } ] }, options: tAyar });
                 }
             },
             () => {
                 let cTrend = document.getElementById('trendGrafigi');
                 if (trendGrafikVerisi && trendGrafikVerisi.aylar && cTrend) {
-                    let ctx = cTrend.getContext('2d'); let grad = ctx.createLinearGradient(0, 0, 0, 350); grad.addColorStop(0, 'rgba(244, 63, 94, 0.4)'); grad.addColorStop(1, 'rgba(244, 63, 94, 0.0)');
-                    let trAyar = getOrtakSecenekler(); trAyar.scales = { x: { border: {display: false}, grid: { display: false }, ticks: { padding: 10 } }, y: { beginAtZero: true, border: {display: false}, grid: { color: '#f1f5f9' }, ticks: { padding: 10, stepSize: 1 } } }; trAyar.plugins.tooltip.callbacks = { label: ctx => ' Stres Yoğunluğu: ' + ctx.parsed.y + ' Etkileşim' };
+                    let ctx = cTrend.getContext('2d');
+                    let grad = ctx.createLinearGradient(0, 0, 0, 350); grad.addColorStop(0, 'rgba(244, 63, 94, 0.4)'); grad.addColorStop(1, 'rgba(244, 63, 94, 0.0)');
+                    let trAyar = getOrtakSecenekler(); trAyar.scales = { x: { border: {display: false}, grid: { display: false }, ticks: { padding: 10 } }, y: { beginAtZero: true, border: {display: false}, grid: { color: '#f1f5f9' }, ticks: { padding: 10, stepSize: 1 } } };
+                    trAyar.plugins.tooltip.callbacks = { label: ctx => ' Stres Yoğunluğu: ' + ctx.parsed.y + ' Etkileşim' };
                     new Chart(ctx, { type: 'line', data: { labels: trendGrafikVerisi.aylar, datasets: [{ label: 'Trend', data: trendGrafikVerisi.yogunluklar, borderColor: '#f43f5e', backgroundColor: grad, borderWidth: 3, pointBackgroundColor: '#fff', pointBorderColor: '#f43f5e', pointBorderWidth: 2, pointRadius: 4, pointHoverRadius: 6, fill: true, tension: 0.4 }] }, options: trAyar });
                 }
                 
@@ -333,12 +338,15 @@ window.addEventListener("load", function() {
         let frameIndex = 0;
         function renderNextChart() {
             if (frameIndex < renderQueue.length) {
-                renderQueue[frameIndex]();
-                frameIndex++;
-                requestAnimationFrame(renderNextChart);
+                // 🚀 CPU RAHATLATICI: Tarayıcıya diğer işleri yapması için 50ms mola verir
+                setTimeout(() => {
+                    renderQueue[frameIndex]();
+                    frameIndex++;
+                    renderNextChart();
+                }, 50);
             }
         }
-        requestAnimationFrame(renderNextChart);
+        renderNextChart();
 
         let btnAiTavsiye = document.getElementById('btnAiTavsiye');
         if (btnAiTavsiye) {
@@ -356,14 +364,13 @@ window.addEventListener("load", function() {
                             method: 'POST', 
                             headers: { 
                                 'Content-Type': 'application/json',
-                                'RequestVerificationToken': securityToken // <-- Token'ı sunucuya gönderiyoruz
+                                'RequestVerificationToken': securityToken
                             }, 
                             body: JSON.stringify(dashboardData)
                         });
 
                     if (response.ok) {
                         let aiVerisi = await response.json();
-                        
                         let safeHtml = (id, property) => { let el = document.getElementById(id); if (el && aiVerisi[property]) el.innerHTML = aiVerisi[property]; };
                         
                         safeHtml('ozetDuygu', 'duyguTavsiyesi');
@@ -373,7 +380,7 @@ window.addEventListener("load", function() {
                         safeHtml('ozetUlke', 'ulkeTavsiyesi');
                         safeHtml('ozetKonaklama', 'konaklamaTavsiyesi');
                         safeHtml('ozetTrend', 'trendTavsiyesi');
-
+                        
                         btn.innerHTML = '<i class="fas fa-check-circle me-2"></i> Raporlar Güncellendi';
                         btn.style.background = "linear-gradient(135deg, #10b981 0%, #059669 100%)";
                     } else { throw new Error("Sunucu hatası"); }

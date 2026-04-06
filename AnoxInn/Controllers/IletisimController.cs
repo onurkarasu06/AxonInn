@@ -5,6 +5,7 @@ using System.Net;
 using System.Text.Json;
 using AxonInn.Models.Entities;
 using AxonInn.Models.Context; // ⚡ Yüksek Hızlı Yeni Nesil JSON
+using Microsoft.Extensions.Configuration; // ⚡ EKLENDİ: appsettings'i okumak için gerekli
 
 namespace AxonInn.Controllers
 {
@@ -12,10 +13,13 @@ namespace AxonInn.Controllers
     public class IletisimController : Controller
     {
         private readonly AxonInnContext _context;
+        private readonly IConfiguration _configuration; // ⚡ EKLENDİ
 
-        public IletisimController(AxonInnContext context)
+        // ⚡ CONSTRUCTOR GÜNCELLENDİ: IConfiguration Dependency Injection ile içeri alındı
+        public IletisimController(AxonInnContext context, IConfiguration configuration)
         {
             _context = context;
+            _configuration = configuration;
         }
 
         [Route("Iletisim")]
@@ -53,10 +57,17 @@ namespace AxonInn.Controllers
 
                 var loginOlanPersonel = JsonSerializer.Deserialize<Personel>(personelJson);
 
+                // ⚡ Merkezi appsettings.json dosyasından SMTP ayarlarını çekiyoruz
+                string smtpServer = _configuration["EmailSettings:SmtpServer"]!;
+                int port = int.Parse(_configuration["EmailSettings:Port"] ?? "587");
+                string senderEmail = _configuration["EmailSettings:SenderEmail"]!;
+                string password = _configuration["EmailSettings:Password"]!;
+                bool enableSsl = bool.Parse(_configuration["EmailSettings:EnableSsl"] ?? "false");
+
                 // ⚡ RAM OPTİMİZASYONU (Memory Leak Önlemi): IDisposable nesneler "using var" ile anında bellekten temizlenir.
                 using var mail = new MailMessage();
-                mail.From = new MailAddress("no-reply@axoninn.com.tr", "AxonInn Web Form");
-                mail.To.Add("info@axoninn.com.tr");
+                mail.From = new MailAddress(senderEmail, "AxonInn Web Form"); // Dinamik yapıldı
+                mail.To.Add("info@axoninn.com.tr"); // İstersen burayı da appsettings'ten bir "ReceiverEmail" olarak ayarlayabilirsin
                 mail.Subject = $"Yeni Mesaj: {model.Konu}";
                 mail.IsBodyHtml = true;
                 mail.Body = $@"
@@ -70,11 +81,12 @@ namespace AxonInn.Controllers
                     </div>
                 ";
 
-                using var smtp = new SmtpClient("104.247.162.18", 587);
+                // Sabit IP yerine appsettings'ten gelen sunucu adresi (mail.axoninn.com.tr) kullanılıyor
+                using var smtp = new SmtpClient(smtpServer, port);
                 smtp.UseDefaultCredentials = false;
-                smtp.Credentials = new NetworkCredential("info@axoninn.com.tr", "12345+pl");
+                smtp.Credentials = new NetworkCredential(senderEmail, password); // Dinamik şifre
                 ServicePointManager.ServerCertificateValidationCallback = (sender, certificate, chain, sslPolicyErrors) => true;
-                smtp.EnableSsl = true;
+                smtp.EnableSsl = enableSsl; // Dinamik SSL
 
                 // ⚡ THREAD (İŞLEMCİ) OPTİMİZASYONU: Asenkron SendMailAsync ile sunucunun kilitlenmesi önlendi.
                 await smtp.SendMailAsync(mail);
@@ -90,7 +102,7 @@ namespace AxonInn.Controllers
                 return View("~/Views/Error/Error.cshtml", new ErrorViewModel { RequestId = ex.Message });
             }
 
-            return RedirectToAction("Iletisim"); // ⚡ HATA GİDERİLDİ: Doğru sayfaya yönlendirme düzeltildi (Index yerine Iletisim)
+            return RedirectToAction("Iletisim");
         }
 
         private async Task<bool> LogKaydet(Personel? personel, string islemTipi, string yeniDeger)

@@ -4,12 +4,26 @@
     Layout = "~/Views/Shared/_Layout.cshtml";
 }
 
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css" media="print" onload="this.media='all'" />
-<noscript>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css" />
-</noscript>
-
 <style>
+    /* --- SADELEŞTİRİLMİŞ MİKRO ANİMASYONLAR (Animate.css yerine) --- */
+    @@keyframes fadeIn {
+        from { opacity: 0; }
+        to { opacity: 1; }
+    }
+    @@keyframes fadeInDown {
+        from { opacity: 0; transform: translate3d(0, -20px, 0); }
+        to { opacity: 1; transform: translate3d(0, 0, 0); }
+    }
+    @@keyframes shakeX {
+        from, to { transform: translate3d(0, 0, 0); }
+        10%, 30%, 50%, 70%, 90% { transform: translate3d(-10px, 0, 0); }
+        20%, 40%, 60%, 80% { transform: translate3d(10px, 0, 0); }
+    }
+    .animate__animated { animation-fill-mode: both; }
+    .animate__fadeIn { animation: fadeIn 0.8s ease-out both; }
+    .animate__fadeInDown { animation: fadeInDown 0.8s ease-out both; }
+    .animate__shakeX { animation: shakeX 1s both; }
+
     /* İSKELET ANİMASYONU (SKELETON) */
     .skeleton-box {
         display: inline-block;
@@ -53,14 +67,14 @@
         background-color: #f8f9fa !important;
         border: 1px dashed #dee2e6 !important;
         color: #495057 !important; /* #6c757d yerine daha koyu ve okunaklı bir gri yaptık */
-        font-weight: 500; /* Metni biraz daha belirginleştirdik */
+        font-weight: 500;
         cursor: not-allowed !important;
     }
     
     .input-editable {
         background-color: #ffffff !important;
         border: 1px solid #ced4da !important; /* Editlenebilir olduğunu gösteren net çerçeve */
-        box-shadow: inset 0 1px 3px rgba(0,0,0,0.06) !important; /* İçeri göçük hissi (yazmaya davet eder) */
+        box-shadow: inset 0 1px 3px rgba(0,0,0,0.06) !important;
     }
     
     .input-editable:focus {
@@ -76,7 +90,7 @@
         
         .info-card-body { padding: 1rem !important; }
         .info-icon { 
-            width: 35px !important; 
+            width: 35px !important;
             height: 35px !important; 
             font-size: 0.85rem !important;
             margin-bottom: 0.25rem !important; 
@@ -89,13 +103,11 @@
         .form-card-title { font-size: 1.1rem !important; margin-bottom: 1rem !important; }
     }
 
-    /* Logo Kontrast Ayarı (Bunu Yeni Ekledik) */
+    /* Logo Kontrast Ayarı */
     .text-primary {
-        color: #0a58ca !important; 
+        color: #0a58ca !important;
     }
 </style>
-
-
 
 <div id="mainContent" class="container py-2 animate__animated animate__fadeIn">
 
@@ -157,29 +169,28 @@
                     }
 
                     <form id="iletisimForm" asp-controller="Iletisim" asp-action="MailGonder" method="post">
-                        
                         @Html.AntiForgeryToken()
 
                         <div class="row g-2">
-                                <div class="col-md-6">
-                                    <label for="adSoyad" class="form-label small fw-bold text-secondary text-uppercase mb-1" style="font-size: 0.6rem; letter-spacing: 1px;">Adınız Soyadınız</label>
-                                    <input id="adSoyad" type="text" name="AdSoyad" value="@Model.Adi @Model.Soyadi" readonly class="form-control py-2 input-readonly" style="font-size: 0.85rem;" required />
-                                </div>
+                            <div class="col-md-6">
+                                <label for="adSoyad" class="form-label small fw-bold text-secondary text-uppercase mb-1" style="font-size: 0.6rem; letter-spacing: 1px;">Adınız Soyadınız</label>
+                                <input id="adSoyad" type="text" name="AdSoyad" value="@Model.Adi @Model.Soyadi" readonly class="form-control py-2 input-readonly" style="font-size: 0.85rem;" required />
+                            </div>
 
-                                <div class="col-md-6">
-                                    <label for="emailAdres" class="form-label small fw-bold text-secondary text-uppercase mb-1" style="font-size: 0.6rem; letter-spacing: 1px;">E-Posta Adresiniz</label>
-                                    <input id="emailAdres" type="email" name="Email" value="@Model.MailAdresi" readonly class="form-control py-2 input-readonly" style="font-size: 0.85rem;" required />
-                                </div>
+                            <div class="col-md-6">
+                                <label for="emailAdres" class="form-label small fw-bold text-secondary text-uppercase mb-1" style="font-size: 0.6rem; letter-spacing: 1px;">E-Posta Adresiniz</label>
+                                <input id="emailAdres" type="email" name="Email" value="@Model.MailAdresi" readonly class="form-control py-2 input-readonly" style="font-size: 0.85rem;" required />
+                            </div>
 
-                                <div class="col-12 mt-3">
-                                    <label for="mesajKonusu" class="form-label small fw-bold text-secondary text-uppercase mb-1" style="font-size: 0.6rem; letter-spacing: 1px;">Konu</label>
-                                    <input id="mesajKonusu" type="text" name="Konu" class="form-control py-2 input-editable transition-focus" placeholder="Neden ulaşıyorsunuz?" style="font-size: 0.85rem;" required />
-                                </div>
+                            <div class="col-12 mt-3">
+                                <label for="mesajKonusu" class="form-label small fw-bold text-secondary text-uppercase mb-1" style="font-size: 0.6rem; letter-spacing: 1px;">Konu</label>
+                                <input id="mesajKonusu" type="text" name="Konu" class="form-control py-2 input-editable transition-focus" placeholder="Neden ulaşıyorsunuz?" style="font-size: 0.85rem;" required />
+                            </div>
 
-                                <div class="col-12 mt-3">
-                                    <label for="mesajIcerigi" class="form-label small fw-bold text-secondary text-uppercase mb-1" style="font-size: 0.6rem; letter-spacing: 1px;">Mesajınız</label>
-                                    <textarea id="mesajIcerigi" name="Mesaj" class="form-control py-2 input-editable transition-focus" rows="3" placeholder="Size nasıl yardımcı olabiliriz?" style="font-size: 0.85rem;" required></textarea>
-                                </div>
+                            <div class="col-12 mt-3">
+                                <label for="mesajIcerigi" class="form-label small fw-bold text-secondary text-uppercase mb-1" style="font-size: 0.6rem; letter-spacing: 1px;">Mesajınız</label>
+                                <textarea id="mesajIcerigi" name="Mesaj" class="form-control py-2 input-editable transition-focus" rows="3" placeholder="Size nasıl yardımcı olabiliriz?" style="font-size: 0.85rem;" required></textarea>
+                            </div>
 
                             <div class="col-12 mt-3">
                                 <button type="submit" id="btnGonder" class="btn btn-primary px-4 py-2 fw-bold text-uppercase shadow-sm border-0 float-end d-inline-flex align-items-center justify-content-center" style="border-radius: 10px; font-size: 0.8rem; letter-spacing: 1px; background: linear-gradient(45deg, #0d6efd, #0dcaf0);">
@@ -200,8 +211,6 @@
 @section Scripts {
     <script>
         document.addEventListener("DOMContentLoaded", function () {
-        
-
             // Form Submit Animasyonu ve Çift Tıklama Koruması
             const form = document.getElementById('iletisimForm');
             if (form) {

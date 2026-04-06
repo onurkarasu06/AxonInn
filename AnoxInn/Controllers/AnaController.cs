@@ -39,13 +39,13 @@ namespace AxonInn.Controllers
                 if (loginOlanPersonel == null)
                     return RedirectToAction("Login", "Login");
 
-                // ⚡ OPTİMİZASYON: Tüm null check'leri Select içinde halledip doğrudan temiz veri alıyoruz.
+                // ⚡ GEREKSİZ VERİ ÇEKİMİ ENGELLENDİ: Sadece lazım olan 3 kolon RAM'e alınıyor.
                 var sessionBilgisi = await _context.Departmen
                     .AsNoTracking()
                     .Where(d => d.Id == loginOlanPersonel.DepartmanRef)
                     .Select(d => new {
-                        HotelId = d.HotelRef, 
-                        HotelAdi = d.HotelRefNavigation.Adi ?? "Bilinmeyen Otel",
+                        HotelId = d.HotelRef,
+                        HotelAdi = d.HotelRefNavigation != null ? d.HotelRefNavigation.Adi : "Bilinmeyen Otel",
                         DepartmanAdi = d.Adi ?? "Bilinmeyen Departman"
                     })
                     .FirstOrDefaultAsync();
@@ -56,12 +56,10 @@ namespace AxonInn.Controllers
                 long hotelId = sessionBilgisi.HotelId;
 
                 // --- 🚀 BASE QUERY TEMİZLİĞİ ---
-                // Navigation property'ler için != null kontrolü kaldırıldı (INNER JOIN'e zorlayıp SQL'i hızlandırır).
                 IQueryable<Personel> personelQuery = _context.Personels.AsNoTracking().Where(p => p.AktifMi == 1);
                 IQueryable<Gorev> gorevQuery = _context.Gorevs.AsNoTracking().Where(g => g.PersonelRefNavigation.AktifMi == 1);
                 IQueryable<Departman> departmanQuery = _context.Departmen.AsNoTracking();
 
-                // Yetki Filtrelemeleri (Daha sade)
                 if (loginOlanPersonel.Yetki == 3)
                 {
                     personelQuery = personelQuery.Where(p => p.Id == loginOlanPersonel.Id);
@@ -81,7 +79,8 @@ namespace AxonInn.Controllers
                     departmanQuery = departmanQuery.Where(d => d.HotelRef == hotelId);
                 }
 
-                // ⚡ SQL SORGULARI 
+                // ⚡ SQL SORGULARI (Asenkron ve Sıralı)
+                // Her sorgu kendi içinde asenkron çalışarak IIS thread'lerini serbest bırakır.
                 var departmanPersonelSayilariDb = await personelQuery
                     .GroupBy(p => p.DepartmanRefNavigation.Adi)
                     .Select(g => new { departmanAd = g.Key, adet = g.Count() })
@@ -104,9 +103,9 @@ namespace AxonInn.Controllers
                         tamamlandi = g.Count(x => x.Durum == 3)
                     }).ToListAsync();
 
-                // ⚡ OPTİMİZASYON: !string.IsNullOrEmpty SQL'de daha performanslıdır
+                // SQL index dostu kontrol (string.IsNullOrEmpty yerine veritabanı karşılığı net olan null ve boşluk kontrolü)
                 var aiKategoriDb = await gorevQuery
-                    .Where(g => !string.IsNullOrEmpty(g.AiKategori))
+                    .Where(g => g.AiKategori != null && g.AiKategori != "")
                     .GroupBy(g => g.AiKategori)
                     .Select(g => new { kategori = g.Key, adet = g.Count() })
                     .ToListAsync();

@@ -2,6 +2,8 @@
 @using Microsoft.AspNetCore.Http
 @using System.Text.Json
 @using AxonInn.Controllers 
+@using Microsoft.Extensions.Caching.Memory
+@inject Microsoft.Extensions.Caching.Memory.IMemoryCache MemoryCache
 @{
     Layout = "~/Views/Shared/_Layout.cshtml";
 
@@ -11,12 +13,17 @@
 
 
 
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css" media="print" onload="this.media='all'" />
-<noscript>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css" />
-</noscript>
+
 
 <style>
+    /* --- SADELEŞTİRİLMİŞ MİKRO ANİMASYON (Animate.css Yerine) --- */
+    @@keyframes fadeIn {
+        from { opacity: 0; }
+        to { opacity: 1; }
+    }
+    .animate__animated { animation-duration: 0.5s; animation-fill-mode: both; }
+    .animate__fadeIn { animation-name: fadeIn; }
+
     .table-container {
         transition: all 0.3s ease;
         border-radius: 1.25rem;
@@ -261,10 +268,10 @@
                     <div class="d-flex align-items-center justify-content-between p-3" style="background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);">
                         <div class="d-flex align-items-center text-start">
                             <div class="flex-shrink-0 d-flex align-items-center justify-content-center shadow" style="width: 55px; height: 55px; background: linear-gradient(135deg, #0d6efd 0%, #0dcaf0 100%); border-radius: 12px;">
-                                <img src="~/axoninn.png" alt="Ekip" width="55" height="55" style="width: 100%; height: 100%; object-fit: contain; border-radius: 12px;" />
+                                <img src="~/AxonInn.webp" alt="Ekip" width="55" height="55" style="width: 100%; height: 100%; object-fit: contain; border-radius: 12px;" />
                             </div>
                             <div class="ms-3">
-                                <h1 class="h5 mb-0 fw-bold text-dark" style="letter-spacing: -0.5px;">Departmanlar ve Personeller</h1>
+                                <h2 class="h5 mb-0 fw-bold text-dark" style="letter-spacing: -0.5px;">Departmanlar ve Personeller</h2>
                                 <small class="text-muted d-none d-md-block" style="font-size: 0.75rem;">Kurumsal Yönetim Paneli</small>
                                 <small class="text-muted d-inline d-md-none" style="font-size: 0.65rem;">Yönetim Paneli</small>
                             </div>
@@ -277,9 +284,10 @@
     </div>
 
        <div class="d-flex align-items-center justify-content-center shadow-sm w-100 mb-3 py-2" style="background-color: #f0f4ff; border-radius: 10px; border: 1px solid rgba(92, 124, 250, 0.1);">
-        <h6 class="mb-0 text-uppercase fw-900" style="letter-spacing: 4px; color: #5c7cfa; font-size: 0.75rem;">
+        <h6 class="mb-0 text-uppercase fw-900" style="letter-spacing: 4px; color: #3b5bdb; font-size: 0.75rem;">
             <i class="fas fa-hotel me-2 small"></i>@(Model?.Adi ?? "AxonInn")
         </h6>
+
       </div>
 
    @foreach (var departman in departmanListesi)
@@ -324,7 +332,7 @@
                                                     {
                                                         s++;
                                                         string uniqueRowId = $"dep{departman.Id}_pers{personel.Id}_{s}";
-                                                        string fotoVersiyon = DepartmanController.PersonelFotoVersiyonlari.TryGetValue(personel.Id, out var v) ? v : DepartmanController.AppStartVersion;
+                                                     string fotoVersiyon = MemoryCache.Get<string>($"FotoVersiyon_{personel.Id}") ?? DepartmanController.AppStartVersion;
                                                         <tr style="font-size: 0.85rem;">
                                                             <td data-label="SIRA" class="text-muted">
                                                                 <span>@s @Html.Raw(personel.AktifMi == 2 ? "<span class='text-danger fw-bold ms-1'>(Pasif)</span>" : "")</span>
@@ -345,7 +353,7 @@
                                                                 }
                                                                 else if (personel.Yetki == 2)
                                                                 {
-                                                                    <div class="d-inline-flex align-items-center text-warning fw-bold" style="font-size: 0.7rem; letter-spacing: 0.5px; filter: brightness(0.85);"><i class="fas fa-star me-1"></i>ŞEF</div>
+                                                                  <div class="d-inline-flex align-items-center fw-bold" style="color: #d97706; font-size: 0.7rem; letter-spacing: 0.5px;"><i class="fas fa-star me-1"></i>ŞEF</div>
                                                                 }
                                                                 else
                                                                 {
@@ -607,7 +615,7 @@
                     <div class="modal-kapat-cerceve-yeni" data-bs-dismiss="modal">
                         <i class="fas fa-times text-white" style="font-size: 0.8rem;"></i>
                     </div>
-                    <img id="modalPersonelResim" src="" class="personel-büyük-foto" />
+                  <img id="modalPersonelResim" src="" class="personel-büyük-foto" alt="Personel Büyük Fotoğrafı" />
                     <div class="modal-isim-etiket">
                         <span id="modalPersonelIsim"></span>
                     </div>
@@ -619,12 +627,7 @@
 
 @section Scripts {
     <script>
-        // 1. Google Ads dönüşüm kodu geciktirildi (Tarayıcı rahatlatıldı)
-        setTimeout(function() {
-            window.dataLayer = window.dataLayer || [];
-            function gtag(){dataLayer.push(arguments);}
-            gtag('event', 'conversion', {'send_to': 'AW-18020925402/73hECN6-9okcENr_hZFD'});
-        }, 2000);
+
 
         document.addEventListener("DOMContentLoaded", function () {
             // Skeleton Loader Kapatma
@@ -649,7 +652,8 @@
                     const submitBtn = e.submitter || this.querySelector('button[type="submit"]');
                     if (submitBtn) {
                         if (submitBtn.disabled || submitBtn.classList.contains('btn-loading')) {
-                            e.preventDefault(); return;
+                            e.preventDefault();
+                            return;
                         }
                         if (!this.checkValidity() && !submitBtn.hasAttribute('formnovalidate')) {
                             return;
@@ -659,18 +663,28 @@
                         
                         const textSpan = submitBtn.querySelector('.btn-text');
                         const spinner = submitBtn.querySelector('.btn-spinner');
+                        
                         if(textSpan) {
                             submitBtn.setAttribute('data-original-text', textSpan.innerText);
+                            
                             if (submitBtn.id === 'btnAktivasyonGonder') {
                                 textSpan.innerText = 'Gönderiliyor...';
-                            } else {
+                            } 
+                            // ⚡ YENİ: Güncelle modalındaki Kaydet butonunun metnini değiştirme
+                            else if (submitBtn.closest('#personelGuncelleModal')) {
+                                // Metin "KAYDET" olarak kalır, müdahale edilmez.
+                            } 
+                            else {
                                 textSpan.innerText = 'İşleniyor...';
                             }
                         }
+                        
                         if(spinner) spinner.classList.remove('d-none');
                     }
                 });
             });
+        
+        
         });
 
         // BFCache (Geri Tuşu) Kurtarıcı

@@ -5,7 +5,6 @@
     var hotelAdi = ViewBag.HotelAdi ?? "Bilinmeyen Otel";
 }
 
-
 <link rel="preload" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;800&display=swap" as="style" onload="this.onload=null;this.rel='stylesheet'">
 <link rel="preload" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css" as="style" onload="this.onload=null;this.rel='stylesheet'">
 <link rel="preload" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" as="style" onload="this.onload=null;this.rel='stylesheet'">
@@ -15,9 +14,16 @@
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
 </noscript>
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css" media="print" onload="this.media='all'" />
 
 <style>
+    /* --- SADELEŞTİRİLMİŞ MİKRO ANİMASYONLAR (Animate.css Yerine) --- */
+    @@keyframes fadeIn {
+        from { opacity: 0; }
+        to { opacity: 1; }
+    }
+    .animate__animated { animation-duration: 0.8s; animation-fill-mode: both; }
+    .animate__fadeIn { animation-name: fadeIn; }
+
     .fw-600 { font-weight: 600; }
     .fw-900 { font-weight: 900; }
     .rounded-20 { border-radius: 20px; }
@@ -29,7 +35,7 @@
         will-change: transform, box-shadow; 
     }
     .card-hover:hover { 
-        transform: translateY(-5px); 
+        transform: translateY(-5px);
         box-shadow: 0 15px 35px rgba(0, 0, 0, 0.08) !important; 
     }
     
@@ -240,7 +246,7 @@
     <script>
         document.addEventListener("DOMContentLoaded", function () {
             
-            // FCP Hızlandırma: CSS Repaint uyumunu beklemek için requestAnimationFrame kullanılır.
+            // FCP Hızlandırma
             requestAnimationFrame(() => {
                 document.getElementById('skeletonLoader').classList.add('d-none');
                 document.getElementById('mainContent').classList.remove('d-none');
@@ -254,17 +260,16 @@
                 const colors = ['#4e73df', '#1cc88a', '#36b9cc', '#f6c23e', '#e74a3b', '#858796'];
                 const isMobile = window.innerWidth < 768;
                 
-                // --- 1. DEPARTMAN GRAFİĞİ ---
-                const deptCtx = document.getElementById('departmanChart');
                 let departmanChartInstance = null;
+                let perChartInstance = null;
+                let aiChartInstance = null;
 
-                function ekranıGuncelle() {
+                // --- 1. DEPARTMAN GRAFİĞİ FONKSİYONU ---
+                function renderDepartmanChart() {
                     if (!preGroupedPersonel || preGroupedPersonel.length === 0) return;
-                    
+                    const deptCtx = document.getElementById('departmanChart');
                     if (deptCtx) {
-                        // 🚀 MEMORY LEAK (BELLEK SIZINTISI) KORUMASI
                         if (departmanChartInstance) departmanChartInstance.destroy();
-                        
                         departmanChartInstance = new Chart(deptCtx, {
                             type: 'bar',
                             data: {
@@ -287,18 +292,12 @@
                     }
                 }
 
-                ekranıGuncelle();
-
-                // --- 2. PERSONEL İŞ YÜKÜ GRAFİĞİ ---
-                const perCtx = document.getElementById('personelIsYukuChart');
-                let perChartInstance = null;
-
+                // --- 2. PERSONEL İŞ YÜKÜ GRAFİĞİ FONKSİYONU ---
                 function getFilteredData(deptName) {
                     const labels = [];
                     const beklemedeData = [];
                     const islemdeData = [];
                     const tamamlandiData = [];
-
                     preGroupedGorev.forEach(p => {
                         if (deptName !== 'all' && p.dept !== deptName) return;
                         labels.push(p.ad);
@@ -306,7 +305,6 @@
                         islemdeData.push(p.islemde);
                         tamamlandiData.push(p.tamamlandi);
                     });
-
                     return {
                         labels: labels,
                         datasets: [
@@ -317,93 +315,104 @@
                     };
                 }
 
-                if (perCtx && preGroupedGorev.length > 0) {
-                    if (perChartInstance) perChartInstance.destroy();
-
-                    perChartInstance = new Chart(perCtx, {
-                        type: 'bar',
-                        data: getFilteredData('all'),
-                        options: {
-                            maintainAspectRatio: false,
-                            responsive: true,
-                            plugins: { legend: { position: 'top', labels: { boxWidth: 10 } } },
-                            scales: { x: { stacked: false }, y: { beginAtZero: true, ticks: { stepSize: 1 } } }
-                        }
-                    });
-                    
-                    const filterItems = document.querySelectorAll('.dept-filter-item');
-                    const selectedText = document.getElementById('selectedDeptText');
-
-                    if (filterItems.length > 0) {
-                        filterItems.forEach(item => {
-                            item.addEventListener('click', function(e) {
-                                e.preventDefault();
-                                filterItems.forEach(i => i.classList.remove('active'));
-                                this.classList.add('active');
-                                
-                                const value = this.getAttribute('data-value');
-                                selectedText.textContent = this.textContent;
-                                
-                                perChartInstance.data = getFilteredData(value);
-                                perChartInstance.update();
-                            });
+                function renderPersonelIsYukuChart() {
+                    const perCtx = document.getElementById('personelIsYukuChart');
+                    if (perCtx && preGroupedGorev.length > 0) {
+                        if (perChartInstance) perChartInstance.destroy();
+                        perChartInstance = new Chart(perCtx, {
+                            type: 'bar',
+                            data: getFilteredData('all'),
+                            options: {
+                                maintainAspectRatio: false,
+                                responsive: true,
+                                plugins: { legend: { position: 'top', labels: { boxWidth: 10 } } },
+                                scales: { x: { stacked: false }, y: { beginAtZero: true, ticks: { stepSize: 1 } } }
+                            }
                         });
+                        
+                        const filterItems = document.querySelectorAll('.dept-filter-item');
+                        const selectedText = document.getElementById('selectedDeptText');
+
+                        if (filterItems.length > 0) {
+                            filterItems.forEach(item => {
+                                item.addEventListener('click', function(e) {
+                                    e.preventDefault();
+                                    filterItems.forEach(i => i.classList.remove('active'));
+                                    this.classList.add('active');
+                                    
+                                    const value = this.getAttribute('data-value');
+                                    selectedText.textContent = this.textContent;
+                                    
+                                    perChartInstance.data = getFilteredData(value);
+                                    perChartInstance.update();
+                                });
+                            });
+                        }
                     }
                 }
 
-                // --- 3. 🤖 GEMİNİ AI GRAFİĞİ ---
-                const aiCtx = document.getElementById('aiKategoriChart');
-                let aiChartInstance = null;
-
-                if (aiCtx && aiKategoriData.length > 0) {
-                    if (aiChartInstance) aiChartInstance.destroy();
-
-                    const aiColors = ['#8b5cf6', '#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#64748b'];
-                    
-                    aiChartInstance = new Chart(aiCtx, {
-                        type: 'doughnut', 
-                        data: {
-                            labels: aiKategoriData.map(d => `${d.kategori} (%${d.yuzde})`),
-                            datasets: [{
-                                data: aiKategoriData.map(d => d.yuzde),
-                                backgroundColor: aiColors,
-                                borderWidth: 2,
-                                borderColor: '#ffffff',
-                                hoverOffset: 6
-                            }]
-                        },
-                        options: {
-                            maintainAspectRatio: false, 
-                            cutout: '65%', 
-                            plugins: {
-                                legend: { 
-                                    position: isMobile ? 'bottom' : 'right', 
-                                    labels: { 
-                                        boxWidth: 12, 
-                                        usePointStyle: true, 
-                                        font: { size: 11, family: "'Plus Jakarta Sans', sans-serif" } 
-                                    } 
-                                },
-                                tooltip: {
-                                    callbacks: {
-                                        label: function(context) {
-                                            let label = context.label || ''; 
-                                            let adet = aiKategoriData[context.dataIndex].adet; 
-                                            return ` ${label.split('(')[0].trim()} : ${adet} Görev`; 
+                // --- 3. 🤖 GEMİNİ AI GRAFİĞİ FONKSİYONU ---
+                function renderAiChart() {
+                    const aiCtx = document.getElementById('aiKategoriChart');
+                    if (aiCtx && aiKategoriData.length > 0) {
+                        if (aiChartInstance) aiChartInstance.destroy();
+                        const aiColors = ['#8b5cf6', '#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#64748b'];
+                        
+                        aiChartInstance = new Chart(aiCtx, {
+                            type: 'doughnut', 
+                            data: {
+                                labels: aiKategoriData.map(d => `${d.kategori} (%${d.yuzde})`),
+                                datasets: [{
+                                    data: aiKategoriData.map(d => d.yuzde),
+                                    backgroundColor: aiColors,
+                                    borderWidth: 2,
+                                    borderColor: '#ffffff',
+                                    hoverOffset: 6
+                                }]
+                            },
+                            options: {
+                                maintainAspectRatio: false, 
+                                cutout: '65%', 
+                                plugins: {
+                                    legend: { 
+                                        position: isMobile ? 'bottom' : 'right', 
+                                        labels: { 
+                                            boxWidth: 12, 
+                                            usePointStyle: true, 
+                                            font: { size: 11, family: "'Plus Jakarta Sans', sans-serif" } 
+                                        } 
+                                    },
+                                    tooltip: {
+                                        callbacks: {
+                                            label: function(context) {
+                                                let label = context.label || ''; 
+                                                let adet = aiKategoriData[context.dataIndex].adet; 
+                                                return ` ${label.split('(')[0].trim()} : ${adet} Görev`; 
+                                            }
                                         }
                                     }
                                 }
                             }
-                        }
-                    });
+                        });
+                    }
                 }
 
-                // --- 🚀 DOM THRASHING SIFIRLANDI: Tarayıcı CPU Kasmasını Önleyen Sayaç Animasyonu ---
+                // 🚀 STAGGERED RENDERING: Grafikleri ana iş parçacığını kitlememesi için sırayla yüklüyoruz.
+                requestAnimationFrame(() => {
+                    renderDepartmanChart();
+                    setTimeout(() => {
+                        renderPersonelIsYukuChart();
+                        setTimeout(() => {
+                            renderAiChart();
+                        }, 50);
+                    }, 50);
+                });
+
+                // --- DOM THRASHING SIFIRLANDI: CPU Dostu Sayaç Animasyonu ---
                 const counters = document.querySelectorAll('.counter-value');
                 const speed = 15;
 
                 counters.forEach(counter => {
-                    // String okuyup Number yapıyoruz
                     const targetValue = Number(counter.textContent) || 0;
                     
                     if (targetValue === 0) {
@@ -411,25 +420,24 @@
                         return;
                     }
                     
-                    let currentValue = 0; // Değeri DOM yerine JavaScript belleğinde (RAM) işliyoruz
+                    let currentValue = 0; 
                     const inc = Math.max(1, Math.ceil(targetValue / speed));
 
                     const updateCount = () => {
                         currentValue += inc;
 
                         if (currentValue < targetValue) {
-                            counter.textContent = currentValue; // Yalnızca yazma (Write) işlemi
+                            counter.textContent = currentValue; 
                             requestAnimationFrame(updateCount);
                         } else {
                             counter.textContent = targetValue;
                         }
                     };
-                    
                     counter.textContent = '0';
                     requestAnimationFrame(updateCount);
                 });
 
-            }, 100); // UI yerleşebilsin diye ufak bir asenkron pay (100ms)
+            }, 100); 
         });
     </script>
 }

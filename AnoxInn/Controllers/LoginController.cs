@@ -6,6 +6,7 @@ using Microsoft.EntityFrameworkCore;
 using System.Net;
 using System.Net.Mail;
 using System.Text.Json;
+using Microsoft.Extensions.Configuration; // ⚡ EKLENDİ: appsettings'i okumak için gerekli
 
 namespace AxonInn.Controllers
 {
@@ -13,10 +14,13 @@ namespace AxonInn.Controllers
     public class LoginController : Controller
     {
         private readonly AxonInnContext _context;
+        private readonly IConfiguration _configuration; // ⚡ EKLENDİ
 
-        public LoginController(AxonInnContext context)
+        // ⚡ CONSTRUCTOR GÜNCELLENDİ: IConfiguration Dependency Injection ile içeri alındı
+        public LoginController(AxonInnContext context, IConfiguration configuration)
         {
             _context = context;
+            _configuration = configuration;
         }
 
         [HttpGet]
@@ -309,6 +313,13 @@ namespace AxonInn.Controllers
 
             try
             {
+                // ⚡ Merkezi appsettings.json dosyasından SMTP ayarlarını çekiyoruz
+                string smtpServer = _configuration["EmailSettings:SmtpServer"]!;
+                int port = int.Parse(_configuration["EmailSettings:Port"] ?? "587");
+                string senderEmail = _configuration["EmailSettings:SenderEmail"]!;
+                string password = _configuration["EmailSettings:Password"]!;
+                bool enableSsl = bool.Parse(_configuration["EmailSettings:EnableSsl"] ?? "false");
+
                 string baseUrl = $"{Request.Scheme}://{Request.Host}";
                 string resetLink = $"{baseUrl}/Login/ResetPassword?token={token}";
 
@@ -330,7 +341,7 @@ namespace AxonInn.Controllers
 
                 using var mailMessage = new MailMessage
                 {
-                    From = new MailAddress("info@axoninn.com.tr", "AxonInn Otomasyon"),
+                    From = new MailAddress(senderEmail, "AxonInn Otomasyon"), // Dinamik e-posta
                     Subject = "AxonInn - Şifre Sıfırlama Talebi",
                     Body = mailBody,
                     IsBodyHtml = true,
@@ -338,11 +349,11 @@ namespace AxonInn.Controllers
 
                 mailMessage.To.Add(toEmail);
 
-                using var smtpClient = new SmtpClient("mail.axoninn.com.tr")
+                using var smtpClient = new SmtpClient(smtpServer) // Dinamik sunucu
                 {
-                    Port = 587,
-                    Credentials = new NetworkCredential("info@axoninn.com.tr", "12345+pl"),
-                    EnableSsl = false
+                    Port = port, // Dinamik port
+                    Credentials = new NetworkCredential(senderEmail, password), // Dinamik şifre
+                    EnableSsl = enableSsl // Dinamik SSL ayarı
                 };
 
                 await smtpClient.SendMailAsync(mailMessage);

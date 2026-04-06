@@ -1,9 +1,6 @@
 ﻿@{
-    Layout = null;
-      Layout = "~/Views/Shared/_LoginLayout.cshtml";
-
-
-
+    Layout = "~/Views/Shared/_LoginLayout.cshtml";
+    ViewBag.Title = "Giriş Yap";
 }
 @{
     var aforizmalar = new[] {
@@ -35,33 +32,28 @@
     var gununSozu = aforizmalar[rnd.Next(aforizmalar.Length)];
 }
 
-<!DOCTYPE html>
-<html lang="tr">
-<head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="description" content="AxonInn - Akıllı Otel Yönetim Sistemi Giriş Ekranı" />
-    <title>Axoninn - Giriş Yap</title>
-    <link rel="preload" href="/AxonInn.png" as="image" fetchpriority="high" />
-    <link rel="preconnect" href="https://cdn.jsdelivr.net" />
-    <link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin="anonymous" />
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&display=swap" rel="stylesheet" />
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet" />
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" media="print" onload="this.media='all'" />
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css" media="print" onload="this.media='all'" />
-    <noscript>
-        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" />
-        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css" />
-    </noscript>
-
-
-
-
-
+@section Styles {
     <style>
-     body {
+        /* --- MİKRO ANİMASYONLAR (Animate.css Yerine) --- */
+        @@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        @@keyframes fadeInDown { from { opacity: 0; transform: translate3d(0, -20px, 0); } to { opacity: 1; transform: translate3d(0, 0, 0); } }
+        @@keyframes fadeInUp { from { opacity: 0; transform: translate3d(0, 20px, 0); } to { opacity: 1; transform: translate3d(0, 0, 0); } }
+        @@keyframes fadeInLeft { from { opacity: 0; transform: translate3d(-20px, 0, 0); } to { opacity: 1; transform: translate3d(0, 0, 0); } }
+        @@keyframes shakeX {
+            from, to { transform: translate3d(0, 0, 0); }
+            10%, 30%, 50%, 70%, 90% { transform: translate3d(-10px, 0, 0); }
+            20%, 40%, 60%, 80% { transform: translate3d(10px, 0, 0); }
+        }
+        
+        .animate__animated { animation-fill-mode: both; }
+        .animate__fadeIn { animation: fadeIn 0.8s ease-out; }
+        .animate__fadeInDown { animation: fadeInDown 0.8s ease-out; }
+        .animate__fadeInUp { animation: fadeInUp 0.8s ease-out; }
+        .animate__fadeInLeft { animation: fadeInLeft 0.8s ease-out; }
+        .animate__shakeX { animation: shakeX 1s; }
+        .animate__delay-1s { animation-delay: 1s; }
+
+        body {
             font-family: 'Inter', sans-serif;
             background-color: #f0f4f8; 
             height: 100vh; 
@@ -95,7 +87,6 @@
             overflow: hidden;
         }
  
-        /* --- GÜNCELLENEN SOL PANEL ARKAPLANI --- */
         .left-panel {
             flex: 0 0 60%;
             width: 60%;
@@ -108,7 +99,6 @@
             overflow: hidden;
         }
 
-        /* Arkaplana hafif bir teknolojik doku (noktalı ağ hissi) */
         .left-panel::before {
             content: '';
             position: absolute;
@@ -129,7 +119,6 @@
             z-index: 0;
         }
       
-        /* --- 3D GLASSMORPHISM KARTLAR --- */
         .glass-card {
             background: linear-gradient(135deg, rgba(255, 255, 255, 0.08) 0%, rgba(255, 255, 255, 0.02) 100%);
             border-top: 1px solid rgba(255, 255, 255, 0.4);
@@ -148,7 +137,6 @@
             overflow: hidden;
         }
 
-        /* Kartların üzerinden geçen cam parlaması animasyonu */
         .glass-card::after {
             content: '';
             position: absolute;
@@ -169,7 +157,6 @@
             left: 150%;
         }
 
-        /* --- 3D İKON KUTULARI --- */
         .tech-icon-box {
             width: 55px;
             height: 55px;
@@ -260,13 +247,13 @@
                 padding-top: 6vh;
             }
             .login-wrapper { 
-                height: auto; 
+                height: auto;
                 max-height: none; 
                 padding: 0;
                 margin-bottom: 0; 
             }
             .login-card { 
-                flex-direction: column; 
+                flex-direction: column;
                 border-radius: 1.5rem;
             }
             .left-panel { 
@@ -279,287 +266,261 @@
             }
         }
     </style>
+}
 
+<main class="login-wrapper">
+    <div class="login-card">
+        <div class="left-panel d-none d-lg-flex">
+            <div class="vision-glass-circle" style="width: 400px; height: 400px; top: -150px; left: -150px;"></div>
+            <div class="vision-glass-circle" style="width: 300px; height: 300px; bottom: -50px; right: -50px;"></div>
 
-
-
-
-
-</head>
-
-
-<body>
-   <main class="login-wrapper">
-        <div class="login-card">
-            <div class="left-panel d-none d-lg-flex">
-                <div class="vision-glass-circle" style="width: 400px; height: 400px; top: -150px; left: -150px;"></div>
-                <div class="vision-glass-circle" style="width: 300px; height: 300px; bottom: -50px; right: -50px;"></div>
-                <div class="position-relative z-1 text-white animate__animated animate__fadeInLeft">
-                    <div class="badge bg-white text-primary rounded-pill px-3 py-2 mb-4 shadow-sm" style="font-size: 0.75rem; letter-spacing: 1px;">
-                        <i class="fas fa-bolt text-warning me-1"></i> YÖNETİMDEKİ MÜHENDİSLİK
-                    </div>
-                  <h2 class="fw-black mb-3" style="font-size: 2.6rem; letter-spacing: -1px; line-height: 1.15; font-weight: 900;">
-    “Duyguyla ağırlayın, <br /> mühendislikle yönetin.”
-</h2>
-            <p class="opacity-75 mb-4" style="font-size: 0.95rem; line-height: 1.6; max-width: 90%; font-style: italic; font-weight: 300; letter-spacing: 0.3px;">
-    “AxonINN, dijital sinir sistemimiz ile tüm iş yükünü teknolojiye devrediyor, anıların mimarlığını size bırakıyoruz. Geriye sadece misafirlerinizle aranızdaki o özel bağı hissetmek kalıyor.”
-</p>
-                    <div class="d-flex flex-column gap-3">
-                        <div class="d-flex align-items-center glass-card">
-                            <div class="tech-icon-box me-3 shadow-sm"><i class="fas fa-chart-pie fs-5"></i></div>
-                            <div>
-                                <h6 class="mb-1 fw-bold text-white tracking-wide" style="letter-spacing: 0.5px;">Akıllı İş Zekası</h6>
-                                <span class="d-block text-white opacity-75" style="font-size: 0.85rem;">Tahmin etmeyi bırakın, veriyi görün.</span>
-                            </div>
+            <div class="position-relative z-1 text-white animate__animated animate__fadeInLeft">
+                <div class="badge bg-white text-primary rounded-pill px-3 py-2 mb-4 shadow-sm" style="font-size: 0.75rem; letter-spacing: 1px;">
+                    <i class="fas fa-bolt text-warning me-1"></i> YÖNETİMDEKİ MÜHENDİSLİK
+                </div>
+                <h2 class="fw-black mb-3" style="font-size: 2.6rem; letter-spacing: -1px; line-height: 1.15; font-weight: 900;">
+                “Duyguyla ağırlayın, <br /> mühendislikle yönetin.”
+                </h2>
+                <p class="opacity-75 mb-4" style="font-size: 0.95rem; line-height: 1.6; max-width: 90%; font-style: italic; font-weight: 300; letter-spacing: 0.3px;">
+                    “AxonINN, dijital sinir sistemimiz ile tüm iş yükünü teknolojiye devrediyor, anıların mimarlığını size bırakıyoruz. Geriye sadece misafirlerinizle aranızdaki o özel bağı hissetmek kalıyor.”
+                </p>
+                <div class="d-flex flex-column gap-3">
+                    <div class="d-flex align-items-center glass-card">
+                        <div class="tech-icon-box me-3 shadow-sm"><i class="fas fa-chart-pie fs-5"></i></div>
+                        <div>
+                            <h6 class="mb-1 fw-bold text-white tracking-wide" style="letter-spacing: 0.5px;">Akıllı İş Zekası</h6>
+                            <span class="d-block text-white opacity-75" style="font-size: 0.85rem;">Tahmin etmeyi bırakın, veriyi görün.</span>
                         </div>
-                        <div class="d-flex align-items-center glass-card">
-                            <div class="tech-icon-box me-3 shadow-sm"><i class="fas fa-concierge-bell fs-5"></i></div>
-                            <div>
-                                <h6 class="mb-1 fw-bold text-white tracking-wide" style="letter-spacing: 0.5px;">Sessiz Mükemmellik</h6>
-                                <span class="d-block text-white opacity-75" style="font-size: 0.85rem;">Kusursuz hizmet görünmezdir.</span>
-                            </div>
+                    </div>
+                    <div class="d-flex align-items-center glass-card">
+                        <div class="tech-icon-box me-3 shadow-sm"><i class="fas fa-concierge-bell fs-5"></i></div>
+                        <div>
+                            <h6 class="mb-1 fw-bold text-white tracking-wide" style="letter-spacing: 0.5px;">Sessiz Mükemmellik</h6>
+                            <span class="d-block text-white opacity-75" style="font-size: 0.85rem;">Kusursuz hizmet görünmezdir.</span>
                         </div>
                     </div>
                 </div>
-                <div class="position-relative z-1 animate__animated animate__fadeInUp animate__delay-1s mt-4">
-                    <div class="aphorism-box">
-                        <div class="d-flex align-items-start">
-                            <i class="fas fa-quote-left" style="font-size: 1.5rem; color: rgba(255,255,255,0.4); margin-right: 15px; margin-top: 5px;"></i>
-                            <div>
-                                <p class="mb-2 text-white fst-italic fw-medium" style="font-size: 0.95rem; line-height: 1.5;">
-                                    "@gununSozu.Soz"
-                                </p>
-                                <div class="d-flex align-items-center mt-2">
-                                    <div style="width: 25px; height: 1.5px; background-color: rgba(255,255,255,0.6); margin-right: 10px;"></div>
-                                    <span style="font-size: 0.75rem; letter-spacing: 1.5px; color: #ffffff; font-weight: 700; text-transform: uppercase;">
-                                        @gununSozu.Yazar
-                                    </span>
-                                </div>
+            </div>
+            <div class="position-relative z-1 animate__animated animate__fadeInUp animate__delay-1s mt-4">
+                <div class="aphorism-box">
+                    <div class="d-flex align-items-start">
+                        <i class="fas fa-quote-left" style="font-size: 1.5rem; color: rgba(255,255,255,0.4); margin-right: 15px; margin-top: 5px;"></i>
+                        <div>
+                            <p class="mb-2 text-white fst-italic fw-medium" style="font-size: 0.95rem; line-height: 1.5;">
+                                "@gununSozu.Soz"
+                            </p>
+                            <div class="d-flex align-items-center mt-2">
+                                <div style="width: 25px; height: 1.5px; background-color: rgba(255,255,255,0.6); margin-right: 10px;"></div>
+                                <span style="font-size: 0.75rem; letter-spacing: 1.5px; color: #ffffff; font-weight: 700; text-transform: uppercase;">
+                                    @gununSozu.Yazar
+                                </span>
                             </div>
                         </div>
                     </div>
                 </div>
             </div>
-            <div class="right-panel">
-                <div class="flex-grow-1 d-flex flex-column justify-content-center mx-auto w-100" style="max-width: 360px;">
-                   
-                    
-                    
-               <div class="text-center mb-4 animate__animated animate__fadeInDown">
-    <img src="/AxonInn.png" alt="AxonInn Logo" class="brand-logo mb-3" fetchpriority="high" />
-    <h1 class="mb-1 brand-gradient" style="font-size: 2.3rem; letter-spacing: -1.5px; line-height: 1; font-weight: 900;">
-        Axon<span style="font-weight: 300; letter-spacing: 0;">INN</span>
-    </h1>
-    
-    <p class="mb-0 mt-2" style="font-size: 0.95rem; font-weight: 600; font-style: italic; color: #495057;">
-        "Duyguyla ağırlayın, mühendislikle yönetin."
-    </p>
-    <span class="d-block mt-1 text-muted text-uppercase fw-bold" style="font-size: 0.65rem; letter-spacing: 1px;">
-        AxonINN Dijital Sinir Sisteminiz
-    </span>
-</div>
-                    
-                    
-                    
-                    <form id="loginForm" method="post" asp-controller="Login" asp-action="Login">
-                        @Html.AntiForgeryToken()
-                        <div class="mb-3">
-                            <label for="Email" class="form-label small fw-bold text-secondary ms-1 text-uppercase" style="font-size: 0.65rem; letter-spacing: 1px;">E-mail</label>
-                            <div class="input-group rounded-4 overflow-hidden shadow-sm transition-focus">
-                                <span class="input-group-text border-0 bg-transparent ps-3">
-                                    <i class="fas fa-envelope text-primary opacity-50 small"></i>
-                                </span>
-                                <input type="email" class="form-control border-0 py-3 bg-transparent shadow-none"
-                                       id="Email" name="email" placeholder="Email Adresiniz"
-                                       required autocomplete="username" style="font-size: 0.9rem;" />
-                            </div>
+        </div>
+        <div class="right-panel">
+            <div class="flex-grow-1 d-flex flex-column justify-content-center mx-auto w-100" style="max-width: 360px;">
+                
+            <div class="text-center mb-4 animate__animated animate__fadeInDown">
+                <img src="/AxonInn.webp" alt="AxonInn Logo" class="brand-logo mb-3" fetchpriority="high" />
+                <h1 class="mb-1 brand-gradient" style="font-size: 2.3rem; letter-spacing: -1.5px; line-height: 1; font-weight: 900;">
+                    Axon<span style="font-weight: 300; letter-spacing: 0;">INN</span>
+                </h1>
+                <p class="mb-0 mt-2" style="font-size: 0.95rem; font-weight: 600; font-style: italic; color: #495057;">
+                    "Duyguyla ağırlayın, mühendislikle yönetin."
+                </p>
+                <span class="d-block mt-1 text-muted text-uppercase fw-bold" style="font-size: 0.65rem; letter-spacing: 1px;">
+                    AxonINN Dijital Sinir Sisteminiz
+                </span>
+            </div>
+                
+                <form id="loginForm" method="post" asp-controller="Login" asp-action="Login">
+                    @Html.AntiForgeryToken()
+                    <div class="mb-3">
+                        <label for="Email" class="form-label small fw-bold text-secondary ms-1 text-uppercase" style="font-size: 0.65rem; letter-spacing: 1px;">E-mail</label>
+                        <div class="input-group rounded-4 overflow-hidden shadow-sm transition-focus">
+                            <span class="input-group-text border-0 bg-transparent ps-3">
+                                <i class="fas fa-envelope text-primary opacity-50 small"></i>
+                            </span>
+                            <input type="email" class="form-control border-0 py-3 bg-transparent shadow-none"
+                                    id="Email" name="email" placeholder="Email Adresiniz"
+                                    required autocomplete="username" style="font-size: 0.9rem;" />
                         </div>
-                        <div class="mb-4">
-                            <label for="Password" class="form-label small fw-bold text-secondary ms-1 text-uppercase" style="font-size: 0.65rem; letter-spacing: 1px;">Şifre</label>
-                            <div class="input-group rounded-4 overflow-hidden shadow-sm transition-focus">
-                                <span class="input-group-text border-0 bg-transparent ps-3">
-                                    <i class="fas fa-lock text-primary opacity-50 small"></i>
-                                </span>
-                                <input type="password" class="form-control border-0 py-3 bg-transparent shadow-none"
-                                       id="Password" name="password" placeholder="••••••••"
-                                       required autocomplete="current-password" style="font-size: 0.9rem;" />
-                            </div>
+                    </div>
+                    <div class="mb-4">
+                        <label for="Password" class="form-label small fw-bold text-secondary ms-1 text-uppercase" style="font-size: 0.65rem; letter-spacing: 1px;">Şifre</label>
+                        <div class="input-group rounded-4 overflow-hidden shadow-sm transition-focus">
+                            <span class="input-group-text border-0 bg-transparent ps-3">
+                                <i class="fas fa-lock text-primary opacity-50 small"></i>
+                            </span>
+                            <input type="password" class="form-control border-0 py-3 bg-transparent shadow-none"
+                                    id="Password" name="password" placeholder="••••••••"
+                                    required autocomplete="current-password" style="font-size: 0.9rem;" />
                         </div>
-                        @if (TempData["SuccessMessage"] != null)
-                        {
-                            <div class="alert alert-success py-2 px-3 border-0 shadow-sm mb-4 d-flex align-items-center animate__animated animate__fadeInDown"
-                                 style="border-radius: 12px; font-size: 0.8rem; background-color: #f0fdf4; color: #15803d;">
-                                <i class="fas fa-check-circle me-2" style="font-size: 1.1rem;"></i>
-                                <span class="fw-bold ms-2">@TempData["SuccessMessage"]</span>
-                            </div>
-                        }
-                        @if (TempData["ErrorMessage"] != null)
-                        {
+                        </div>
+                    @if (TempData["SuccessMessage"] != null)
+                    {
+                        <div class="alert alert-success py-2 px-3 border-0 shadow-sm mb-4 d-flex align-items-center animate__animated animate__fadeInDown"
+                                style="border-radius: 12px; font-size: 0.8rem; background-color: #f0fdf4; color: #15803d;">
+                            <i class="fas fa-check-circle me-2" style="font-size: 1.1rem;"></i>
+                            <span class="fw-bold ms-2">@TempData["SuccessMessage"]</span>
+                        </div>
+                    }
+                    @if (TempData["ErrorMessage"] != null)
+                    {
                             <div class="alert alert-danger py-2 px-3 border-0 shadow-sm mb-4 d-flex align-items-center animate__animated animate__shakeX"
-                                 style="border-radius: 12px; font-size: 0.8rem; background-color: #fff5f5; color: #e03131;">
-                                <i class="fas fa-exclamation-triangle me-2"></i>
-                                <span class="fw-bold ms-2">@TempData["ErrorMessage"]</span>
-                            </div>
-                        }
-                        <button class="btn btn-primary w-100 py-3 fw-bold text-uppercase shadow-sm transition-hover border-0 d-flex align-items-center justify-content-center"
-                                type="submit" id="loginBtn" style="border-radius: 12px; font-size: 0.9rem; letter-spacing: 1px; background: linear-gradient(135deg, #0d6efd 0%, #0dcaf0 100%);">
-                            <span id="loginBtnText">Sisteme Giriş</span>
-                            <div id="loginBtnSpinner" class="spinner-border spinner-border-sm ms-2 d-none" role="status" aria-hidden="true"></div>
-                        </button>
-                    </form>
-                 
-                    
-                    
-                    
-                                             <div class="d-flex justify-content-between align-items-center mt-4 px-1">
-    <a href="#" data-bs-toggle="modal" data-bs-target="#iletisimModal" class="text-decoration-none d-inline-flex align-items-center rounded-pill transition-hover px-2 py-1" style="color: #6c757d; border: 1px solid rgba(13, 110, 253, 0.15); background-color: transparent;">
-        <div class="d-flex align-items-center justify-content-center rounded-circle me-2" style="width: 24px; height: 24px; background: rgba(13, 110, 253, 0.05); color: #0d6efd;">
-            <i class="fas fa-headset" style="font-size: 0.7rem;"></i>
-        </div>
-        <span class="fw-bold pe-1" style="font-size: 0.75rem; white-space: nowrap;">İletişim & Destek</span>
-    </a>
+                                style="border-radius: 12px; font-size: 0.8rem; background-color: #fff5f5; color: #e03131;">
+                            <i class="fas fa-exclamation-triangle me-2"></i>
+                            <span class="fw-bold ms-2">@TempData["ErrorMessage"]</span>
+                        </div>
+                    }
+                    <button class="btn btn-primary w-100 py-3 fw-bold text-uppercase shadow-sm transition-hover border-0 d-flex align-items-center justify-content-center"
+                            type="submit" id="loginBtn" style="border-radius: 12px; font-size: 0.9rem; letter-spacing: 1px; background: linear-gradient(135deg, #0d6efd 0%, #0dcaf0 100%);">
+                        <span id="loginBtnText">Sisteme Giriş</span>
+                        <div id="loginBtnSpinner" class="spinner-border spinner-border-sm ms-2 d-none" role="status" aria-hidden="true"></div>
+                    </button>
+                </form>
+                
+                <div class="d-flex justify-content-between align-items-center mt-4 px-1">
+                    <a href="#" data-bs-toggle="modal" data-bs-target="#iletisimModal" class="text-decoration-none d-inline-flex align-items-center rounded-pill transition-hover px-2 py-1" style="color: #6c757d; border: 1px solid rgba(13, 110, 253, 0.15); background-color: transparent;">
+                        <div class="d-flex align-items-center justify-content-center rounded-circle me-2" style="width: 24px; height: 24px; background: rgba(13, 110, 253, 0.05); color: #0d6efd;">
+                            <i class="fas fa-headset" style="font-size: 0.7rem;"></i>
+                        </div>
+                        <span class="fw-bold pe-1" style="font-size: 0.75rem; white-space: nowrap;">İletişim & Destek</span>
+                    </a>
 
-    <a href="#" data-bs-toggle="modal" data-bs-target="#forgotPasswordModal" class="text-decoration-none d-inline-flex align-items-center rounded-pill transition-hover px-2 py-1" style="border: 1px solid rgba(13, 202, 240, 0.2); background-color: transparent;">
-        <span class="fw-bold brand-gradient me-2 ps-1" style="font-size: 0.75rem; white-space: nowrap;">Şifremi Unuttum?</span>
-        <div class="d-flex align-items-center justify-content-center rounded-circle" style="width: 24px; height: 24px; background: rgba(13, 202, 240, 0.05); color: #0dcaf0;">
-            <i class="fas fa-unlock-alt" style="font-size: 0.7rem;"></i>
-        </div>
-    </a>
-</div>
-
-
-
-
+                    <a href="#" data-bs-toggle="modal" data-bs-target="#forgotPasswordModal" class="text-decoration-none d-inline-flex align-items-center rounded-pill transition-hover px-2 py-1" style="border: 1px solid rgba(13, 202, 240, 0.2); background-color: transparent;">
+                        <span class="fw-bold brand-gradient me-2 ps-1" style="font-size: 0.75rem; white-space: nowrap;">Şifremi Unuttum?</span>
+                        <div class="d-flex align-items-center justify-content-center rounded-circle" style="width: 24px; height: 24px; background: rgba(13, 202, 240, 0.05); color: #0dcaf0;">
+                            <i class="fas fa-unlock-alt" style="font-size: 0.7rem;"></i>
+                        </div>
+                    </a>
                 </div>
-              <div class="text-center mt-3 pt-3 border-top animate__animated animate__fadeIn" style="border-color: rgba(0,0,0,0.05) !important;">
-    <div style="font-size: 0.65rem; color: #6c757d; letter-spacing: 1px; font-weight: 600;">
-        &copy; @DateTime.Now.Year <span class="brand-gradient" style="font-size: 0.75rem; font-weight: 900;">AxonINN</span>
-        <span class="d-block mt-1" style="font-size: 0.6rem;">Tasarım: Onur KARASU</span>
+            </div>
+            <div class="text-center mt-3 pt-3 border-top animate__animated animate__fadeIn" style="border-color: rgba(0,0,0,0.05) !important;">
+            <div style="font-size: 0.65rem; color: #6c757d; letter-spacing: 1px; font-weight: 600;">
+                &copy; @DateTime.Now.Year <span class="brand-gradient" style="font-size: 0.75rem; font-weight: 900;">AxonINN</span>
+                <span class="d-block mt-1" style="font-size: 0.6rem;">Tasarım: Onur KARASU</span>
+            </div>
+        </div>
+        </div>
+    </div>
+</main>
+
+<div class="modal fade" id="iletisimModal" tabindex="-1" aria-hidden="true">
+<div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content border-0 shadow-lg rounded-4">
+        <div class="modal-header border-0 pb-0 pt-3">
+            <h5 class="modal-title brand-gradient" style="font-weight: 900;">İletişim Bilgileri</h5>
+            <button type="button" class="btn-close shadow-none" data-bs-dismiss="modal" aria-label="Kapat"></button>
+        </div>
+        <div class="modal-body pt-4 pb-4 px-4">
+            <div class="d-flex align-items-center mb-4 p-3 bg-light rounded-4 border-0 shadow-sm transition-hover">
+                <div class="tech-icon-box bg-white text-primary me-3 shadow-sm" style="width: 45px; height: 45px;">
+                    <i class="fas fa-at fs-5"></i>
+                </div>
+                <div>
+                    <span class="d-block text-secondary small text-uppercase fw-bold" style="letter-spacing: 1px; font-size: 0.65rem;">AxonINN Mail</span>
+                    <a href="mailto:info@axoninn.com.tr" class="text-dark text-decoration-none fw-semibold">info@axoninn.com.tr</a>
+                </div>
+            </div>
+            <div class="d-flex align-items-center mb-4 p-3 bg-light rounded-4 border-0 shadow-sm transition-hover">
+                <div class="tech-icon-box bg-white text-primary me-3 shadow-sm" style="width: 45px; height: 45px;">
+                    <i class="fas fa-envelope fs-5"></i>
+                </div>
+                <div>
+                    <span class="d-block text-secondary small text-uppercase fw-bold" style="letter-spacing: 1px; font-size: 0.65rem;">E-Posta Desteği</span>
+                    <a href="mailto:onurkarasu06@gmail.com" class="text-dark text-decoration-none fw-semibold">onurkarasu06@gmail.com</a>
+                </div>
+            </div>
+            <div class="d-flex align-items-center p-3 bg-light rounded-4 border-0 shadow-sm transition-hover">
+                <div class="tech-icon-box bg-white text-primary me-3 shadow-sm" style="width: 45px; height: 45px;">
+                    <i class="fas fa-phone-alt fs-5"></i>
+                </div>
+                <div>
+                    <span class="d-block text-secondary small text-uppercase fw-bold" style="letter-spacing: 1px; font-size: 0.65rem;">Telefon Desteği</span>
+                    <a href="tel:+905327780022" class="text-dark text-decoration-none fw-semibold">0532 778 00 22</a>
+                </div>
+            </div>
+        </div>
     </div>
 </div>
-            </div>
-        </div>
-   </main>
+</div>
 
-
-
-
-   <div class="modal fade" id="iletisimModal" tabindex="-1" aria-hidden="true">
+<div class="modal fade" id="forgotPasswordModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content border-0 shadow-lg rounded-4">
             <div class="modal-header border-0 pb-0 pt-3">
-                <h5 class="modal-title brand-gradient" style="font-weight: 900;">İletişim Bilgileri</h5>
+                <h5 class="modal-title brand-gradient" style="font-weight: 900;">Şifre Sıfırlama Talebi</h5>
                 <button type="button" class="btn-close shadow-none" data-bs-dismiss="modal" aria-label="Kapat"></button>
             </div>
-            <div class="modal-body pt-4 pb-4 px-4">
-                
-                <div class="d-flex align-items-center mb-4 p-3 bg-light rounded-4 border-0 shadow-sm transition-hover">
-                    <div class="tech-icon-box bg-white text-primary me-3 shadow-sm" style="width: 45px; height: 45px;">
-                        <i class="fas fa-at fs-5"></i>
-                    </div>
-                    <div>
-                        <span class="d-block text-secondary small text-uppercase fw-bold" style="letter-spacing: 1px; font-size: 0.65rem;">AxonINN Mail</span>
-                        <a href="mailto:info@axoninn.com.tr" class="text-dark text-decoration-none fw-semibold">info@axoninn.com.tr</a>
-                    </div>
-                </div>
-
-                <div class="d-flex align-items-center mb-4 p-3 bg-light rounded-4 border-0 shadow-sm transition-hover">
-                    <div class="tech-icon-box bg-white text-primary me-3 shadow-sm" style="width: 45px; height: 45px;">
-                        <i class="fas fa-envelope fs-5"></i>
-                    </div>
-                    <div>
-                        <span class="d-block text-secondary small text-uppercase fw-bold" style="letter-spacing: 1px; font-size: 0.65rem;">E-Posta Desteği</span>
-                        <a href="mailto:onurkarasu06@gmail.com" class="text-dark text-decoration-none fw-semibold">onurkarasu06@gmail.com</a>
+            <form id="forgotPasswordForm" method="post" asp-controller="Login" asp-action="ForgotPassword">
+                @Html.AntiForgeryToken()
+                <div class="modal-body pt-3 pb-2">
+                    <p class="text-secondary small mb-3">Sisteme kayıtlı e-posta adresinizi girin. Size şifrenizi sıfırlayabilmeniz için bir bağlantı göndereceğiz.</p>
+                    <div class="mb-3">
+                        <div class="input-group rounded-4 overflow-hidden shadow-sm transition-focus">
+                            <span class="input-group-text border-0 bg-light ps-3">
+                                <i class="fas fa-envelope text-primary opacity-50 small"></i>
+                            </span>
+                                <input type="email" class="form-control border-0 py-2 bg-light shadow-none" name="email" placeholder="E-posta adresiniz" required autocomplete="email" />
+                        </div>
                     </div>
                 </div>
-
-                <div class="d-flex align-items-center p-3 bg-light rounded-4 border-0 shadow-sm transition-hover">
-                    <div class="tech-icon-box bg-white text-primary me-3 shadow-sm" style="width: 45px; height: 45px;">
-                        <i class="fas fa-phone-alt fs-5"></i>
-                    </div>
-                    <div>
-                        <span class="d-block text-secondary small text-uppercase fw-bold" style="letter-spacing: 1px; font-size: 0.65rem;">Telefon Desteği</span>
-                        <a href="tel:+905327780022" class="text-dark text-decoration-none fw-semibold">0532 778 00 22</a>
-                    </div>
+                <div class="modal-footer border-0 pt-0 pb-4 px-4">
+                    <button type="submit" id="forgotBtn" class="btn btn-primary w-100 py-2 fw-bold text-uppercase shadow-sm rounded-pill d-flex align-items-center justify-content-center transition-hover" style="font-size: 0.85rem; letter-spacing: 1px; background: linear-gradient(135deg, #0d6efd 0%, #0dcaf0 100%); border: none;">
+                        <span id="forgotBtnText">Talep Gönder</span>
+                        <div id="forgotBtnSpinner" class="spinner-border spinner-border-sm ms-2 d-none" role="status" aria-hidden="true"></div>
+                    </button>
                 </div>
-
-            </div>
+            </form>
         </div>
     </div>
 </div>
 
-
-
-    <div class="modal fade" id="forgotPasswordModal" tabindex="-1" aria-hidden="true">
-        <div class="modal-dialog modal-dialog-centered">
-            <div class="modal-content border-0 shadow-lg rounded-4">
-                <div class="modal-header border-0 pb-0 pt-3">
-                    <h5 class="modal-title brand-gradient" style="font-weight: 900;">Şifre Sıfırlama Talebi</h5>
-                    <button type="button" class="btn-close shadow-none" data-bs-dismiss="modal" aria-label="Kapat"></button>
-                </div>
-                <form id="forgotPasswordForm" method="post" asp-controller="Login" asp-action="ForgotPassword">
-                    @Html.AntiForgeryToken()
-                    <div class="modal-body pt-3 pb-2">
-                        <p class="text-secondary small mb-3">Sisteme kayıtlı e-posta adresinizi girin. Size şifrenizi sıfırlayabilmeniz için bir bağlantı göndereceğiz.</p>
-                        <div class="mb-3">
-                            <div class="input-group rounded-4 overflow-hidden shadow-sm transition-focus">
-                                <span class="input-group-text border-0 bg-light ps-3">
-                                    <i class="fas fa-envelope text-primary opacity-50 small"></i>
-                                </span>
-                                <input type="email" class="form-control border-0 py-2 bg-light shadow-none" name="email" placeholder="E-posta adresiniz" required autocomplete="email" />
-                            </div>
+<div class="modal fade" id="resetPasswordModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg rounded-4">
+            <div class="modal-header border-0 pb-0 pt-3">
+                <h5 class="modal-title brand-gradient" style="font-weight: 900;">Yeni Şifre Belirle</h5>
+                <button type="button" class="btn-close shadow-none" data-bs-dismiss="modal" aria-label="Kapat"></button>
+            </div>
+            <form id="resetPasswordForm" method="post" asp-controller="Login" asp-action="ResetPassword">
+                @Html.AntiForgeryToken()
+                <input type="hidden" name="token" value="@TempData["ValidResetToken"]" />
+                <div class="modal-body pt-3 pb-2">
+                    <p class="text-secondary small mb-3">Lütfen hesabınız için güvenli, yeni bir şifre giriniz.</p>
+                    <div class="mb-3">
+                        <div class="input-group rounded-4 overflow-hidden shadow-sm transition-focus">
+                            <span class="input-group-text border-0 bg-light ps-3">
+                                <i class="fas fa-lock text-primary opacity-50 small"></i>
+                            </span>
+                            <input type="password" class="form-control border-0 py-2 bg-light shadow-none" name="newPassword" placeholder="Yeni Şifreniz" required minlength="6" autocomplete="new-password" />
                         </div>
                     </div>
-                    <div class="modal-footer border-0 pt-0 pb-4 px-4">
-                        <button type="submit" id="forgotBtn" class="btn btn-primary w-100 py-2 fw-bold text-uppercase shadow-sm rounded-pill d-flex align-items-center justify-content-center transition-hover" style="font-size: 0.85rem; letter-spacing: 1px; background: linear-gradient(135deg, #0d6efd 0%, #0dcaf0 100%); border: none;">
-                            <span id="forgotBtnText">Talep Gönder</span>
-                            <div id="forgotBtnSpinner" class="spinner-border spinner-border-sm ms-2 d-none" role="status" aria-hidden="true"></div>
-                        </button>
+                    <div class="mb-3">
+                        <div class="input-group rounded-4 overflow-hidden shadow-sm transition-focus">
+                            <span class="input-group-text border-0 bg-light ps-3">
+                                <i class="fas fa-check-double text-primary opacity-50 small"></i>
+                            </span>
+                            <input type="password" class="form-control border-0 py-2 bg-light shadow-none" name="confirmPassword" placeholder="Şifrenizi Tekrar Girin" required minlength="6" autocomplete="new-password" />
+                        </div>
                     </div>
-                </form>
-            </div>
+                </div>
+                <div class="modal-footer border-0 pt-0 pb-4 px-4">
+                    <button type="submit" id="resetBtn" class="btn btn-primary w-100 py-2 fw-bold text-uppercase shadow-sm rounded-pill d-flex align-items-center justify-content-center transition-hover" style="font-size: 0.85rem; letter-spacing: 1px; background: linear-gradient(135deg, #0d6efd 0%, #0dcaf0 100%); border: none;">
+                        <span id="resetBtnText">ŞİFREMİ GÜNCELLE</span>
+                        <div id="resetBtnSpinner" class="spinner-border spinner-border-sm ms-2 d-none" role="status" aria-hidden="true"></div>
+                    </button>
+                </div>
+            </form>
         </div>
     </div>
-    <div class="modal fade" id="resetPasswordModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static">
-        <div class="modal-dialog modal-dialog-centered">
-            <div class="modal-content border-0 shadow-lg rounded-4">
-                <div class="modal-header border-0 pb-0 pt-3">
-                    <h5 class="modal-title brand-gradient" style="font-weight: 900;">Yeni Şifre Belirle</h5>
-                    <button type="button" class="btn-close shadow-none" data-bs-dismiss="modal" aria-label="Kapat"></button>
-                </div>
-               <form id="resetPasswordForm" method="post" asp-controller="Login" asp-action="ResetPassword">
-                    @Html.AntiForgeryToken()
-                    <input type="hidden" name="token" value="@TempData["ValidResetToken"]" />
-                    <div class="modal-body pt-3 pb-2">
-                        <p class="text-secondary small mb-3">Lütfen hesabınız için güvenli, yeni bir şifre giriniz.</p>
-                        <div class="mb-3">
-                            <div class="input-group rounded-4 overflow-hidden shadow-sm transition-focus">
-                                <span class="input-group-text border-0 bg-light ps-3">
-                                    <i class="fas fa-lock text-primary opacity-50 small"></i>
-                                </span>
-                                <input type="password" class="form-control border-0 py-2 bg-light shadow-none" name="newPassword" placeholder="Yeni Şifreniz" required minlength="6" autocomplete="new-password" />
-                            </div>
-                        </div>
-                        <div class="mb-3">
-                            <div class="input-group rounded-4 overflow-hidden shadow-sm transition-focus">
-                                <span class="input-group-text border-0 bg-light ps-3">
-                                    <i class="fas fa-check-double text-primary opacity-50 small"></i>
-                                </span>
-                                <input type="password" class="form-control border-0 py-2 bg-light shadow-none" name="confirmPassword" placeholder="Şifrenizi Tekrar Girin" required minlength="6" autocomplete="new-password" />
-                            </div>
-                        </div>
-                    </div>
-                    <div class="modal-footer border-0 pt-0 pb-4 px-4">
-                        <button type="submit" id="resetBtn" class="btn btn-primary w-100 py-2 fw-bold text-uppercase shadow-sm rounded-pill d-flex align-items-center justify-content-center transition-hover" style="font-size: 0.85rem; letter-spacing: 1px; background: linear-gradient(135deg, #0d6efd 0%, #0dcaf0 100%); border: none;">
-                            <span id="resetBtnText">ŞİFREMİ GÜNCELLE</span>
-                            <div id="resetBtnSpinner" class="spinner-border spinner-border-sm ms-2 d-none" role="status" aria-hidden="true"></div>
-                        </button>
-                    </div>
-                </form>
-            </div>
-        </div>
-    </div>
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js" defer></script>
+</div>
+
+@section Scripts {
     <script>
         document.addEventListener("DOMContentLoaded", function() {
             @if (TempData["ValidResetToken"] != null)
@@ -575,7 +536,6 @@
                 const btn = document.getElementById(btnId);
                 const textEl = document.getElementById(btnTextId);
                 const spinner = document.getElementById(spinnerId);
-
                 if (form && btn) {
                     form.addEventListener('submit', function (e) {
                         if (btn.classList.contains('btn-loading') || btn.disabled) {
@@ -594,7 +554,6 @@
             setupFormListener('forgotPasswordForm', 'forgotBtn', 'forgotBtnText', 'forgotBtnSpinner', 'GÖNDERİLİYOR...');
             setupFormListener('resetPasswordForm', 'resetBtn', 'resetBtnText', 'resetBtnSpinner', 'GÜNCELLENİYOR...');
         });
-
         window.addEventListener('pageshow', function (event) {
             if (event.persisted) {
                 function resetState(btnId, btnTextId, spinnerId, originalText) {
@@ -613,5 +572,4 @@
             }
         });
     </script>
-</body>
-</html>
+}

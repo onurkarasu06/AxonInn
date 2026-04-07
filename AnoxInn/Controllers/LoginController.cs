@@ -1,12 +1,14 @@
 ﻿using AxonInn.Models.Context;
 using AxonInn.Models.Entities;
+using AxonInn.Services;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 using System.Net;
 using System.Net.Mail;
 using System.Text.Json;
-using Microsoft.Extensions.Configuration; // ⚡ EKLENDİ: appsettings'i okumak için gerekli
+using System.Text.Json.Serialization; // ⚡ EKLENDİ: ReferenceHandler için gerekli
 
 namespace AxonInn.Controllers
 {
@@ -14,13 +16,22 @@ namespace AxonInn.Controllers
     public class LoginController : Controller
     {
         private readonly AxonInnContext _context;
-        private readonly IConfiguration _configuration; // ⚡ EKLENDİ
+        private readonly IConfiguration _configuration;
+        private readonly ILogService _logService;
 
-        // ⚡ CONSTRUCTOR GÜNCELLENDİ: IConfiguration Dependency Injection ile içeri alındı
-        public LoginController(AxonInnContext context, IConfiguration configuration)
+        // ⚡ GÜVENLİK: JSON döngülerini (Reference Loop) engelleyen ayar eklendi
+        private static readonly JsonSerializerOptions _jsonOptions = new()
+        {
+            PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+            ReferenceHandler = ReferenceHandler.IgnoreCycles
+        };
+
+        // 🛠️ HATA 1 DÜZELTİLDİ: Çift constructor birleştirildi.
+        public LoginController(AxonInnContext context, IConfiguration configuration, ILogService logService)
         {
             _context = context;
             _configuration = configuration;
+            _logService = logService;
         }
 
         [HttpGet]
@@ -63,28 +74,27 @@ namespace AxonInn.Controllers
                     return RedirectToAction(nameof(Login));
                 }
 
-                // ⚡ PERFORMANS: Sadece gerekli kolonları anonim tip ile çekiyoruz (Sıfır izleme - NoTracking)
-                  var dbSonuc = await _context.Personels
-                    .AsNoTracking()
-                    .Where(p => p.MailAdresi == email && p.AktifMi == 1)
-                    .Select(p => new
-                    {
-                        p.Id,
-                        p.Adi,
-                        p.Soyadi,
-                        p.AktifMi,
-                        p.MedenHali,
-                        p.Yetki,
-                        p.DepartmanRef,
-                        p.MailAdresi,
-                        p.TelefonNumarasi,
-                        p.MailOnayliMi,
-                        p.Sifre,
-                        p.DepartmanRefNavigation,
-                        DepartmanAdi = p.DepartmanRefNavigation != null ? p.DepartmanRefNavigation.Adi : string.Empty,
-                        HotelAdi = (p.DepartmanRefNavigation != null && p.DepartmanRefNavigation.HotelRefNavigation != null) ? p.DepartmanRefNavigation.HotelRefNavigation.Adi : string.Empty
-                    })
-                    .FirstOrDefaultAsync();
+                var dbSonuc = await _context.Personels
+                  .AsNoTracking()
+                  .Where(p => p.MailAdresi == email && p.AktifMi == 1)
+                  .Select(p => new
+                  {
+                      p.Id,
+                      p.Adi,
+                      p.Soyadi,
+                      p.AktifMi,
+                      p.MedenHali,
+                      p.Yetki,
+                      p.DepartmanRef,
+                      p.MailAdresi,
+                      p.TelefonNumarasi,
+                      p.MailOnayliMi,
+                      p.Sifre,
+                      p.DepartmanRefNavigation,
+                      DepartmanAdi = p.DepartmanRefNavigation != null ? p.DepartmanRefNavigation.Adi : string.Empty,
+                      HotelAdi = (p.DepartmanRefNavigation != null && p.DepartmanRefNavigation.HotelRefNavigation != null) ? p.DepartmanRefNavigation.HotelRefNavigation.Adi : string.Empty
+                  })
+                  .FirstOrDefaultAsync();
 
                 if (dbSonuc != null && BCrypt.Net.BCrypt.Verify(password, dbSonuc.Sifre))
                 {
@@ -94,7 +104,6 @@ namespace AxonInn.Controllers
                         return RedirectToAction(nameof(Login));
                     }
 
-                    // ⚡ GÜVENLİK VE BELLEK: Session'a tüm nesneyi (ve şifreyi) atmak yerine sadece gerekli verileri içeren temiz bir nesne oluşturuyoruz.
                     var sessionPersonel = new Personel
                     {
                         Id = dbSonuc.Id,
@@ -107,14 +116,15 @@ namespace AxonInn.Controllers
                         MailAdresi = dbSonuc.MailAdresi,
                         TelefonNumarasi = dbSonuc.TelefonNumarasi,
                         MailOnayliMi = dbSonuc.MailOnayliMi,
-                        DepartmanRefNavigation=dbSonuc.DepartmanRefNavigation
+                        DepartmanRefNavigation = dbSonuc.DepartmanRefNavigation
                     };
 
-                    bool logKayit = await LogKaydet(sessionPersonel, "Sisteme Giriş Başarılı", "Login İşlemi", email, dbSonuc.HotelAdi, dbSonuc.DepartmanAdi);
+                    bool logKayit = await _logService.LogKaydetAsync(sessionPersonel, "Sisteme Giriş Başarılı", "Login İşlemi", email, dbSonuc.HotelAdi, dbSonuc.DepartmanAdi);
 
                     if (logKayit)
                     {
-                        HttpContext.Session.SetString("GirisYapanPersonel", JsonSerializer.Serialize(sessionPersonel));
+                        // 🛠️ HATA 2 DÜZELTİLDİ: Sonsuz döngüleri engelleyen options parametresi eklendi
+                        HttpContext.Session.SetString("GirisYapanPersonel", JsonSerializer.Serialize(sessionPersonel, _jsonOptions));
                         return RedirectToAction("Ana", "Ana");
                     }
 
@@ -122,7 +132,7 @@ namespace AxonInn.Controllers
                     return RedirectToAction(nameof(Login));
                 }
 
-                await LogKaydet(null, "Hatalı Giriş Denemesi", $"Kullanıcı Bulunamadı. Denenen: {email}", string.Empty);
+                await _logService.LogKaydetAsync(null, "Hatalı Giriş Denemesi", $"Kullanıcı Bulunamadı. Denenen: {email}", string.Empty);
                 TempData["ErrorMessage"] = "Girdiğiniz bilgiler hatalı veya kullanıcı aktif değil!";
                 return RedirectToAction(nameof(Login));
             }
@@ -143,7 +153,6 @@ namespace AxonInn.Controllers
                     return RedirectToAction(nameof(Login));
                 }
 
-                // ⚡ PERFORMANS: Veriyi RAM'e çekmeden doğrudan SQL UPDATE atıyoruz (Sıfır RAM Tüketimi)
                 int etkilenenSatir = await _context.Personels
                     .Where(p => p.VerificationToken == token)
                     .ExecuteUpdateAsync(s => s
@@ -174,9 +183,10 @@ namespace AxonInn.Controllers
                 if (string.IsNullOrWhiteSpace(personelJson))
                     return RedirectToAction(nameof(Login));
 
-                var loginOlanPersonel = JsonSerializer.Deserialize<Personel>(personelJson);
+                // 🛠️ HATA 2 DÜZELTİLDİ: Deserialize edilirken de options eklendi
+                var loginOlanPersonel = JsonSerializer.Deserialize<Personel>(personelJson, _jsonOptions);
 
-                bool logkayit = await LogKaydet(loginOlanPersonel, "Güvenli Çıkış Yapıldı", "Logout İşlemi", loginOlanPersonel?.MailAdresi ?? string.Empty);
+                bool logkayit = await _logService.LogKaydetAsync(loginOlanPersonel, "Güvenli Çıkış Yapıldı", "Logout İşlemi", loginOlanPersonel?.MailAdresi ?? string.Empty);
 
                 if (logkayit)
                 {
@@ -191,51 +201,6 @@ namespace AxonInn.Controllers
             catch (Exception ex)
             {
                 return View("~/Views/Error/Error.cshtml", new ErrorViewModel { RequestId = ex.Message });
-            }
-        }
-
-        private async Task<bool> LogKaydet(Personel? personel, string islemTipi, string yeniDeger, string girilenVeri, string? preHotelAdi = null, string? preDeptAdi = null)
-        {
-            try
-            {
-                string hotelAdi = preHotelAdi ?? string.Empty;
-                string departmanAdi = preDeptAdi ?? string.Empty;
-
-                if (personel != null && personel.DepartmanRef != 0 && string.IsNullOrWhiteSpace(hotelAdi))
-                {
-                    var depBilgisi = await _context.Departmen
-                        .AsNoTracking()
-                        .Where(d => d.Id == personel.DepartmanRef)
-                        .Select(d => new { d.Adi, HotelAdi = d.HotelRefNavigation != null ? d.HotelRefNavigation.Adi : string.Empty })
-                        .FirstOrDefaultAsync();
-
-                    if (depBilgisi != null)
-                    {
-                        departmanAdi = depBilgisi.Adi ?? string.Empty;
-                        hotelAdi = depBilgisi.HotelAdi ?? string.Empty;
-                    }
-                }
-
-                var log = new AuditLog
-                {
-                    IslemTarihi = DateTime.Now,
-                    IlgiliTablo = "Personel",
-                    KayitRefId = personel?.Id ?? 0,
-                    IslemTipi = islemTipi,
-                    EskiDeger = girilenVeri ?? string.Empty,
-                    YeniDeger = yeniDeger ?? string.Empty,
-                    YapanHotelAd = hotelAdi,
-                    YapanDepartmanAd = departmanAdi,
-                    YapanAdSoyad = personel != null ? $"{personel.Adi} {personel.Soyadi}" : "Bilinmeyen Kullanıcı"
-                };
-
-                _context.AuditLogs.Add(log);
-                await _context.SaveChangesAsync();
-                return true;
-            }
-            catch
-            {
-                return false;
             }
         }
 
@@ -254,7 +219,6 @@ namespace AxonInn.Controllers
 
                 email = email.Trim();
 
-                // ⚡ PERFORMANS: Sadece ihtiyacımız olan statü verilerini AsNoTracking ile okuduk. Bütün tablo RAM'e alınmadı.
                 var userRecord = await _context.Personels
                     .AsNoTracking()
                     .Where(p => p.MailAdresi == email && p.AktifMi == 1)
@@ -265,10 +229,8 @@ namespace AxonInn.Controllers
                 {
                     if (userRecord.MailOnayliMi == 1 && string.IsNullOrWhiteSpace(userRecord.VerificationToken))
                     {
-                        // "N" formatı ile gereksiz tireleri (-) kaldırarak string boyutu küçültüldü
                         string newToken = Guid.NewGuid().ToString("N");
 
-                        // ⚡ PERFORMANS: Entity Tracking (SaveChanges) yerine doğrudan SQL seviyesinde UPDATE yapıyoruz.
                         await _context.Personels
                             .Where(p => p.Id == userRecord.Id)
                             .ExecuteUpdateAsync(s => s
@@ -279,18 +241,18 @@ namespace AxonInn.Controllers
 
                         if (mailBasariliMi)
                         {
-                            await LogKaydet(null, "Şifre Sıfırlama Maili Gönderildi.", "Başarılı", userRecord.MailAdresi);
+                            await _logService.LogKaydetAsync(null, "Şifre Sıfırlama Maili Gönderildi.", "Başarılı", userRecord.MailAdresi);
                             TempData["SuccessMessage"] = $"{userRecord.MailAdresi} adresine şifre sıfırlama maili gönderildi.";
                         }
                         else
                         {
-                            await LogKaydet(null, "Şifre Sıfırlama Maili Gönderilemedi.", "Başarısız", userRecord.MailAdresi);
+                            await _logService.LogKaydetAsync(null, "Şifre Sıfırlama Maili Gönderilemedi.", "Başarısız", userRecord.MailAdresi);
                             TempData["ErrorMessage"] = $"{userRecord.MailAdresi} adresine şifre sıfırlama maili gönderilemedi. Lütfen sistem yöneticisiyle iletişime geçin.";
                         }
                     }
                     else
                     {
-                        await LogKaydet(null, "Şifre değişikliğinden önce mail adresinizi aktive etmeniz gerekmektedir.", "Başarısız", userRecord.MailAdresi);
+                        await _logService.LogKaydetAsync(null, "Şifre değişikliğinden önce mail adresinizi aktive etmeniz gerekmektedir.", "Başarısız", userRecord.MailAdresi);
                         TempData["ErrorMessage"] = "Şifre Değişikliğinden Önce Mail Adresinizi Aktive Etmeniz Gerekmektedir.";
                     }
                 }
@@ -313,7 +275,6 @@ namespace AxonInn.Controllers
 
             try
             {
-                // ⚡ Merkezi appsettings.json dosyasından SMTP ayarlarını çekiyoruz
                 string smtpServer = _configuration["EmailSettings:SmtpServer"]!;
                 int port = int.Parse(_configuration["EmailSettings:Port"] ?? "587");
                 string senderEmail = _configuration["EmailSettings:SenderEmail"]!;
@@ -341,7 +302,7 @@ namespace AxonInn.Controllers
 
                 using var mailMessage = new MailMessage
                 {
-                    From = new MailAddress(senderEmail, "AxonInn Otomasyon"), // Dinamik e-posta
+                    From = new MailAddress(senderEmail, "AxonInn Otomasyon"),
                     Subject = "AxonInn - Şifre Sıfırlama Talebi",
                     Body = mailBody,
                     IsBodyHtml = true,
@@ -349,11 +310,11 @@ namespace AxonInn.Controllers
 
                 mailMessage.To.Add(toEmail);
 
-                using var smtpClient = new SmtpClient(smtpServer) // Dinamik sunucu
+                using var smtpClient = new SmtpClient(smtpServer)
                 {
-                    Port = port, // Dinamik port
-                    Credentials = new NetworkCredential(senderEmail, password), // Dinamik şifre
-                    EnableSsl = enableSsl // Dinamik SSL ayarı
+                    Port = port,
+                    Credentials = new NetworkCredential(senderEmail, password),
+                    EnableSsl = enableSsl
                 };
 
                 await smtpClient.SendMailAsync(mailMessage);
@@ -377,7 +338,6 @@ namespace AxonInn.Controllers
                     return RedirectToAction(nameof(Login));
                 }
 
-                // ⚡ PERFORMANS: Veriyi belleğe çekmek yerine sadece veritabanında var mı diye (EXISTS sorgusu) bakıyoruz. RAM tüketimi sıfır.
                 bool tokenGecerli = await _context.Personels
                     .AnyAsync(p => p.VerificationToken == token && p.AktifMi == 1 && p.MailOnayliMi == 0);
 
@@ -417,7 +377,6 @@ namespace AxonInn.Controllers
                     return RedirectToAction(nameof(Login));
                 }
 
-                // Log atmak için sadece email'i çekeceğiz.
                 var userEmail = await _context.Personels
                     .AsNoTracking()
                     .Where(p => p.VerificationToken == token && p.AktifMi == 1)
@@ -432,7 +391,6 @@ namespace AxonInn.Controllers
 
                 string hashedSifre = BCrypt.Net.BCrypt.HashPassword(newPassword);
 
-                // ⚡ PERFORMANS: Veriyi RAM'e (Tracking) almadan doğrudan SQL katmanında (ExecuteUpdateAsync) tek seferde Bulk Update yapıyoruz.
                 await _context.Personels
                     .Where(p => p.VerificationToken == token && p.AktifMi == 1)
                     .ExecuteUpdateAsync(s => s
@@ -440,7 +398,7 @@ namespace AxonInn.Controllers
                         .SetProperty(p => p.VerificationToken, (string?)null)
                         .SetProperty(p => p.MailOnayliMi, 1));
 
-                await LogKaydet(null, "Şifre Başarıyla Sıfırlandı", "Başarılı", userEmail);
+                await _logService.LogKaydetAsync(null, "Şifre Başarıyla Sıfırlandı", "Başarılı", userEmail);
 
                 TempData["SuccessMessage"] = "Şifreniz başarıyla değiştirildi! Yeni şifrenizle giriş yapabilirsiniz.";
                 return RedirectToAction(nameof(Login));

@@ -1,6 +1,7 @@
 using AxonInn.Models.Analitik;
 using AxonInn.Models.Context;
 using Microsoft.EntityFrameworkCore;
+using AxonInn.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -24,6 +25,9 @@ builder.Services.AddSession(options =>
     options.Cookie.IsEssential = true;              // GDPR/KVKK uyumluluğu için çerezi zorunlu kılar
 });
 // ------------------------------------------------
+
+//log için ekledim
+builder.Services.AddScoped<ILogService, LogService>();
 
 var app = builder.Build();
 

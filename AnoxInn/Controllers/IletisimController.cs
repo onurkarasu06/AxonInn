@@ -1,11 +1,13 @@
-﻿using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
-using System.Net.Mail;
-using System.Net;
-using System.Text.Json;
+﻿using AxonInn.Models.Context;
 using AxonInn.Models.Entities;
-using AxonInn.Models.Context; // ⚡ Yüksek Hızlı Yeni Nesil JSON
-using Microsoft.Extensions.Configuration; // ⚡ EKLENDİ: appsettings'i okumak için gerekli
+using AxonInn.Services;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
+using System.Net;
+using System.Net.Mail;
+using System.Text.Json;
+using System.Text.Json.Serialization; // ⚡ EKLENDİ: ReferenceHandler için gerekli
 
 namespace AxonInn.Controllers
 {
@@ -13,13 +15,22 @@ namespace AxonInn.Controllers
     public class IletisimController : Controller
     {
         private readonly AxonInnContext _context;
-        private readonly IConfiguration _configuration; // ⚡ EKLENDİ
+        private readonly IConfiguration _configuration;
+        private readonly ILogService _logService;
 
-        // ⚡ CONSTRUCTOR GÜNCELLENDİ: IConfiguration Dependency Injection ile içeri alındı
-        public IletisimController(AxonInnContext context, IConfiguration configuration)
+        // ⚡ GÜVENLİK: JSON döngülerini (Reference Loop) engelleyen ayar eklendi
+        private static readonly JsonSerializerOptions _jsonOptions = new()
+        {
+            PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+            ReferenceHandler = ReferenceHandler.IgnoreCycles
+        };
+
+        // 🛠️ HATA 1 DÜZELTİLDİ: Çift constructor birleştirildi. Tüm DI nesneleri tek kurucuda.
+        public IletisimController(AxonInnContext context, IConfiguration configuration, ILogService logService)
         {
             _context = context;
             _configuration = configuration;
+            _logService = logService;
         }
 
         [Route("Iletisim")]
@@ -31,11 +42,11 @@ namespace AxonInn.Controllers
                 if (string.IsNullOrEmpty(personelJson))
                     return RedirectToAction("Login", "Login");
 
-                // ⚡ RAM OPTİMİZASYONU: Newtonsoft yerine System.Text.Json kullanıldı
-                var loginOlanPersonel = JsonSerializer.Deserialize<Personel>(personelJson);
+                // 🛠️ JSON ayarları eklendi
+                var loginOlanPersonel = JsonSerializer.Deserialize<Personel>(personelJson, _jsonOptions);
 
-                // Sayfaya giriş logu
-                await LogKaydet(loginOlanPersonel, "İletişim Sayfasına Giriş Yapıldı", "Sayfa Görüntüleme");
+                // 🛠️ HATA 2 DÜZELTİLDİ: Parametre sıralaması (eskiDeger: boş, yeniDeger: "Sayfa Görüntüleme") yapıldı
+                await _logService.LogKaydetAsync(loginOlanPersonel, "İletişim Sayfasına Giriş Yapıldı", string.Empty, "Sayfa Görüntüleme");
 
                 return View("Iletisim", loginOlanPersonel);
             }
@@ -55,19 +66,17 @@ namespace AxonInn.Controllers
                 if (string.IsNullOrEmpty(personelJson))
                     return RedirectToAction("Login", "Login");
 
-                var loginOlanPersonel = JsonSerializer.Deserialize<Personel>(personelJson);
+                var loginOlanPersonel = JsonSerializer.Deserialize<Personel>(personelJson, _jsonOptions);
 
-                // ⚡ Merkezi appsettings.json dosyasından SMTP ayarlarını çekiyoruz
                 string smtpServer = _configuration["EmailSettings:SmtpServer"]!;
                 int port = int.Parse(_configuration["EmailSettings:Port"] ?? "587");
                 string senderEmail = _configuration["EmailSettings:SenderEmail"]!;
                 string password = _configuration["EmailSettings:Password"]!;
                 bool enableSsl = bool.Parse(_configuration["EmailSettings:EnableSsl"] ?? "false");
 
-                // ⚡ RAM OPTİMİZASYONU (Memory Leak Önlemi): IDisposable nesneler "using var" ile anında bellekten temizlenir.
                 using var mail = new MailMessage();
-                mail.From = new MailAddress(senderEmail, "AxonInn Web Form"); // Dinamik yapıldı
-                mail.To.Add("info@axoninn.com.tr"); // İstersen burayı da appsettings'ten bir "ReceiverEmail" olarak ayarlayabilirsin
+                mail.From = new MailAddress(senderEmail, "AxonInn Web Form");
+                mail.To.Add("info@axoninn.com.tr");
                 mail.Subject = $"Yeni Mesaj: {model.Konu}";
                 mail.IsBodyHtml = true;
                 mail.Body = $@"
@@ -81,20 +90,19 @@ namespace AxonInn.Controllers
                     </div>
                 ";
 
-                // Sabit IP yerine appsettings'ten gelen sunucu adresi (mail.axoninn.com.tr) kullanılıyor
                 using var smtp = new SmtpClient(smtpServer, port);
                 smtp.UseDefaultCredentials = false;
-                smtp.Credentials = new NetworkCredential(senderEmail, password); // Dinamik şifre
+                smtp.Credentials = new NetworkCredential(senderEmail, password);
                 ServicePointManager.ServerCertificateValidationCallback = (sender, certificate, chain, sslPolicyErrors) => true;
-                smtp.EnableSsl = enableSsl; // Dinamik SSL
+                smtp.EnableSsl = enableSsl;
 
-                // ⚡ THREAD (İŞLEMCİ) OPTİMİZASYONU: Asenkron SendMailAsync ile sunucunun kilitlenmesi önlendi.
                 await smtp.SendMailAsync(mail);
 
                 TempData["BasariMesaji"] = "Mesajınız başarıyla iletildi. En kısa sürede dönüş yapacağız.";
 
-                // Başarılı gönderim logu
-                await LogKaydet(loginOlanPersonel, "Mail Gönderildi", $"Konu: {model.Konu}");
+                // 🛠️ HATA 2 DÜZELTİLDİ: Tüm form modelini JSON olarak yeniDeger parametresine kaydettik.
+                string jsonModel = JsonSerializer.Serialize(model, _jsonOptions);
+                await _logService.LogKaydetAsync(loginOlanPersonel, "İletişim Formu Dolduruldu ve Mail Gönderildi", string.Empty, jsonModel);
             }
             catch (Exception ex)
             {
@@ -103,46 +111,6 @@ namespace AxonInn.Controllers
             }
 
             return RedirectToAction("Iletisim");
-        }
-
-        private async Task<bool> LogKaydet(Personel? personel, string islemTipi, string yeniDeger)
-        {
-            try
-            {
-                string departmanAdi = personel?.DepartmanRefNavigation?.Adi ?? "";
-                string hotelAdi = "";
-
-                if (personel != null && personel.DepartmanRef != 0)
-                {
-                    // ⚡ DB OPTİMİZASYONU: Sadece okuma yapıldığı için AsNoTracking eklendi, RAM tasarrufu sağlandı.
-                    hotelAdi = await _context.Departmen
-                        .AsNoTracking()
-                        .Where(d => d.Id == personel.DepartmanRef)
-                        .Select(d => d.HotelRefNavigation.Adi)
-                        .FirstOrDefaultAsync() ?? "";
-                }
-
-                var log = new AuditLog
-                {
-                    IslemTarihi = DateTime.Now,
-                    IlgiliTablo = "Iletisim",
-                    KayitRefId = personel?.Id ?? 0,
-                    IslemTipi = islemTipi,
-                    EskiDeger = "",
-                    YeniDeger = yeniDeger,
-                    YapanHotelAd = hotelAdi,
-                    YapanDepartmanAd = departmanAdi,
-                    YapanAdSoyad = personel != null ? $"{personel.Adi} {personel.Soyadi}" : "Bilinmeyen"
-                };
-
-                _context.AuditLogs.Add(log);
-                await _context.SaveChangesAsync();
-                return true;
-            }
-            catch
-            {
-                return false;
-            }
         }
     }
 }

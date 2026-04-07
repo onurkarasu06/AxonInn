@@ -1,9 +1,11 @@
 using AxonInn.Models.Context;
 using AxonInn.Models.Entities;
+using AxonInn.Services;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using System.Diagnostics;
 using System.Text.Json;
+using System.Text.Json.Serialization; // ⚡ EKLENDİ: ReferenceHandler için gerekli
 
 namespace AxonInn.Controllers
 {
@@ -11,17 +13,29 @@ namespace AxonInn.Controllers
     public class AnaController : Controller
     {
         private readonly AxonInnContext _context;
-        private static readonly JsonSerializerOptions _jsonOptions = new() { PropertyNamingPolicy = JsonNamingPolicy.CamelCase };
-        public AnaController(AxonInnContext context)
+        private readonly ILogService _logService;
+
+        // 🛠️ DÜZELTME: Sonsuz döngüleri engelleyen standart ReferenceHandler eklendi
+        private static readonly JsonSerializerOptions _jsonOptions = new()
+        {
+            PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+            ReferenceHandler = ReferenceHandler.IgnoreCycles
+        };
+
+        // 🛠️ HATA 1 DÜZELTİLDİ: Tüm servisler tek constructor içinde birleştirildi
+        public AnaController(AxonInnContext context, ILogService logService)
         {
             _context = context;
+            _logService = logService;
         }
+
         private Personel? GetActiveUser()
         {
             try
             {
                 var personelJson = HttpContext.Session.GetString("GirisYapanPersonel");
-                return JsonSerializer.Deserialize<Personel>(personelJson);
+                // 🛠️ DÜZELTME: _jsonOptions parametresi eklendi
+                return string.IsNullOrEmpty(personelJson) ? null : JsonSerializer.Deserialize<Personel>(personelJson, _jsonOptions);
             }
             catch
             {
@@ -39,7 +53,6 @@ namespace AxonInn.Controllers
                 if (loginOlanPersonel == null)
                     return RedirectToAction("Login", "Login");
 
-                // ⚡ GEREKSİZ VERİ ÇEKİMİ ENGELLENDİ: Sadece lazım olan 3 kolon RAM'e alınıyor.
                 var sessionBilgisi = await _context.Departmen
                     .AsNoTracking()
                     .Where(d => d.Id == loginOlanPersonel.DepartmanRef)
@@ -55,7 +68,6 @@ namespace AxonInn.Controllers
 
                 long hotelId = sessionBilgisi.HotelId;
 
-                // --- 🚀 BASE QUERY TEMİZLİĞİ ---
                 IQueryable<Personel> personelQuery = _context.Personels.AsNoTracking().Where(p => p.AktifMi == 1);
                 IQueryable<Gorev> gorevQuery = _context.Gorevs.AsNoTracking().Where(g => g.PersonelRefNavigation.AktifMi == 1);
                 IQueryable<Departman> departmanQuery = _context.Departmen.AsNoTracking();
@@ -79,8 +91,6 @@ namespace AxonInn.Controllers
                     departmanQuery = departmanQuery.Where(d => d.HotelRef == hotelId);
                 }
 
-                // ⚡ SQL SORGULARI (Asenkron ve Sıralı)
-                // Her sorgu kendi içinde asenkron çalışarak IIS thread'lerini serbest bırakır.
                 var departmanPersonelSayilariDb = await personelQuery
                     .GroupBy(p => p.DepartmanRefNavigation.Adi)
                     .Select(g => new { departmanAd = g.Key, adet = g.Count() })
@@ -103,7 +113,6 @@ namespace AxonInn.Controllers
                         tamamlandi = g.Count(x => x.Durum == 3)
                     }).ToListAsync();
 
-                // SQL index dostu kontrol (string.IsNullOrEmpty yerine veritabanı karşılığı net olan null ve boşluk kontrolü)
                 var aiKategoriDb = await gorevQuery
                     .Where(g => g.AiKategori != null && g.AiKategori != "")
                     .GroupBy(g => g.AiKategori)
@@ -114,7 +123,6 @@ namespace AxonInn.Controllers
                     .Select(d => new Departman { Id = d.Id, Adi = d.Adi })
                     .ToListAsync();
 
-                // --- 🚀 RAM (C#) İŞLEMLERİ VE FORMATLAMA ---
                 var departmanPersonelSayilari = departmanPersonelSayilariDb.Select(x => new {
                     departmanAd = x.departmanAd ?? "Belirtilmemiş",
                     adet = x.adet
@@ -136,7 +144,6 @@ namespace AxonInn.Controllers
                     yuzde = toplamKategorizeGorev > 0 ? Math.Round(((double)x.adet / toplamKategorizeGorev) * 100, 1) : 0
                 }).OrderByDescending(x => x.yuzde).ToList();
 
-                // --- 🚀 VIEW BAG ATAMALARI ---
                 ViewBag.AiKategoriJson = JsonSerializer.Serialize(aiChartData, _jsonOptions);
                 ViewBag.PersonelJson = JsonSerializer.Serialize(departmanPersonelSayilari, _jsonOptions);
                 ViewBag.GorevJson = JsonSerializer.Serialize(gorevChartData, _jsonOptions);
@@ -148,61 +155,14 @@ namespace AxonInn.Controllers
                 ViewBag.BittiAdet = gorevChartData.Sum(x => x.tamamlandi);
                 ViewBag.Departmanlar = departmanlar;
 
-                await LogKaydetAsync(loginOlanPersonel, "Ana Sayfaya Giriş Yapıldı", "Dashboard Görüntüleme", sessionBilgisi.HotelAdi, sessionBilgisi.DepartmanAdi);
+                // 🛠️ HATA 2 DÜZELTİLDİ: Parametre sıralaması (eskiDeger: string.Empty, yeniDeger: "Dashboard Görüntüleme") olarak düzeltildi.
+                await _logService.LogKaydetAsync(loginOlanPersonel, "Ana Sayfaya Giriş Yapıldı", string.Empty, "Dashboard Görüntüleme", sessionBilgisi.HotelAdi, sessionBilgisi.DepartmanAdi);
 
                 return View();
             }
             catch (Exception)
             {
                 return View("~/Views/Error/Error.cshtml", new ErrorViewModel { RequestId = Activity.Current?.Id ?? HttpContext.TraceIdentifier });
-            }
-        }
-
-        private async Task<bool> LogKaydetAsync(Personel? personel, string islemTipi, string yeniDeger, string oncedenAlinanHotelAd = "", string oncedenAlinanDepartmanAd = "")
-        {
-            try
-            {
-                if (personel == null) return false;
-
-                string departmanAdi = oncedenAlinanDepartmanAd;
-                string hotelAdi = oncedenAlinanHotelAd;
-
-                if (personel.DepartmanRef != 0 && string.IsNullOrWhiteSpace(hotelAdi))
-                {
-                    var depBilgisi = await _context.Departmen
-                        .AsNoTracking()
-                        .Where(d => d.Id == personel.DepartmanRef)
-                        .Select(d => new { d.Adi, HotelAdi = d.HotelRefNavigation != null ? d.HotelRefNavigation.Adi : string.Empty })
-                        .FirstOrDefaultAsync();
-
-                    if (depBilgisi != null)
-                    {
-                        departmanAdi = depBilgisi.Adi ?? string.Empty;
-                        hotelAdi = depBilgisi.HotelAdi ?? string.Empty;
-                    }
-                }
-
-                var log = new AuditLog
-                {
-                    IslemTarihi = DateTime.Now,
-                    IlgiliTablo = "SayfaZiyareti",
-                    KayitRefId = personel.Id,
-                    IslemTipi = islemTipi,
-                    EskiDeger = string.Empty,
-                    YeniDeger = yeniDeger ?? string.Empty,
-                    YapanHotelAd = hotelAdi,
-                    YapanDepartmanAd = departmanAdi,
-                    YapanAdSoyad = string.IsNullOrWhiteSpace(personel.Soyadi) ? (personel.Adi ?? string.Empty).Trim() : string.Concat(personel.Adi, " ", personel.Soyadi).Trim()
-                };
-
-                _context.AuditLogs.Add(log);
-                await _context.SaveChangesAsync();
-
-                return true;
-            }
-            catch
-            {
-                return false;
             }
         }
     }

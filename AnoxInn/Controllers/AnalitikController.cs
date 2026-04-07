@@ -1,18 +1,19 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿using AxonInn.Models;
+using AxonInn.Models.Analitik;
+using AxonInn.Models.Context;
+using AxonInn.Models.Entities;
+using AxonInn.Services;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using System.Diagnostics;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
 using System;
+using System.Collections.Generic;
+using System.Diagnostics;
+using System.Linq;
 using System.Net.Http;
-using System.Net.Http.Json; // Performans optimizasyonu için eklendi
+using System.Net.Http.Json;
 using System.Text.Json;
 using System.Text.Json.Serialization;
-using AxonInn.Models.Entities;
-using AxonInn.Models.Context;
-using AxonInn.Models.Analitik;
-using AxonInn.Models;
+using System.Threading.Tasks;
 
 namespace AxonInn.Controllers
 {
@@ -21,25 +22,29 @@ namespace AxonInn.Controllers
     {
         private readonly AxonInnContext _context;
         private readonly IConfiguration _configuration;
+        private readonly ILogService _logService;
 
-        // PERFORMANS: Ağ (TCP) Portları tükenmesine karşı tekilleştirildi
         private static readonly HttpClient _httpClient = new HttpClient();
 
-        // PERFORMANS: JSON Objeleri sürekli RAM'de yaratılıp silinmemesi için Static olarak önbelleklendi
+        // 🛠️ DÜZELTME: Sonsuz döngüleri engelleyen standart ReferenceHandler eklendi
         private static readonly JsonSerializerOptions _jsonOptions = new JsonSerializerOptions
         {
             PropertyNameCaseInsensitive = true,
-            DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
+            DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
+            ReferenceHandler = ReferenceHandler.IgnoreCycles
         };
+
         private static readonly JsonSerializerOptions _jsonRelaxedOptions = new JsonSerializerOptions
         {
             Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping
         };
 
-        public AnalitikController(AxonInnContext context, IConfiguration configuration)
+        // 🛠️ HATA 1 DÜZELTİLDİ: Tüm Dependency Injection servisleri tek bir constructorda birleştirildi.
+        public AnalitikController(AxonInnContext context, IConfiguration configuration, ILogService logService)
         {
             _context = context;
             _configuration = configuration;
+            _logService = logService;
         }
 
         private Personel? GetActiveUser()
@@ -113,7 +118,9 @@ namespace AxonInn.Controllers
                     Yil = yil.HasValue ? yil.Value.ToString() : "Tüm Yıllar"
                 };
 
-                await LogKaydet(loginOlanPersonel, "Analitik Sayfasına Giriş Yapıldı", "Analitik Sayfası");
+                // 🛠️ HATA 2 DÜZELTİLDİ: Parametre sıralaması düzeltildi (eskiDeger: string.Empty, yeniDeger: "Analitik Sayfası Görüntüleme")
+                await _logService.LogKaydetAsync(loginOlanPersonel, "Analitik Sayfasına Giriş Yapıldı", string.Empty, "Analitik Sayfası Görüntüleme", ViewBag.HotelAdi ?? string.Empty, string.Empty);
+
                 return View(yorumDashboardViewModel);
             }
             catch (Exception)
@@ -138,7 +145,6 @@ namespace AxonInn.Controllers
 
                 if (panelVerisi.Yil == icindeBulunanYil)
                 {
-                    // PERFORMANS: Read-Only (Okunabilir) veri olduğu için EF Core'da AsNoTracking() belleği korur
                     var trendYorumlarListesi = await _context.Yorum
                                                  .AsNoTracking()
                                                  .Where(y => y.HotelRef == loginOlanPersonel.DepartmanRefNavigation.HotelRef)
@@ -209,14 +215,13 @@ Lütfen bu verileri detaylıca incele ve otel müdürü için aksiyon alınabili
                 }
 
                 string geminiApiKey = _configuration["GeminiApi:ApiKey"];
-                string apiUrl = $"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={geminiApiKey}";
+                string apiUrl = $"[https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=](https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=){geminiApiKey}";
                 var requestData = new
                 {
                     contents = new[] { new { parts = new[] { new { text = prompt } } } },
                     generationConfig = new { temperature = 0.2, response_mime_type = "application/json" }
                 };
 
-                // PERFORMANS: StringContent ile devasa metinler oluşturup RAM şişirmek yerine PostAsJsonAsync ile doğrudan stream akışına yazılır.
                 var response = await _httpClient.PostAsJsonAsync(apiUrl, requestData, _jsonOptions);
 
                 if (response.IsSuccessStatusCode)
@@ -233,7 +238,8 @@ Lütfen bu verileri detaylıca incele ve otel müdürü için aksiyon alınabili
 
                             var sonuc = JsonSerializer.Deserialize<AiTavsiyeSonucu>(aiCevabi, _jsonOptions);
 
-                            await LogKaydet(loginOlanPersonel, "Analitik Sayfası YapayZekaTavsiyesiAl Yapıldı", aiCevabi);
+                            // 🛠️ HATA 2 DÜZELTİLDİ: Yapay zekadan dönen sonuç yeniDeger parametresine kaydırıldı.
+                            await _logService.LogKaydetAsync(loginOlanPersonel, "Yapay Zeka Tavsiyesi Alındı", string.Empty, aiCevabi);
 
                             return Json(sonuc);
                         }
@@ -260,7 +266,6 @@ Lütfen bu verileri detaylıca incele ve otel müdürü için aksiyon alınabili
             YorumIslem yorumIslem = new YorumIslem();
             List<Yorum> yorumList = await yorumIslem.TripadvisorYorumGetirApifyApiAsync(hotelID, getirilecekKayitAdeti, apiToken);
 
-            // PERFORMANS: İşlem asenkron yapılarak thread (I/O) kilitlenmesi önlendi
             await yorumIslem.TripadvisorYorumKaydetAsync(hotelID, yorumList, _context);
 
             return RedirectToAction("Yorum");
@@ -280,7 +285,6 @@ Lütfen bu verileri detaylıca incele ve otel müdürü için aksiyon alınabili
             YorumIslem yorumIslem = new YorumIslem();
             List<Yorum> yorumList = await yorumIslem.TripadvisorYorumGetirRapidApiAsync(hotelID, tripadvisorHotelID, getirilecekKayitAdeti, apiToken);
 
-            // PERFORMANS: Asenkron işlem
             await yorumIslem.TripadvisorYorumKaydetAsync(hotelID, yorumList, _context);
 
             return RedirectToAction("Yorum");
@@ -314,7 +318,7 @@ Lütfen bu verileri detaylıca incele ve otel müdürü için aksiyon alınabili
             if (session == null || session.HotelRefNavigation == null) return;
 
             string geminiApiKey = _configuration["GeminiApi:ApiKey"];
-            string apiUrl = $"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={geminiApiKey}";
+            string apiUrl = $"[https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=](https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=){geminiApiKey}";
 
             var adayYorumlar = await _context.Yorum
                 .AsNoTracking()
@@ -322,8 +326,6 @@ Lütfen bu verileri detaylıca incele ve otel müdürü için aksiyon alınabili
                 .Select(y => new { y.Id, y.MisafirUlkesi })
                 .ToListAsync();
 
-            // CPU OPTİMİZASYONU: "ToLower()" kullanmak her satırda hafızada geçici string üretir.
-            // StringComparer.OrdinalIgnoreCase kullanılarak en yüksek doğruluk ve hız elde edildi.
             var haricUlkeler = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "türkiye", "almanya", "rusya", "ingiltere", "kazakistan", "ukrayna" };
 
             var filtrelenmisIdler = adayYorumlar
@@ -402,57 +404,11 @@ Kesin Kurallar:
                 }
                 catch (Exception)
                 {
-                    // İstisna durumlarda patlamadan sıradaki bloğa geçecek.
+
                 }
 
                 await _context.SaveChangesAsync();
                 _context.ChangeTracker.Clear();
-            }
-        }
-
-        private async Task<bool> LogKaydet(Personel? personel, string islemTipi, string yeniDeger)
-        {
-            try
-            {
-                string departmanAdi = "";
-                string hotelAdi = "";
-
-                if (personel != null && personel.DepartmanRef != 0)
-                {
-                    var depBilgisi = await _context.Departmen
-                        .AsNoTracking()
-                        .Where(d => d.Id == personel.DepartmanRef)
-                        .Select(d => new { d.Adi, HotelAdi = d.HotelRefNavigation != null ? d.HotelRefNavigation.Adi : "" })
-                        .FirstOrDefaultAsync();
-
-                    if (depBilgisi != null)
-                    {
-                        // BUG FIX: Mevcut kodda yer alan departmanAdi = departmanAdi ataması düzeltildi.
-                        departmanAdi = depBilgisi.Adi;
-                        hotelAdi = depBilgisi.HotelAdi;
-                    }
-                }
-
-                var log = new AuditLog
-                {
-                    IslemTarihi = DateTime.Now,
-                    IlgiliTablo = "SayfaZiyareti",
-                    KayitRefId = personel?.Id ?? 0,
-                    IslemTipi = islemTipi,
-                    EskiDeger = "",
-                    YeniDeger = yeniDeger,
-                    YapanHotelAd = hotelAdi,
-                    YapanDepartmanAd = departmanAdi,
-                    YapanAdSoyad = personel != null ? $"{personel.Adi} {personel.Soyadi}" : "Bilinmeyen"
-                };
-
-                await _context.AuditLogs.AddAsync(log); // Add yerine AddAsync
-                await _context.SaveChangesAsync();
-                return true;
-            }
-            catch
-            {
-                return false;
             }
         }
     }

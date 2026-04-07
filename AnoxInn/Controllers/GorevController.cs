@@ -1,12 +1,14 @@
-﻿using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
-using System.Text.Json;
-using System.IO;
-using System.Diagnostics;
-using AxonInn.Models.Entities;
-using AxonInn.Models.Context;
+﻿using AxonInn.Helpers;
 using AxonInn.Models.Analitik;
-using AxonInn.Helpers;
+using AxonInn.Models.Context;
+using AxonInn.Models.Entities;
+using AxonInn.Services;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+using System.Diagnostics;
+using System.IO;
+using System.Text.Json;
+using System.Text.Json.Serialization; // ⚡ EKLENDİ: ReferenceHandler için gerekli
 
 namespace AxonInn.Controllers
 {
@@ -15,27 +17,31 @@ namespace AxonInn.Controllers
     {
         private readonly AxonInnContext _context;
         private readonly GeminiApiService _geminiService;
+        private readonly ILogService _logService;
 
-        // ⚡ PERFORMANS: Her HTTP isteğinde bellekte JSON ayarlarının tekrar oluşturulmasını (GC yükünü) engeller.
+        // ⚡ GÜVENLİK VE PERFORMANS: Sonsuz döngü koruması eklendi
         private static readonly JsonSerializerOptions _jsonOptions = new()
         {
             PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-            PropertyNameCaseInsensitive = true
+            PropertyNameCaseInsensitive = true,
+            ReferenceHandler = ReferenceHandler.IgnoreCycles // 🛠️ DÜZELTME EKLENDİ
         };
 
-        public GorevController(AxonInnContext context, GeminiApiService geminiService)
+        // 🛠️ HATA 1 DÜZELTİLDİ: Tüm servisler tek constructor içinde birleştirildi
+        public GorevController(AxonInnContext context, GeminiApiService geminiService, ILogService logService)
         {
             _context = context;
             _geminiService = geminiService;
+            _logService = logService;
         }
 
-        // ⚡ GÜVENLİK VE PERFORMANS: Session okuma işlemini merkezileştirerek DRY prensibini sağladık.
         private Personel? GetGirisYapanPersonel()
         {
             try
             {
                 var personelJson = HttpContext.Session.GetString("GirisYapanPersonel");
-                return JsonSerializer.Deserialize<Personel>(personelJson);
+                if (string.IsNullOrEmpty(personelJson)) return null;
+                return JsonSerializer.Deserialize<Personel>(personelJson, _jsonOptions);
             }
             catch
             {
@@ -62,8 +68,6 @@ namespace AxonInn.Controllers
                 if (depBilgi == null || depBilgi.HotelRef == null || depBilgi.HotelRef == 0)
                     return RedirectToAction("Login", "Login");
 
-                // ⚡ PERFORMANS: AsNoTrackingWithIdentityResolution. 
-                // Ağır Include zincirlerinde nesnelerin bellekte kopyalanmasını önleyip RAM dostu çalışır. Cartesian patlamayı önlemek için AsSplitQuery kullanıldı.
                 var query = _context.Hotels
                     .AsNoTrackingWithIdentityResolution()
                     .AsSplitQuery()
@@ -100,8 +104,6 @@ namespace AxonInn.Controllers
 
                     foreach (var chunk in gorevIds.Chunk(2000))
                     {
-                        // 🚀 ZERO-ALLOCATION (Sıfır Bellek Tahsisi): 
-                        // Yalnızca ID ve GorevRef alınıp anonim tip üretmeden asıl tipe aktarıldı.
                         var fotolar = await _context.GorevFotografs
                             .AsNoTracking()
                             .Where(gf => chunk.Contains(gf.GorevRef))
@@ -115,12 +117,12 @@ namespace AxonInn.Controllers
 
                     foreach (var gorev in tumGorevler)
                     {
-                        // Resim yoksa boş yere RAM'de obje tahsis edilmez.
                         gorev.GorevFotografs = fotoLookup.Contains(gorev.Id) ? fotoLookup[gorev.Id].ToList() : new List<GorevFotograf>(0);
                     }
                 }
 
-                await LogKaydetAsync(loginOlanPersonel, "Görev Sayfasına Giriş Yapıldı", "Görev Listesi Görüntüleme", null, depBilgi.HotelAdi ?? string.Empty, depBilgi.DepartmanAdi ?? string.Empty);
+                // 🛠️ HATA 2 DÜZELTİLDİ: null yerine string.Empty konuldu ve parametre sırası düzeltildi.
+                await _logService.LogKaydetAsync(loginOlanPersonel, "Görev Sayfasına Giriş Yapıldı", string.Empty, "Görev Listesi Görüntüleme", depBilgi.HotelAdi ?? string.Empty, depBilgi.DepartmanAdi ?? string.Empty);
 
                 return View("Gorev", hotel);
             }
@@ -154,7 +156,6 @@ namespace AxonInn.Controllers
                     model.GorevFotografs = new List<GorevFotograf>(Fotograf.Count);
                     foreach (var dosya in Fotograf)
                     {
-                        // 🛡️ GÜVENLİK KONTROLÜ (MIME Spoofing) EKLENDİ (.IsValidImageSignature KULLANILDI)
                         if (dosya.Length > 0 && dosya.Length <= 5 * 1024 * 1024 && dosya.IsValidImageSignature())
                         {
                             using var ms = new MemoryStream((int)dosya.Length);
@@ -164,7 +165,6 @@ namespace AxonInn.Controllers
                     }
                 }
 
-                // 🤖 AI KORUMASI: Gemini API çökerse bile "Görev Oluşturma" işlemi sekteye uğramaz
                 try
                 {
                     model.AiKategori = await _geminiService.KategorizeEtAsync(model.Aciklama, model.PersonelNotu);
@@ -174,16 +174,16 @@ namespace AxonInn.Controllers
                     model.AiKategori = "Diğer";
                 }
 
-                // 🛡️ İŞLEM BÜTÜNLÜĞÜ (TRANSACTION) EKLENDİ
                 await using var transaction = await _context.Database.BeginTransactionAsync();
                 try
                 {
                     _context.Gorevs.Add(model);
-                    await _context.SaveChangesAsync(); // Görev ve Fotoları yazar, model.Id oluşur.
+                    await _context.SaveChangesAsync();
 
-                    bool logBasarili = await LogKaydetAsync(loginOlanPersonel, "Yeni Görev Eklendi", $"Görev ID: {model.Id} oluşturuldu.", null);
+                    // 🛠️ HATA 2 DÜZELTİLDİ: Eklenen modeli JSON formatında yeniDeger'e yazıyoruz
+                    string jsonModel = JsonSerializer.Serialize(model, _jsonOptions);
+                    bool logBasarili = await _logService.LogKaydetAsync(loginOlanPersonel, "Yeni Görev Eklendi", string.Empty, jsonModel);
 
-                    // Log yazılamazsa görevi de iptal et (Guncelle metodundaki standart)
                     if (!logBasarili) throw new Exception("Log kaydı oluşturulamadı.");
 
                     await transaction.CommitAsync();
@@ -191,7 +191,7 @@ namespace AxonInn.Controllers
                 catch (Exception)
                 {
                     await transaction.RollbackAsync();
-                    throw; // Hatayı dışarıdaki ana catch bloğuna fırlatıp Error sayfasına yönlendirir
+                    throw;
                 }
 
                 return RedirectToAction(nameof(Gorev));
@@ -210,7 +210,6 @@ namespace AxonInn.Controllers
                 var loginOlanPersonel = GetGirisYapanPersonel();
                 if (loginOlanPersonel == null) return RedirectToAction("Login", "Login");
 
-                // 🛡️ İŞLEM BÜTÜNLÜĞÜ (TRANSACTION) EKLENDİ
                 await using var transaction = await _context.Database.BeginTransactionAsync();
                 try
                 {
@@ -219,7 +218,8 @@ namespace AxonInn.Controllers
 
                     if (silinenAdet > 0)
                     {
-                        bool logBasarili = await LogKaydetAsync(loginOlanPersonel, "Görev Silindi", $"Görev ID: {id} silindi.", null);
+                        // 🛠️ HATA 2 DÜZELTİLDİ: Silinen datanın bilgisini eskiDeger parametresine koyduk, null yerine string.Empty yazdık.
+                        bool logBasarili = await _logService.LogKaydetAsync(loginOlanPersonel, "Görev Silindi", $"Görev ID: {id} silindi.", string.Empty);
                         if (!logBasarili) throw new Exception("Log kaydı oluşturulamadı.");
                     }
 
@@ -228,7 +228,7 @@ namespace AxonInn.Controllers
                 catch (Exception)
                 {
                     await transaction.RollbackAsync();
-                    throw; // Geri al ve ana catch'e düşür
+                    throw;
                 }
 
                 return RedirectToAction(nameof(Gorev));
@@ -249,9 +249,6 @@ namespace AxonInn.Controllers
                 var loginOlanPersonel = GetGirisYapanPersonel();
                 if (loginOlanPersonel == null) return RedirectToAction("Login", "Login");
 
-                // 🚀 MUAZZAM RAM OPTİMİZASYONU:
-                // FindAsync ile tüm tabloyu RAM'e çekip izlemeye (Tracking) almak yerine
-                // sadece ihtiyacımız olan mevcut alanları anonim (hafif) tiplerle okuyoruz.
                 var mevcutDurum = await _context.Gorevs
                     .AsNoTracking()
                     .Where(g => g.Id == model.Id)
@@ -276,7 +273,6 @@ namespace AxonInn.Controllers
                     string yeniAciklama = mevcutDurum.Aciklama ?? string.Empty;
                     string yeniNot = mevcutDurum.PersonelNotu ?? string.Empty;
 
-                    // --- Açıklama Kontrolü ---
                     string eskiMetin = NormalizeText(mevcutDurum.Aciklama);
                     string yeniMetin = NormalizeText(model.Aciklama);
 
@@ -295,7 +291,6 @@ namespace AxonInn.Controllers
                         }
                     }
 
-                    // --- Not Kontrolü ---
                     string eskiNot = NormalizeText(mevcutDurum.PersonelNotu);
                     string yeniNotGirilen = NormalizeText(model.PersonelNotu);
 
@@ -321,7 +316,6 @@ namespace AxonInn.Controllers
                         }
                     }
 
-                    // --- Durum ve Tarih ---
                     int yeniDurumDegeri = mevcutDurum.Durum;
                     DateTime? yeniBaslamaTarihi = mevcutDurum.CozumBaslamaTarihi;
                     DateTime? yeniBitisTarihi = mevcutDurum.CozumBitisTarihi;
@@ -335,7 +329,6 @@ namespace AxonInn.Controllers
                             yeniBitisTarihi = DateTime.Now;
                     }
 
-                    // --- AI Kategori Güncelleme ---
                     string? yeniAiKategori = mevcutDurum.AiKategori;
                     if (metinDegisti)
                     {
@@ -346,12 +339,10 @@ namespace AxonInn.Controllers
                         catch { /* API Hata verirse eski kategori kalır. */ }
                     }
 
-                    // 🛡️ TRANSACTION BAŞLANGICI: Veri bütünlüğü için DB işlemlerini sarıyoruz
                     await using var transaction = await _context.Database.BeginTransactionAsync();
 
                     try
                     {
-                        // ⚡ SQL BYPASS: ChangeTracker'ı atlayıp doğrudan veritabanında UPDATE gönderiyoruz
                         var updateQuery = _context.Gorevs.Where(g => g.Id == model.Id);
 
                         if (metinDegisti)
@@ -374,7 +365,6 @@ namespace AxonInn.Controllers
                                .SetProperty(g => g.CozumBitisTarihi, yeniBitisTarihi));
                         }
 
-                        // --- Yeni Fotoğraf Kaydı ---
                         if (YeniFotograflar != null && YeniFotograflar.Count > 0)
                         {
                             foreach (var dosya in YeniFotograflar)
@@ -390,25 +380,24 @@ namespace AxonInn.Controllers
                                     });
                                 }
                             }
-                            await _context.SaveChangesAsync(); // Sadece yeni Insert fotoğraflar için SaveChanges atılır
+                            await _context.SaveChangesAsync();
                         }
 
-                        // LogKaydet DB'ye gitmemesi için sanal bir nesne üretiyoruz
                         var tempPersonel = new Personel { Id = loginOlanPersonel.Id, Adi = loginOlanPersonel.Adi, Soyadi = loginOlanPersonel.Soyadi, DepartmanRef = loginOlanPersonel.DepartmanRef };
 
-                        bool logBasarili = await LogKaydetAsync(tempPersonel, "Görev Güncellendi", $"Görev ID: {model.Id} güncellendi.", null);
+                        // 🛠️ HATA 2 DÜZELTİLDİ: Güncellenen yeni modeli JSON formatında yeniDeger alanına basıyoruz.
+                        string jsonModel = JsonSerializer.Serialize(model, _jsonOptions);
+                        bool logBasarili = await _logService.LogKaydetAsync(tempPersonel, "Görev Güncellendi", $"Güncellenen Görev ID: {model.Id}", jsonModel);
 
                         if (!logBasarili)
                         {
                             throw new Exception("Log kaydı oluşturulamadığı için işlem geri alınıyor.");
                         }
 
-                        // Tüm DB işlemleri başarılıysa onaylıyoruz
                         await transaction.CommitAsync();
                     }
                     catch (Exception)
                     {
-                        // Hata anında işlemleri geri al ve Error sayfasına yönlendirilmesi için hatayı dışarı fırlat
                         await transaction.RollbackAsync();
                         throw;
                     }
@@ -452,53 +441,6 @@ namespace AxonInn.Controllers
                 return File(fotoBytes, "image/jpeg");
 
             return NotFound();
-        }
-
-        private async Task<bool> LogKaydetAsync(Personel? personel, string islemTipi, string yeniDeger, Gorev? gorev, string preHotelAdi = "", string preDeptAdi = "")
-        {
-            try
-            {
-                if (personel == null) return false;
-
-                string departmanAdi = !string.IsNullOrWhiteSpace(preDeptAdi) ? preDeptAdi : (personel.DepartmanRefNavigation?.Adi ?? string.Empty);
-                string hotelAdi = preHotelAdi;
-
-                if (personel.DepartmanRef != 0 && string.IsNullOrWhiteSpace(hotelAdi))
-                {
-                    var data = await _context.Departmen
-                        .AsNoTracking()
-                        .Where(d => d.Id == personel.DepartmanRef)
-                        .Select(d => new { d.Adi, hAdi = d.HotelRefNavigation != null ? d.HotelRefNavigation.Adi : string.Empty })
-                        .FirstOrDefaultAsync();
-
-                    if (data != null)
-                    {
-                        hotelAdi = data.hAdi ?? string.Empty;
-                        departmanAdi = data.Adi ?? string.Empty;
-                    }
-                }
-
-                var log = new AuditLog
-                {
-                    IslemTarihi = DateTime.Now,
-                    IlgiliTablo = "Gorev",
-                    KayitRefId = gorev?.Id ?? personel.Id,
-                    IslemTipi = islemTipi,
-                    EskiDeger = string.Empty,
-                    YeniDeger = yeniDeger ?? string.Empty,
-                    YapanHotelAd = hotelAdi,
-                    YapanDepartmanAd = departmanAdi,
-                    YapanAdSoyad = string.IsNullOrWhiteSpace(personel.Soyadi) ? (personel.Adi ?? string.Empty).Trim() : string.Concat(personel.Adi, " ", personel.Soyadi).Trim()
-                };
-
-                _context.AuditLogs.Add(log);
-                await _context.SaveChangesAsync();
-                return true;
-            }
-            catch
-            {
-                return false;
-            }
         }
     }
 }

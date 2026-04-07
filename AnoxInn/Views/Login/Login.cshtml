@@ -323,18 +323,54 @@
         <div class="right-panel">
             <div class="flex-grow-1 d-flex flex-column justify-content-center mx-auto w-100" style="max-width: 360px;">
                 
-            <div class="text-center mb-4 animate__animated animate__fadeInDown">
-                <img src="/AxonInn.webp" alt="AxonInn Logo" class="brand-logo mb-3" fetchpriority="high" />
-                <h1 class="mb-1 brand-gradient" style="font-size: 2.3rem; letter-spacing: -1.5px; line-height: 1; font-weight: 900;">
-                    Axon<span style="font-weight: 300; letter-spacing: 0;">INN</span>
-                </h1>
-                <p class="mb-0 mt-2" style="font-size: 0.95rem; font-weight: 600; font-style: italic; color: #495057;">
-                    "Duyguyla ağırlayın, mühendislikle yönetin."
-                </p>
-                <span class="d-block mt-1 text-muted text-uppercase fw-bold" style="font-size: 0.65rem; letter-spacing: 1px;">
-                    AxonINN Dijital Sinir Sisteminiz
-                </span>
-            </div>
+
+
+
+
+
+
+
+
+              
+                   <div class="text-center mb-4 animate__animated animate__fadeInDown d-flex flex-column align-items-center">
+    
+    <div class="position-relative mb-2" style="width: 75px; height: 75px;">
+        <div class="position-absolute w-100 h-100 rounded-4" 
+             style="background: linear-gradient(135deg, #0d6efd 0%, #0dcaf0 100%); filter: blur(12px); opacity: 0.5; top: 4px; left: 0; z-index: 0;"></div>
+        <img src="/AxonInn.webp" alt="AxonInn Logo" class="brand-logo position-relative bg-white w-100 h-100" 
+             style="border: 2px solid #ffffff; z-index: 1; object-fit: contain; border-radius: 18px;" fetchpriority="high" />
+    </div>
+
+    <h1 class="mb-3" style="font-size: 2.6rem; letter-spacing: -1px; line-height: 1;">
+        <span class="brand-gradient" style="font-weight: 900;">Axon</span><span style="font-weight: 300; color: #061831;">INN</span>
+    </h1>
+
+    <div class="d-inline-block px-3 py-2 mb-3 rounded-3 shadow-sm w-100" 
+         style="max-width: 320px; background-color: #f8f9fa; border-left: 3px solid #0dcaf0; border-right: 1px solid #f1f3f5; border-top: 1px solid #f1f3f5; border-bottom: 1px solid #f1f3f5;">
+        <p class="mb-0 text-center" style="font-size: 0.85rem; color: #495057;">
+            <i class="fas fa-quote-left me-1 opacity-50" style="color: #0dcaf0; font-size: 0.75rem; vertical-align: top;"></i>
+            <span style="font-style: italic; font-weight: 500;">Duyguyla ağırlayın,</span> 
+            <span class="fw-bold text-dark">mühendislikle</span> <span style="font-style: italic; font-weight: 500;">yönetin.</span>
+        </p>
+    </div>
+
+    <div class="d-inline-flex align-items-center justify-content-center rounded-pill px-3 py-1 shadow-sm transition-hover" 
+         style="font-size: 0.65rem; letter-spacing: 1px; background: rgba(13, 110, 253, 0.05); border: 1px solid rgba(13, 110, 253, 0.15); color: #0d6efd;">
+        <i class="fas fa-network-wired me-2 opacity-75"></i> 
+        <span class="fw-bold text-uppercase">Dijital Sinir Sisteminiz</span>
+    </div>
+    
+</div>
+
+
+
+
+
+
+
+
+
+
                 
                 <form id="loginForm" method="post" asp-controller="Login" asp-action="Login">
                     @Html.AntiForgeryToken()

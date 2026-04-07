@@ -23,8 +23,8 @@ namespace AxonInn.Controllers
         private static readonly JsonSerializerOptions _jsonOptions = new()
         {
             PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-            PropertyNameCaseInsensitive = true,
-            ReferenceHandler = ReferenceHandler.IgnoreCycles // 🛠️ DÜZELTME EKLENDİ
+            ReferenceHandler = ReferenceHandler.IgnoreCycles,
+            PropertyNameCaseInsensitive = true // ⚡ EKLENDİ: Gelen JSON'daki büyük/küçük harf uyuşmazlığını tolere eder
         };
 
         // 🛠️ HATA 1 DÜZELTİLDİ: Tüm servisler tek constructor içinde birleştirildi
@@ -55,7 +55,16 @@ namespace AxonInn.Controllers
             try
             {
                 var loginOlanPersonel = GetGirisYapanPersonel();
-                if (loginOlanPersonel == null) return RedirectToAction("Login", "Login");
+      
+                // ⚡ DÜZELTME 1: Session okunamadıysa önce sil, sonra yönlendir
+                if (loginOlanPersonel == null)
+                {
+                    HttpContext.Session.Remove("GirisYapanPersonel"); // Döngüyü kırar
+                    return RedirectToAction("Login", "Login");
+                }
+
+
+
 
                 ViewData["GirisYapanPersonel"] = loginOlanPersonel;
 
@@ -412,7 +421,6 @@ namespace AxonInn.Controllers
         }
 
         [HttpGet]
-        [ResponseCache(Duration = 86400, Location = ResponseCacheLocation.Client)]
         public async Task<IActionResult> PersonelFotoGetir(long id)
         {
             var fotoBytes = await _context.PersonelFotografs
@@ -428,7 +436,6 @@ namespace AxonInn.Controllers
         }
 
         [HttpGet]
-        [ResponseCache(Duration = 86400, Location = ResponseCacheLocation.Client)]
         public async Task<IActionResult> KanitFotoGetir(long id)
         {
             var fotoBytes = await _context.GorevFotografs

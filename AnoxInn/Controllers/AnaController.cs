@@ -13,13 +13,15 @@ namespace AxonInn.Controllers
     public class AnaController : Controller
     {
         private readonly AxonInnContext _context;
+
         private readonly ILogService _logService;
 
         // 🛠️ DÜZELTME: Sonsuz döngüleri engelleyen standart ReferenceHandler eklendi
         private static readonly JsonSerializerOptions _jsonOptions = new()
         {
             PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-            ReferenceHandler = ReferenceHandler.IgnoreCycles
+            ReferenceHandler = ReferenceHandler.IgnoreCycles,
+            PropertyNameCaseInsensitive = true // ⚡ EKLENDİ: Gelen JSON'daki büyük/küçük harf uyuşmazlığını tolere eder
         };
 
         // 🛠️ HATA 1 DÜZELTİLDİ: Tüm servisler tek constructor içinde birleştirildi
@@ -50,8 +52,12 @@ namespace AxonInn.Controllers
             {
                 var loginOlanPersonel = GetActiveUser();
 
+                // ⚡ DÜZELTME 1: Session okunamadıysa önce sil, sonra yönlendir
                 if (loginOlanPersonel == null)
+                {
+                    HttpContext.Session.Remove("GirisYapanPersonel"); // Döngüyü kırar
                     return RedirectToAction("Login", "Login");
+                }
 
                 var sessionBilgisi = await _context.Departmen
                     .AsNoTracking()
@@ -63,8 +69,12 @@ namespace AxonInn.Controllers
                     })
                     .FirstOrDefaultAsync();
 
+                // ⚡ DÜZELTME 2: Departman bulanamadıysa önce sil, sonra yönlendir
                 if (sessionBilgisi == null || sessionBilgisi.HotelId == 0)
+                {
+                    HttpContext.Session.Remove("GirisYapanPersonel"); // Döngüyü kırar
                     return RedirectToAction("Login", "Login");
+                }
 
                 long hotelId = sessionBilgisi.HotelId;
 

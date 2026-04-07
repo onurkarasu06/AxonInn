@@ -17,7 +17,8 @@ namespace AxonInn.Controllers
         private static readonly JsonSerializerOptions _jsonOptions = new()
         {
             PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-            ReferenceHandler = ReferenceHandler.IgnoreCycles
+            ReferenceHandler = ReferenceHandler.IgnoreCycles,
+            PropertyNameCaseInsensitive = true // ⚡ EKLENDİ: Gelen JSON'daki büyük/küçük harf uyuşmazlığını tolere eder
         };
 
         // 🛠️ HATA 1 DÜZELTİLDİ: Tüm servisler tek constructor içinde birleştirildi
@@ -34,7 +35,10 @@ namespace AxonInn.Controllers
             {
                 var personelJson = HttpContext.Session.GetString("GirisYapanPersonel");
                 if (string.IsNullOrEmpty(personelJson))
+                {
+                    HttpContext.Session.Remove("GirisYapanPersonel"); // Döngüyü kırar
                     return RedirectToAction("Login", "Login");
+                }
 
                 // 🛠️ DÜZELTME: Session okunurken _jsonOptions parametresi eklendi
                 var loginOlanPersonel = JsonSerializer.Deserialize<Personel>(personelJson, _jsonOptions);

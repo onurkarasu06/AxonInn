@@ -22,8 +22,10 @@ namespace AxonInn.Controllers
         private static readonly JsonSerializerOptions _jsonOptions = new()
         {
             PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-            ReferenceHandler = ReferenceHandler.IgnoreCycles
+            ReferenceHandler = ReferenceHandler.IgnoreCycles,
+            PropertyNameCaseInsensitive = true // ⚡ EKLENDİ: Gelen JSON'daki büyük/küçük harf uyuşmazlığını tolere eder
         };
+
 
         // 🛠️ HATA 1 DÜZELTİLDİ: Çift constructor birleştirildi. Tüm DI nesneleri tek kurucuda.
         public IletisimController(AxonInnContext context, IConfiguration configuration, ILogService logService)
@@ -93,7 +95,6 @@ namespace AxonInn.Controllers
                 using var smtp = new SmtpClient(smtpServer, port);
                 smtp.UseDefaultCredentials = false;
                 smtp.Credentials = new NetworkCredential(senderEmail, password);
-                ServicePointManager.ServerCertificateValidationCallback = (sender, certificate, chain, sslPolicyErrors) => true;
                 smtp.EnableSsl = enableSsl;
 
                 await smtp.SendMailAsync(mail);

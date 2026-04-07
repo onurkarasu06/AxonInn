@@ -22,7 +22,6 @@ namespace AxonInn.Controllers
         // ⚡ GÜVENLİK: JSON döngülerini (Reference Loop) engelleyen ayar eklendi
         private static readonly JsonSerializerOptions _jsonOptions = new()
         {
-            PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
             ReferenceHandler = ReferenceHandler.IgnoreCycles
         };
 

@@ -26,7 +26,8 @@ namespace AxonInn.Controllers
         private static readonly JsonSerializerOptions _jsonOptions = new()
         {
             PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-            ReferenceHandler = ReferenceHandler.IgnoreCycles
+            ReferenceHandler = ReferenceHandler.IgnoreCycles,
+            PropertyNameCaseInsensitive = true // ⚡ EKLENDİ: Gelen JSON'daki büyük/küçük harf uyuşmazlığını tolere eder
         };
 
         public DepartmanController(AxonInnContext context, IConfiguration configuration, IMemoryCache memoryCache, ILogService logService)
@@ -49,10 +50,14 @@ namespace AxonInn.Controllers
         {
             try
             {
-                var loginOlanPersonel = GetActiveUser();
+                    var loginOlanPersonel = GetActiveUser();
 
-                if (loginOlanPersonel == null)
-                    return RedirectToAction("Login", "Login");
+        // ⚡ DÜZELTME 1: Session okunamadıysa önce sil, sonra yönlendir
+        if (loginOlanPersonel == null)
+        {
+            HttpContext.Session.Remove("GirisYapanPersonel"); // Döngüyü kırar
+            return RedirectToAction("Login", "Login");
+        }
 
                 ViewData["GirisYapanPersonel"] = loginOlanPersonel;
 

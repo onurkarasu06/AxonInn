@@ -27,11 +27,11 @@ namespace AxonInn.Controllers
         private static readonly HttpClient _httpClient = new HttpClient();
 
         // 🛠️ DÜZELTME: Sonsuz döngüleri engelleyen standart ReferenceHandler eklendi
-        private static readonly JsonSerializerOptions _jsonOptions = new JsonSerializerOptions
+        private static readonly JsonSerializerOptions _jsonOptions = new()
         {
-            PropertyNameCaseInsensitive = true,
-            DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
-            ReferenceHandler = ReferenceHandler.IgnoreCycles
+            PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+            ReferenceHandler = ReferenceHandler.IgnoreCycles,
+            PropertyNameCaseInsensitive = true // ⚡ EKLENDİ: Gelen JSON'daki büyük/küçük harf uyuşmazlığını tolere eder
         };
 
         private static readonly JsonSerializerOptions _jsonRelaxedOptions = new JsonSerializerOptions
@@ -77,7 +77,13 @@ namespace AxonInn.Controllers
             try
             {
                 var loginOlanPersonel = GetActiveUser();
-                if (loginOlanPersonel == null) return RedirectToAction("Login", "Login");
+
+                // ⚡ DÜZELTME 1: Session okunamadıysa önce sil, sonra yönlendir
+                if (loginOlanPersonel == null)
+                {
+                    HttpContext.Session.Remove("GirisYapanPersonel"); // Döngüyü kırar
+                    return RedirectToAction("Login", "Login");
+                }
 
                 var sessionBilgisi = GetSessionBilgisi(loginOlanPersonel);
                 if (sessionBilgisi?.HotelRefNavigation == null) return RedirectToAction("Login", "Login");
@@ -215,7 +221,7 @@ Lütfen bu verileri detaylıca incele ve otel müdürü için aksiyon alınabili
                 }
 
                 string geminiApiKey = _configuration["GeminiApi:ApiKey"];
-                string apiUrl = $"[https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=](https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=){geminiApiKey}";
+                string apiUrl = $"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={geminiApiKey}";
                 var requestData = new
                 {
                     contents = new[] { new { parts = new[] { new { text = prompt } } } },

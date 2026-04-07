@@ -163,6 +163,7 @@
 
 @section Scripts {
 <script src="https://cdn.jsdelivr.net/npm/chart.js" defer></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.0.6/purify.min.js" defer></script>
 
 <script>
 window.addEventListener("load", function() {
@@ -371,8 +372,17 @@ window.addEventListener("load", function() {
 
                     if (response.ok) {
                         let aiVerisi = await response.json();
-                        let safeHtml = (id, property) => { let el = document.getElementById(id); if (el && aiVerisi[property]) el.innerHTML = aiVerisi[property]; };
-                        
+
+                      let safeHtml = (id, property) => { 
+                                let el = document.getElementById(id);
+                                if (el && aiVerisi[property]) {
+                                    // AI'dan gelen veriyi DOMPurify ile temizle ve sadece belirli etiketlere izin ver
+                                    let temizlenmisHtml = DOMPurify.sanitize(aiVerisi[property], { ALLOWED_TAGS: ['b', 'i', 'em', 'strong', 'a', 'br'] });
+                                    el.innerHTML = temizlenmisHtml; 
+                                }
+                            };
+                            
+
                         safeHtml('ozetDuygu', 'duyguTavsiyesi');
                         safeHtml('ozetDepartman', 'departmanTavsiyesi');
                         safeHtml('ozetHisPolar', 'hisPolarTavsiyesi');

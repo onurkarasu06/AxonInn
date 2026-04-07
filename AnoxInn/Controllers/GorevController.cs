@@ -6,6 +6,7 @@ using System.Diagnostics;
 using AxonInn.Models.Entities;
 using AxonInn.Models.Context;
 using AxonInn.Models.Analitik;
+using AxonInn.Helpers;
 
 namespace AxonInn.Controllers
 {
@@ -153,7 +154,8 @@ namespace AxonInn.Controllers
                     model.GorevFotografs = new List<GorevFotograf>(Fotograf.Count);
                     foreach (var dosya in Fotograf)
                     {
-                        if (dosya.Length > 0 && dosya.Length <= 5 * 1024 * 1024 && dosya.ContentType.StartsWith("image/"))
+                        // 🛡️ GÜVENLİK KONTROLÜ (MIME Spoofing) EKLENDİ (.IsValidImageSignature KULLANILDI)
+                        if (dosya.Length > 0 && dosya.Length <= 5 * 1024 * 1024 && dosya.IsValidImageSignature())
                         {
                             using var ms = new MemoryStream((int)dosya.Length);
                             await dosya.CopyToAsync(ms);
@@ -172,10 +174,26 @@ namespace AxonInn.Controllers
                     model.AiKategori = "Diğer";
                 }
 
-                _context.Gorevs.Add(model);
-                await _context.SaveChangesAsync();
+                // 🛡️ İŞLEM BÜTÜNLÜĞÜ (TRANSACTION) EKLENDİ
+                await using var transaction = await _context.Database.BeginTransactionAsync();
+                try
+                {
+                    _context.Gorevs.Add(model);
+                    await _context.SaveChangesAsync(); // Görev ve Fotoları yazar, model.Id oluşur.
 
-                await LogKaydetAsync(loginOlanPersonel, "Yeni Görev Eklendi", $"Görev ID: {model.Id} oluşturuldu.", null);
+                    bool logBasarili = await LogKaydetAsync(loginOlanPersonel, "Yeni Görev Eklendi", $"Görev ID: {model.Id} oluşturuldu.", null);
+
+                    // Log yazılamazsa görevi de iptal et (Guncelle metodundaki standart)
+                    if (!logBasarili) throw new Exception("Log kaydı oluşturulamadı.");
+
+                    await transaction.CommitAsync();
+                }
+                catch (Exception)
+                {
+                    await transaction.RollbackAsync();
+                    throw; // Hatayı dışarıdaki ana catch bloğuna fırlatıp Error sayfasına yönlendirir
+                }
+
                 return RedirectToAction(nameof(Gorev));
             }
             catch (Exception)
@@ -192,13 +210,25 @@ namespace AxonInn.Controllers
                 var loginOlanPersonel = GetGirisYapanPersonel();
                 if (loginOlanPersonel == null) return RedirectToAction("Login", "Login");
 
-                // ExecuteDeleteAsync doğrudan SQL'e gittiği için kusursuzdur, RAM tüketimi 0'dır.
-                await _context.GorevFotografs.Where(f => f.GorevRef == id).ExecuteDeleteAsync();
-                int silinenAdet = await _context.Gorevs.Where(g => g.Id == id).ExecuteDeleteAsync();
-
-                if (silinenAdet > 0)
+                // 🛡️ İŞLEM BÜTÜNLÜĞÜ (TRANSACTION) EKLENDİ
+                await using var transaction = await _context.Database.BeginTransactionAsync();
+                try
                 {
-                    await LogKaydetAsync(loginOlanPersonel, "Görev Silindi", $"Görev ID: {id} silindi.", null);
+                    await _context.GorevFotografs.Where(f => f.GorevRef == id).ExecuteDeleteAsync();
+                    int silinenAdet = await _context.Gorevs.Where(g => g.Id == id).ExecuteDeleteAsync();
+
+                    if (silinenAdet > 0)
+                    {
+                        bool logBasarili = await LogKaydetAsync(loginOlanPersonel, "Görev Silindi", $"Görev ID: {id} silindi.", null);
+                        if (!logBasarili) throw new Exception("Log kaydı oluşturulamadı.");
+                    }
+
+                    await transaction.CommitAsync();
+                }
+                catch (Exception)
+                {
+                    await transaction.RollbackAsync();
+                    throw; // Geri al ve ana catch'e düşür
                 }
 
                 return RedirectToAction(nameof(Gorev));
@@ -349,7 +379,7 @@ namespace AxonInn.Controllers
                         {
                             foreach (var dosya in YeniFotograflar)
                             {
-                                if (dosya.Length > 0 && dosya.Length <= 5 * 1024 * 1024 && dosya.ContentType.StartsWith("image/"))
+                                if (dosya.Length > 0 && dosya.Length <= 5 * 1024 * 1024 && dosya.IsValidImageSignature())
                                 {
                                     using var ms = new MemoryStream((int)dosya.Length);
                                     await dosya.CopyToAsync(ms);

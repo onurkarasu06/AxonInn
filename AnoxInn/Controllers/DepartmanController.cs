@@ -1,13 +1,14 @@
-﻿using System.Collections.Concurrent;
+﻿using AxonInn.Helpers;
+using AxonInn.Models.Context;
+using AxonInn.Models.Entities;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using System.Text.Json;
+using Microsoft.Extensions.Caching.Memory;
+using System.Collections.Concurrent;
+using System.Diagnostics;
 using System.Net;
 using System.Net.Mail;
-using System.Diagnostics;
-using AxonInn.Models.Entities;
-using AxonInn.Models.Context;
-using Microsoft.Extensions.Caching.Memory;
+using System.Text.Json;
 
 namespace AxonInn.Controllers
 {
@@ -121,12 +122,12 @@ namespace AxonInn.Controllers
                 yeniPersonel.VerificationToken = Guid.NewGuid().ToString("N"); // "N" formatı tireleri atar ve daha hafiftir
                 yeniPersonel.Sifre = BCrypt.Net.BCrypt.HashPassword(yeniPersonel.Sifre);
 
-                // 🛡️ GÜVENLİK 2: RAM Bombası kalkanı. Sadece resim formatında ve max 5 MB dosyalara izin verilir.
+                // 🛡️ GÜVENLİK 2 & 3: RAM Bombası ve MIME Spoofing kalkanı. (.IsValidImageSignature KULLANILDI)
                 if (yuklenenFoto != null && yuklenenFoto.Length > 0)
                 {
-                    if (yuklenenFoto.Length > 5 * 1024 * 1024 || !yuklenenFoto.ContentType.StartsWith("image/"))
+                    if (yuklenenFoto.Length > 5 * 1024 * 1024 || !yuklenenFoto.IsValidImageSignature())
                     {
-                        TempData["Mesaj"] = "Fotoğraf geçersiz veya 5MB boyutundan büyük olamaz.";
+                        TempData["Mesaj"] = "Yüklediğiniz dosya geçerli bir resim formatında değil veya 5MB boyutundan büyük olamaz.";
                         TempData["MesajTipi"] = "warning";
                         return RedirectToAction(nameof(Departman));
                     }
@@ -275,7 +276,8 @@ namespace AxonInn.Controllers
                         .SetProperty(x => x.AktifMi, p.AktifMi));
                 }
 
-                if (yuklenenFoto != null && yuklenenFoto.Length > 0 && yuklenenFoto.Length <= 5 * 1024 * 1024 && yuklenenFoto.ContentType.StartsWith("image/"))
+                // 🛡️ GÜVENLİK 3: MIME Spoofing kalkanı (.IsValidImageSignature KULLANILDI)
+                if (yuklenenFoto != null && yuklenenFoto.Length > 0 && yuklenenFoto.Length <= 5 * 1024 * 1024 && yuklenenFoto.IsValidImageSignature())
                 {
                     using var ms = new MemoryStream((int)yuklenenFoto.Length);
                     await yuklenenFoto.CopyToAsync(ms);

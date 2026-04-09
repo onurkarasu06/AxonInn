@@ -62,11 +62,8 @@ namespace AxonInn.Controllers
         {
             try
             {
-                var personelJson = HttpContext.Session.GetString("GirisYapanPersonel");
-                if (string.IsNullOrEmpty(personelJson))
-                    return RedirectToAction("Login", "Login");
-
-                var loginOlanPersonel = JsonSerializer.Deserialize<Personel>(personelJson, _jsonOptions);
+                var loginOlanPersonel = _currentUserService.GetUser();
+                if (loginOlanPersonel == null) return RedirectToAction("Login", "Login");
 
                 string smtpServer = _configuration["EmailSettings:SmtpServer"]!;
                 int port = int.Parse(_configuration["EmailSettings:Port"] ?? "587");

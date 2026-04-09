@@ -12,6 +12,7 @@ namespace AxonInn.Controllers
     {
         private readonly AxonInnContext _context;
         private readonly ILogService _logService;
+        private readonly ICurrentUserService _currentUserService;
 
         // ⚡ GÜVENLİK: JSON döngülerini (Reference Loop) engelleyen standart ayarımız
         private static readonly JsonSerializerOptions _jsonOptions = new()
@@ -22,10 +23,11 @@ namespace AxonInn.Controllers
         };
 
         // 🛠️ HATA 1 DÜZELTİLDİ: Tüm servisler tek constructor içinde birleştirildi
-        public GizlilikController(AxonInnContext context, ILogService logService)
+        public GizlilikController(AxonInnContext context, ILogService logService, ICurrentUserService currentUserService)
         {
             _context = context;
             _logService = logService;
+            _currentUserService = currentUserService;
         }
 
         [Route("Gizlilik")]
@@ -33,15 +35,8 @@ namespace AxonInn.Controllers
         {
             try
             {
-                var personelJson = HttpContext.Session.GetString("GirisYapanPersonel");
-                if (string.IsNullOrEmpty(personelJson))
-                {
-                    HttpContext.Session.Remove("GirisYapanPersonel"); // Döngüyü kırar
-                    return RedirectToAction("Login", "Login");
-                }
-
-                // 🛠️ DÜZELTME: Session okunurken _jsonOptions parametresi eklendi
-                var loginOlanPersonel = JsonSerializer.Deserialize<Personel>(personelJson, _jsonOptions);
+                var loginOlanPersonel = _currentUserService.GetUser();
+                if (loginOlanPersonel == null) return RedirectToAction("Login", "Login");
 
                 ViewData["GirisYapanPersonel"] = loginOlanPersonel;
 

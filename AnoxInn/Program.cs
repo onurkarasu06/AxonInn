@@ -15,6 +15,9 @@ builder.Services.AddControllersWithViews();
 
 builder.Services.AddHttpClient<GeminiApiService>();
 
+// HttpContext'e servislerden erişmek için şart
+builder.Services.AddHttpContextAccessor(); 
+builder.Services.AddScoped<ICurrentUserService, CurrentUserService>();
 
 // --- 1. SESSION (OTURUM) SERVİSLERİ EKLENİYOR ---
 builder.Services.AddDistributedMemoryCache(); // Oturum verilerini bellekte tutmak için gerekli

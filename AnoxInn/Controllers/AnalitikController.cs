@@ -23,6 +23,7 @@ namespace AxonInn.Controllers
         private readonly AxonInnContext _context;
         private readonly IConfiguration _configuration;
         private readonly ILogService _logService;
+        private readonly ICurrentUserService _currentUserService;
 
         private static readonly HttpClient _httpClient = new HttpClient();
 
@@ -40,24 +41,15 @@ namespace AxonInn.Controllers
         };
 
         // 🛠️ HATA 1 DÜZELTİLDİ: Tüm Dependency Injection servisleri tek bir constructorda birleştirildi.
-        public AnalitikController(AxonInnContext context, IConfiguration configuration, ILogService logService)
+        public AnalitikController(AxonInnContext context, IConfiguration configuration, ILogService logService, ICurrentUserService currentUserService)
         {
             _context = context;
             _configuration = configuration;
             _logService = logService;
+            _currentUserService = currentUserService;
         }
 
-        private Personel? GetActiveUser()
-        {
-            if (HttpContext.Items["CachedUser"] is Personel cachedUser) return cachedUser;
-
-            var personelJson = HttpContext.Session.GetString("GirisYapanPersonel");
-            if (string.IsNullOrEmpty(personelJson)) return null;
-
-            var user = JsonSerializer.Deserialize<Personel>(personelJson, _jsonOptions);
-            HttpContext.Items["CachedUser"] = user;
-            return user;
-        }
+  
 
         private Departman? GetSessionBilgisi(Personel loginOlanPersonel)
         {
@@ -76,7 +68,7 @@ namespace AxonInn.Controllers
         {
             try
             {
-                var loginOlanPersonel = GetActiveUser();
+                var loginOlanPersonel = _currentUserService.GetUser();
 
                 // ⚡ DÜZELTME 1: Session okunamadıysa önce sil, sonra yönlendir
                 if (loginOlanPersonel == null)
@@ -140,7 +132,7 @@ namespace AxonInn.Controllers
         {
             try
             {
-                var loginOlanPersonel = GetActiveUser();
+                var loginOlanPersonel = _currentUserService.GetUser();
 
                 if (loginOlanPersonel == null)
                     return RedirectToAction("Login", "Login");
@@ -261,7 +253,7 @@ Lütfen bu verileri detaylıca incele ve otel müdürü için aksiyon alınabili
 
         public async Task<IActionResult> TripadvisorYorumlariApifyApiKaydet()
         {
-            var user = GetActiveUser();
+            var user = _currentUserService.GetUser();
             var session = user != null ? GetSessionBilgisi(user) : null;
             if (session?.HotelRefNavigation == null) return RedirectToAction("Login", "Login");
 
@@ -279,7 +271,7 @@ Lütfen bu verileri detaylıca incele ve otel müdürü için aksiyon alınabili
 
         public async Task<IActionResult> TripadvisorYorumlariRapidApiKaydet()
         {
-            var user = GetActiveUser();
+            var user =   _currentUserService.GetUser();
             var session = user != null ? GetSessionBilgisi(user) : null;
             if (session?.HotelRefNavigation == null) return RedirectToAction("Login", "Login");
 
@@ -298,7 +290,7 @@ Lütfen bu verileri detaylıca incele ve otel müdürü için aksiyon alınabili
 
         public async Task<IActionResult> GeminiAnalizleriKaydetAsync()
         {
-            var user = GetActiveUser();
+            var user = _currentUserService.GetUser();
             var session = user != null ? GetSessionBilgisi(user) : null;
             if (session?.HotelRefNavigation == null) return RedirectToAction("Login", "Login");
 
@@ -318,7 +310,7 @@ Lütfen bu verileri detaylıca incele ve otel müdürü için aksiyon alınabili
 
         public async Task TripadvisordanAlamadigimizMisafirUlkesiniGeminiTahminEdipGuncellesinTopluAsync()
         {
-            var user = GetActiveUser();
+            var user = _currentUserService.GetUser();
             if (user == null) return;
             var session = GetSessionBilgisi(user);
             if (session == null || session.HotelRefNavigation == null) return;

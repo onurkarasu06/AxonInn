@@ -17,6 +17,7 @@ namespace AxonInn.Controllers
         private readonly AxonInnContext _context;
         private readonly IConfiguration _configuration;
         private readonly ILogService _logService;
+        private readonly ICurrentUserService _currentUserService;
 
         // ⚡ GÜVENLİK: JSON döngülerini (Reference Loop) engelleyen ayar eklendi
         private static readonly JsonSerializerOptions _jsonOptions = new()
@@ -28,11 +29,12 @@ namespace AxonInn.Controllers
 
 
         // 🛠️ HATA 1 DÜZELTİLDİ: Çift constructor birleştirildi. Tüm DI nesneleri tek kurucuda.
-        public IletisimController(AxonInnContext context, IConfiguration configuration, ILogService logService)
+        public IletisimController(AxonInnContext context, IConfiguration configuration, ILogService logService, ICurrentUserService currentUserService)
         {
             _context = context;
             _configuration = configuration;
             _logService = logService;
+            _currentUserService = currentUserService;
         }
 
         [Route("Iletisim")]
@@ -40,12 +42,8 @@ namespace AxonInn.Controllers
         {
             try
             {
-                var personelJson = HttpContext.Session.GetString("GirisYapanPersonel");
-                if (string.IsNullOrEmpty(personelJson))
-                    return RedirectToAction("Login", "Login");
-
-                // 🛠️ JSON ayarları eklendi
-                var loginOlanPersonel = JsonSerializer.Deserialize<Personel>(personelJson, _jsonOptions);
+                var loginOlanPersonel = _currentUserService.GetUser();
+                if (loginOlanPersonel == null) return RedirectToAction("Login", "Login");
 
                 // 🛠️ HATA 2 DÜZELTİLDİ: Parametre sıralaması (eskiDeger: boş, yeniDeger: "Sayfa Görüntüleme") yapıldı
                 await _logService.LogKaydetAsync(loginOlanPersonel, "İletişim Sayfasına Giriş Yapıldı", string.Empty, "Sayfa Görüntüleme");

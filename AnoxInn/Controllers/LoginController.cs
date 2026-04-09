@@ -1,36 +1,39 @@
 ﻿using AxonInn.Models.Context;
 using AxonInn.Models.Entities;
+using AxonInn.Models; // ErrorViewModel'in bulunduğu yer
 using AxonInn.Services;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
+using System.Diagnostics; // ⚡ EKLENDİ: Güvenli TraceId kullanımı için
 using System.Net;
 using System.Net.Mail;
 using System.Text.Json;
-using System.Text.Json.Serialization; // ⚡ EKLENDİ: ReferenceHandler için gerekli
+using System.Text.Json.Serialization;
 
 namespace AxonInn.Controllers
 {
+    // Class seviyesinde bulunduğu için POST metotlarındaki gereksiz tekrarları kaldırdım
     [AutoValidateAntiforgeryToken]
     public class LoginController : Controller
     {
         private readonly AxonInnContext _context;
         private readonly IConfiguration _configuration;
         private readonly ILogService _logService;
+        private readonly ICurrentUserService _currentUserService;
 
-        // ⚡ GÜVENLİK: JSON döngülerini (Reference Loop) engelleyen ayar eklendi
         private static readonly JsonSerializerOptions _jsonOptions = new()
         {
             ReferenceHandler = ReferenceHandler.IgnoreCycles
         };
 
-        // 🛠️ HATA 1 DÜZELTİLDİ: Çift constructor birleştirildi.
-        public LoginController(AxonInnContext context, IConfiguration configuration, ILogService logService)
+        public LoginController(AxonInnContext context, IConfiguration configuration, ILogService logService, ICurrentUserService currentUserService)
         {
             _context = context;
             _configuration = configuration;
             _logService = logService;
+            _currentUserService = currentUserService;
         }
 
         [HttpGet]
@@ -46,14 +49,14 @@ namespace AxonInn.Controllers
 
                 return View();
             }
-            catch (Exception ex)
+            catch (Exception)
             {
-                return View("~/Views/Error/Error.cshtml", new ErrorViewModel { RequestId = ex.Message });
+                // ⚡ GÜVENLİK DÜZELTMESİ: ex.Message ekrana basılmaz, kullanıcıya güvenli TraceId gösterilir.
+                return View("~/Views/Error/Error.cshtml", new ErrorViewModel { RequestId = Activity.Current?.Id ?? HttpContext.TraceIdentifier });
             }
         }
 
         [HttpPost]
-        [ValidateAntiForgeryToken]
         [EnableRateLimiting("LoginLimit")]
         public async Task<ActionResult> Login(string email, string password)
         {
@@ -89,7 +92,6 @@ namespace AxonInn.Controllers
                       p.TelefonNumarasi,
                       p.MailOnayliMi,
                       p.Sifre,
-                      p.DepartmanRefNavigation,
                       DepartmanAdi = p.DepartmanRefNavigation != null ? p.DepartmanRefNavigation.Adi : string.Empty,
                       HotelAdi = (p.DepartmanRefNavigation != null && p.DepartmanRefNavigation.HotelRefNavigation != null) ? p.DepartmanRefNavigation.HotelRefNavigation.Adi : string.Empty
                   })
@@ -103,6 +105,7 @@ namespace AxonInn.Controllers
                         return RedirectToAction(nameof(Login));
                     }
 
+                    // ⚡ PERFORMANS DÜZELTMESİ: Session içerisine Navigation Property (İlişkili Sınıflar) eklenmez.
                     var sessionPersonel = new Personel
                     {
                         Id = dbSonuc.Id,
@@ -114,15 +117,13 @@ namespace AxonInn.Controllers
                         DepartmanRef = dbSonuc.DepartmanRef,
                         MailAdresi = dbSonuc.MailAdresi,
                         TelefonNumarasi = dbSonuc.TelefonNumarasi,
-                        MailOnayliMi = dbSonuc.MailOnayliMi,
-                        DepartmanRefNavigation = dbSonuc.DepartmanRefNavigation
+                        MailOnayliMi = dbSonuc.MailOnayliMi
                     };
 
                     bool logKayit = await _logService.LogKaydetAsync(sessionPersonel, "Sisteme Giriş Başarılı", "Login İşlemi", email, dbSonuc.HotelAdi, dbSonuc.DepartmanAdi);
 
                     if (logKayit)
                     {
-                        // 🛠️ HATA 2 DÜZELTİLDİ: Sonsuz döngüleri engelleyen options parametresi eklendi
                         HttpContext.Session.SetString("GirisYapanPersonel", JsonSerializer.Serialize(sessionPersonel, _jsonOptions));
                         return RedirectToAction("Ana", "Ana");
                     }
@@ -135,9 +136,9 @@ namespace AxonInn.Controllers
                 TempData["ErrorMessage"] = "Girdiğiniz bilgiler hatalı veya kullanıcı aktif değil!";
                 return RedirectToAction(nameof(Login));
             }
-            catch (Exception ex)
+            catch (Exception)
             {
-                return View("~/Views/Error/Error.cshtml", new ErrorViewModel { RequestId = ex.Message });
+                return View("~/Views/Error/Error.cshtml", new ErrorViewModel { RequestId = Activity.Current?.Id ?? HttpContext.TraceIdentifier });
             }
         }
 
@@ -167,9 +168,9 @@ namespace AxonInn.Controllers
                 TempData["SuccessMessage"] = "E-posta adresiniz başarıyla doğrulandı! Şimdi giriş yapabilirsiniz.";
                 return RedirectToAction(nameof(Login));
             }
-            catch (Exception ex)
+            catch (Exception)
             {
-                return View("~/Views/Error/Error.cshtml", new ErrorViewModel { RequestId = ex.Message });
+                return View("~/Views/Error/Error.cshtml", new ErrorViewModel { RequestId = Activity.Current?.Id ?? HttpContext.TraceIdentifier });
             }
         }
 
@@ -178,33 +179,24 @@ namespace AxonInn.Controllers
         {
             try
             {
-                var personelJson = HttpContext.Session.GetString("GirisYapanPersonel");
-                if (string.IsNullOrWhiteSpace(personelJson))
-                    return RedirectToAction(nameof(Login));
+                var loginOlanPersonel = _currentUserService.GetUser();
 
-                // 🛠️ HATA 2 DÜZELTİLDİ: Deserialize edilirken de options eklendi
-                var loginOlanPersonel = JsonSerializer.Deserialize<Personel>(personelJson, _jsonOptions);
-
-                bool logkayit = await _logService.LogKaydetAsync(loginOlanPersonel, "Güvenli Çıkış Yapıldı", "Logout İşlemi", loginOlanPersonel?.MailAdresi ?? string.Empty);
-
-                if (logkayit)
+                if (loginOlanPersonel != null)
                 {
-                    HttpContext.Session.Clear();
-                    return RedirectToAction(nameof(Login));
+                    await _logService.LogKaydetAsync(loginOlanPersonel, "Güvenli Çıkış Yapıldı", "Logout İşlemi", loginOlanPersonel.MailAdresi ?? string.Empty);
                 }
-                else
-                {
-                    return View("~/Views/Error/Error.cshtml", new ErrorViewModel { RequestId = "Çıkış İşlemi Loglanamadı" });
-                }
+
+                // ⚡ HATA DÜZELTİLDİ: Loglama başarısız olsa bile Session temizlenmeli, aksi halde kullanıcı içeride hapis kalır.
+                HttpContext.Session.Clear();
+                return RedirectToAction(nameof(Login));
             }
-            catch (Exception ex)
+            catch (Exception)
             {
-                return View("~/Views/Error/Error.cshtml", new ErrorViewModel { RequestId = ex.Message });
+                return View("~/Views/Error/Error.cshtml", new ErrorViewModel { RequestId = Activity.Current?.Id ?? HttpContext.TraceIdentifier });
             }
         }
 
         [HttpPost]
-        [ValidateAntiForgeryToken]
         [EnableRateLimiting("LoginLimit")]
         public async Task<IActionResult> ForgotPassword(string email)
         {
@@ -221,22 +213,25 @@ namespace AxonInn.Controllers
                 var userRecord = await _context.Personels
                     .AsNoTracking()
                     .Where(p => p.MailAdresi == email && p.AktifMi == 1)
-                    .Select(p => new { p.Id, p.MailAdresi, p.MailOnayliMi, p.VerificationToken })
+                    .Select(p => new { p.Id, p.MailAdresi, p.MailOnayliMi }) // Token'i her halükarda ezeceğimiz için DB'den çekmedik
                     .FirstOrDefaultAsync();
 
                 if (userRecord != null)
                 {
-                    if (userRecord.MailOnayliMi == 1 && string.IsNullOrWhiteSpace(userRecord.VerificationToken))
+                    if (userRecord.MailOnayliMi == 1)
                     {
                         string newToken = Guid.NewGuid().ToString("N");
 
+                        // ⚡ KRİTİK MANTIK HATASI DÜZELTİLDİ: SetProperty(p => p.MailOnayliMi, 0) kodu kaldırıldı!
                         await _context.Personels
                             .Where(p => p.Id == userRecord.Id)
-                            .ExecuteUpdateAsync(s => s
-                                .SetProperty(p => p.VerificationToken, newToken)
-                                .SetProperty(p => p.MailOnayliMi, 0));
+                            .ExecuteUpdateAsync(s => s.SetProperty(p => p.VerificationToken, newToken));
 
-                        bool mailBasariliMi = await SendPasswordResetEmailAsync(userRecord.MailAdresi, newToken);
+                        // String birleştirme yerine MVC metodu kullanıldı
+                        string resetLink = Url.Action("ResetPassword", "Login", new { token = newToken }, Request.Scheme)
+                            ?? $"{Request.Scheme}://{Request.Host}/Login/ResetPassword?token={newToken}";
+
+                        bool mailBasariliMi = await SendPasswordResetEmailAsync(userRecord.MailAdresi, resetLink);
 
                         if (mailBasariliMi)
                         {
@@ -246,7 +241,7 @@ namespace AxonInn.Controllers
                         else
                         {
                             await _logService.LogKaydetAsync(null, "Şifre Sıfırlama Maili Gönderilemedi.", "Başarısız", userRecord.MailAdresi);
-                            TempData["ErrorMessage"] = $"{userRecord.MailAdresi} adresine şifre sıfırlama maili gönderilemedi. Lütfen sistem yöneticisiyle iletişime geçin.";
+                            TempData["ErrorMessage"] = "Şifre sıfırlama maili gönderilemedi. Lütfen sistem yöneticisiyle iletişime geçin.";
                         }
                     }
                     else
@@ -262,13 +257,13 @@ namespace AxonInn.Controllers
 
                 return RedirectToAction(nameof(Login));
             }
-            catch (Exception ex)
+            catch (Exception)
             {
-                return View("~/Views/Error/Error.cshtml", new ErrorViewModel { RequestId = ex.Message });
+                return View("~/Views/Error/Error.cshtml", new ErrorViewModel { RequestId = Activity.Current?.Id ?? HttpContext.TraceIdentifier });
             }
         }
 
-        private async Task<bool> SendPasswordResetEmailAsync(string? toEmail, string token)
+        private async Task<bool> SendPasswordResetEmailAsync(string? toEmail, string resetLink)
         {
             if (string.IsNullOrWhiteSpace(toEmail)) return false;
 
@@ -279,9 +274,6 @@ namespace AxonInn.Controllers
                 string senderEmail = _configuration["EmailSettings:SenderEmail"]!;
                 string password = _configuration["EmailSettings:Password"]!;
                 bool enableSsl = bool.Parse(_configuration["EmailSettings:EnableSsl"] ?? "false");
-
-                string baseUrl = $"{Request.Scheme}://{Request.Host}";
-                string resetLink = $"{baseUrl}/Login/ResetPassword?token={token}";
 
                 string mailBody = $"""
             <div style='font-family: Arial, sans-serif; max-width: 600px; margin: auto; border: 1px solid #ddd; padding: 20px; border-radius: 10px;'>
@@ -337,8 +329,9 @@ namespace AxonInn.Controllers
                     return RedirectToAction(nameof(Login));
                 }
 
+                // ⚡ DÜZELTME: p.MailOnayliMi == 0 şartı silindi
                 bool tokenGecerli = await _context.Personels
-                    .AnyAsync(p => p.VerificationToken == token && p.AktifMi == 1 && p.MailOnayliMi == 0);
+                    .AnyAsync(p => p.VerificationToken == token && p.AktifMi == 1);
 
                 if (!tokenGecerli)
                 {
@@ -349,14 +342,13 @@ namespace AxonInn.Controllers
                 TempData["ValidResetToken"] = token;
                 return RedirectToAction(nameof(Login));
             }
-            catch (Exception ex)
+            catch (Exception)
             {
-                return View("~/Views/Error/Error.cshtml", new ErrorViewModel { RequestId = ex.Message });
+                return View("~/Views/Error/Error.cshtml", new ErrorViewModel { RequestId = Activity.Current?.Id ?? HttpContext.TraceIdentifier });
             }
         }
 
         [HttpPost]
-        [ValidateAntiForgeryToken]
         [EnableRateLimiting("LoginLimit")]
         public async Task<IActionResult> ResetPassword(string token, string newPassword, string confirmPassword)
         {
@@ -394,17 +386,16 @@ namespace AxonInn.Controllers
                     .Where(p => p.VerificationToken == token && p.AktifMi == 1)
                     .ExecuteUpdateAsync(s => s
                         .SetProperty(p => p.Sifre, hashedSifre)
-                        .SetProperty(p => p.VerificationToken, (string?)null)
-                        .SetProperty(p => p.MailOnayliMi, 1));
+                        .SetProperty(p => p.VerificationToken, (string?)null)); // MailOnayliMi'yi tekrardan 1'e set etmeye gerek kalmadı.
 
                 await _logService.LogKaydetAsync(null, "Şifre Başarıyla Sıfırlandı", "Başarılı", userEmail);
 
                 TempData["SuccessMessage"] = "Şifreniz başarıyla değiştirildi! Yeni şifrenizle giriş yapabilirsiniz.";
                 return RedirectToAction(nameof(Login));
             }
-            catch (Exception ex)
+            catch (Exception)
             {
-                return View("~/Views/Error/Error.cshtml", new ErrorViewModel { RequestId = ex.Message });
+                return View("~/Views/Error/Error.cshtml", new ErrorViewModel { RequestId = Activity.Current?.Id ?? HttpContext.TraceIdentifier });
             }
         }
     }

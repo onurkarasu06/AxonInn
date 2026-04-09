@@ -18,6 +18,7 @@ namespace AxonInn.Controllers
         private readonly AxonInnContext _context;
         private readonly GeminiApiService _geminiService;
         private readonly ILogService _logService;
+        private readonly ICurrentUserService _currentUserService;
 
         // ⚡ GÜVENLİK VE PERFORMANS: Sonsuz döngü koruması eklendi
         private static readonly JsonSerializerOptions _jsonOptions = new()
@@ -28,41 +29,23 @@ namespace AxonInn.Controllers
         };
 
         // 🛠️ HATA 1 DÜZELTİLDİ: Tüm servisler tek constructor içinde birleştirildi
-        public GorevController(AxonInnContext context, GeminiApiService geminiService, ILogService logService)
+        public GorevController(AxonInnContext context, GeminiApiService geminiService, ILogService logService, ICurrentUserService currentUserService)
         {
             _context = context;
             _geminiService = geminiService;
             _logService = logService;
+            _currentUserService = currentUserService;
         }
 
-        private Personel? GetGirisYapanPersonel()
-        {
-            try
-            {
-                var personelJson = HttpContext.Session.GetString("GirisYapanPersonel");
-                if (string.IsNullOrEmpty(personelJson)) return null;
-                return JsonSerializer.Deserialize<Personel>(personelJson, _jsonOptions);
-            }
-            catch
-            {
-                return null;
-            }
-        }
+        
 
         [Route("Gorevler")]
         public async Task<IActionResult> Gorev()
         {
             try
             {
-                var loginOlanPersonel = GetGirisYapanPersonel();
-      
-                // ⚡ DÜZELTME 1: Session okunamadıysa önce sil, sonra yönlendir
-                if (loginOlanPersonel == null)
-                {
-                    HttpContext.Session.Remove("GirisYapanPersonel"); // Döngüyü kırar
-                    return RedirectToAction("Login", "Login");
-                }
-
+                var loginOlanPersonel = _currentUserService.GetUser();
+                if (loginOlanPersonel == null) return RedirectToAction("Login", "Login");
 
 
 
@@ -146,7 +129,7 @@ namespace AxonInn.Controllers
         {
             try
             {
-                var loginOlanPersonel = GetGirisYapanPersonel();
+                var loginOlanPersonel =  _currentUserService.GetUser();
                 if (loginOlanPersonel == null) return RedirectToAction("Login", "Login");
 
                 model.KayitTarihi = DateTime.Now;
@@ -216,7 +199,7 @@ namespace AxonInn.Controllers
         {
             try
             {
-                var loginOlanPersonel = GetGirisYapanPersonel();
+                var loginOlanPersonel = _currentUserService.GetUser();
                 if (loginOlanPersonel == null) return RedirectToAction("Login", "Login");
 
                 await using var transaction = await _context.Database.BeginTransactionAsync();
@@ -255,7 +238,7 @@ namespace AxonInn.Controllers
         {
             try
             {
-                var loginOlanPersonel = GetGirisYapanPersonel();
+                var loginOlanPersonel = _currentUserService.GetUser();
                 if (loginOlanPersonel == null) return RedirectToAction("Login", "Login");
 
                 var mevcutDurum = await _context.Gorevs

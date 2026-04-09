@@ -15,6 +15,7 @@ namespace AxonInn.Controllers
         private readonly AxonInnContext _context;
 
         private readonly ILogService _logService;
+        private readonly ICurrentUserService _currentUserService;
 
         // 🛠️ DÜZELTME: Sonsuz döngüleri engelleyen standart ReferenceHandler eklendi
         private static readonly JsonSerializerOptions _jsonOptions = new()
@@ -25,24 +26,11 @@ namespace AxonInn.Controllers
         };
 
         // 🛠️ HATA 1 DÜZELTİLDİ: Tüm servisler tek constructor içinde birleştirildi
-        public AnaController(AxonInnContext context, ILogService logService)
+        public AnaController(AxonInnContext context, ILogService logService, ICurrentUserService currentUserService)
         {
             _context = context;
             _logService = logService;
-        }
-
-        private Personel? GetActiveUser()
-        {
-            try
-            {
-                var personelJson = HttpContext.Session.GetString("GirisYapanPersonel");
-                // 🛠️ DÜZELTME: _jsonOptions parametresi eklendi
-                return string.IsNullOrEmpty(personelJson) ? null : JsonSerializer.Deserialize<Personel>(personelJson, _jsonOptions);
-            }
-            catch
-            {
-                return null;
-            }
+            _currentUserService = currentUserService;
         }
 
         [Route("AnaSayfa")]
@@ -50,7 +38,7 @@ namespace AxonInn.Controllers
         {
             try
             {
-                var loginOlanPersonel = GetActiveUser();
+                var loginOlanPersonel =  _currentUserService.GetUser();
 
                 // ⚡ DÜZELTME 1: Session okunamadıysa önce sil, sonra yönlendir
                 if (loginOlanPersonel == null)

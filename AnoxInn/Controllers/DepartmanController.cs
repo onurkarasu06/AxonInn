@@ -20,6 +20,7 @@ namespace AxonInn.Controllers
         private readonly IConfiguration _configuration;
         private readonly IMemoryCache _memoryCache;
         private readonly ILogService _logService;
+        private readonly ICurrentUserService _currentUserService;
 
         public static readonly string AppStartVersion = DateTime.Now.Ticks.ToString();
 
@@ -30,19 +31,16 @@ namespace AxonInn.Controllers
             PropertyNameCaseInsensitive = true // ⚡ EKLENDİ: Gelen JSON'daki büyük/küçük harf uyuşmazlığını tolere eder
         };
 
-        public DepartmanController(AxonInnContext context, IConfiguration configuration, IMemoryCache memoryCache, ILogService logService)
+        public DepartmanController(AxonInnContext context, IConfiguration configuration, IMemoryCache memoryCache, ILogService logService, ICurrentUserService currentUserService)
         {
             _context = context;
             _configuration = configuration;
             _memoryCache = memoryCache;
             _logService = logService;
+            _currentUserService = currentUserService;
         }
 
-        private Personel? GetActiveUser()
-        {
-            var personelJson = HttpContext.Session.GetString("GirisYapanPersonel");
-            return string.IsNullOrEmpty(personelJson) ? null : JsonSerializer.Deserialize<Personel>(personelJson, _jsonOptions);
-        }
+   
 
         [Route("Departmanlar")]
         [HttpGet]
@@ -50,10 +48,10 @@ namespace AxonInn.Controllers
         {
             try
             {
-                    var loginOlanPersonel = GetActiveUser();
+                    var loginOlanPersonel = _currentUserService.GetUser();
 
-        // ⚡ DÜZELTME 1: Session okunamadıysa önce sil, sonra yönlendir
-        if (loginOlanPersonel == null)
+                // ⚡ DÜZELTME 1: Session okunamadıysa önce sil, sonra yönlendir
+                if (loginOlanPersonel == null)
         {
             HttpContext.Session.Remove("GirisYapanPersonel"); // Döngüyü kırar
             return RedirectToAction("Login", "Login");
@@ -107,7 +105,7 @@ namespace AxonInn.Controllers
         {
             try
             {
-                var loginOlanPersonel = GetActiveUser();
+                var loginOlanPersonel = _currentUserService.GetUser();
                 if (loginOlanPersonel == null) return RedirectToAction("Login", "Login");
 
                 yeniPersonel.TelefonNumarasi = FormatTelefon(yeniPersonel.TelefonNumarasi);
@@ -207,7 +205,7 @@ namespace AxonInn.Controllers
         {
             try
             {
-                var loginOlanPersonel = GetActiveUser();
+                var loginOlanPersonel = _currentUserService.GetUser();
                 if (loginOlanPersonel == null) return RedirectToAction("Login", "Login");
 
                 bool gorevVarMi = await _context.Gorevs.AnyAsync(g => g.PersonelRef == id);
@@ -245,7 +243,7 @@ namespace AxonInn.Controllers
         {
             try
             {
-                var loginOlanPersonel = GetActiveUser();
+                var loginOlanPersonel = _currentUserService.GetUser();
                 if (loginOlanPersonel == null) return RedirectToAction("Login", "Login");
 
                 string formatliTel = FormatTelefon(p.TelefonNumarasi);
@@ -407,7 +405,7 @@ namespace AxonInn.Controllers
         {
             try
             {
-                var loginOlanPersonel = GetActiveUser();
+                var loginOlanPersonel = _currentUserService.GetUser();
                 if (loginOlanPersonel == null) return RedirectToAction("Login", "Login");
 
                 var dbPersonel = await _context.Personels

@@ -68,6 +68,28 @@
 
         gtag('config', 'G-LSLKRPYXY2');
         gtag('config', 'AW-18020925402');
+
+    
+    
+ 
+        window.gtag_report_conversion = function(url) {
+        var callback = function () {
+        if (typeof(url) != 'undefined') {
+        window.location = url;
+        }
+        };
+        gtag('event', 'conversion', {
+        'send_to': 'AW-18020925402/3RCLCKHyp5wcENr_hZFD',
+        'value': 1.0,
+        'currency': 'TRY',
+        'event_callback': callback
+        });
+        return false;
+        };
+   
+
+
+
         }, 3500);
         });
 
@@ -77,6 +99,11 @@
         document.documentElement.style.transition = "opacity 0.5s ease";
         document.documentElement.style.opacity = "1";
         });
+
+
+     
+
+
     </script>
 </body>
 </html>

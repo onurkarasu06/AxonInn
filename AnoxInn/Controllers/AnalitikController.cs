@@ -64,16 +64,15 @@ namespace AxonInn.Controllers
         }
 
         [Route("Analitik")]
-        public async Task<IActionResult> Analitik(int? yil = null)
+        public async Task<IActionResult> Analitik(string? ay = null) // int? yil yerine string? ay kullanıyoruz
         {
             try
             {
                 var loginOlanPersonel = _currentUserService.GetUser();
 
-                // ⚡ DÜZELTME 1: Session okunamadıysa önce sil, sonra yönlendir
                 if (loginOlanPersonel == null)
                 {
-                    HttpContext.Session.Remove("GirisYapanPersonel"); // Döngüyü kırar
+                    HttpContext.Session.Remove("GirisYapanPersonel");
                     return RedirectToAction("Login", "Login");
                 }
 
@@ -85,19 +84,21 @@ namespace AxonInn.Controllers
 
                 var tumYorumlarQuery = _context.Yorum.AsNoTracking().Where(y => y.HotelRef == aktifOtelId);
 
-                var yillar = await tumYorumlarQuery
-                   .Where(y => !string.IsNullOrEmpty(y.MisafirKonaklamaTarihi) && y.MisafirKonaklamaTarihi.Length >= 4)
-                   .Select(y => y.MisafirKonaklamaTarihi.Substring(0, 4))
+                // YYYY-MM formatında (Örn: 2024-05) benzersiz ayları çekiyoruz
+                var aylar = await tumYorumlarQuery
+                   .Where(y => !string.IsNullOrEmpty(y.MisafirKonaklamaTarihi) && y.MisafirKonaklamaTarihi.Length >= 7)
+                   .Select(y => y.MisafirKonaklamaTarihi.Substring(0, 7))
                    .Distinct()
-                   .OrderByDescending(y => y)
+                   .OrderByDescending(a => a)
                    .ToListAsync();
 
-                ViewBag.Yillar = yillar;
-                ViewBag.SeciliYil = yil;
+                ViewBag.Aylar = aylar;
+                ViewBag.SeciliAy = ay;
 
-                if (yil.HasValue && yil.Value > 0)
+                // Seçili ay varsa filtrelemeyi MisafirKonaklamaTarihi üzerinden yapıyoruz
+                if (!string.IsNullOrEmpty(ay))
                 {
-                    tumYorumlarQuery = tumYorumlarQuery.Where(y => y.MisafirYorumTarihi != null && y.MisafirYorumTarihi.Value.Year == yil.Value);
+                    tumYorumlarQuery = tumYorumlarQuery.Where(y => !string.IsNullOrEmpty(y.MisafirKonaklamaTarihi) && y.MisafirKonaklamaTarihi.StartsWith(ay));
                 }
 
                 List<Yorum> yorumList = await tumYorumlarQuery.ToListAsync();
@@ -113,10 +114,10 @@ namespace AxonInn.Controllers
                     UlkeGrafik = yorumDashboardGrafikServisi.HesaplaUlkeGrafigi(yorumList),
                     KonaklamaGrafik = yorumDashboardGrafikServisi.HesaplaKonaklamaTipiGrafigi(yorumList),
                     TrendGrafik = yorumDashboardGrafikServisi.HesaplaAylikTrendGrafigi(yorumList),
-                    Yil = yil.HasValue ? yil.Value.ToString() : "Tüm Yıllar"
+                    // Modeldeki prop adını değiştirmemek için veriyi Yil parametresinde taşıyoruz
+                    Yil = !string.IsNullOrEmpty(ay) ? ay : "Tüm Zamanlar"
                 };
 
-                // 🛠️ HATA 2 DÜZELTİLDİ: Parametre sıralaması düzeltildi (eskiDeger: string.Empty, yeniDeger: "Analitik Sayfası Görüntüleme")
                 await _logService.LogKaydetAsync(loginOlanPersonel, "Analitik Sayfasına Giriş Yapıldı", string.Empty, "Analitik Sayfası Görüntüleme", ViewBag.HotelAdi ?? string.Empty, string.Empty);
 
                 return View(yorumDashboardViewModel);
@@ -132,6 +133,13 @@ namespace AxonInn.Controllers
         {
             try
             {
+                // 1. KONTROL: Tüm zamanlar verisi üzerinden analiz yapılmasını engelleyelim
+                if (string.IsNullOrEmpty(panelVerisi.Yil) || panelVerisi.Yil == "Tüm Zamanlar")
+                {
+                    // Frontend tarafındaki fetch(ok) kontrolüne takılması için BadRequest dönüyoruz
+                    return BadRequest("Yapay zeka analizinin sağlıklı çalışabilmesi için lütfen belirli bir ay seçiniz. 'Tüm Zamanlar' verisi üzerinden özet oluşturulamamaktadır.");
+                }
+
                 var loginOlanPersonel = _currentUserService.GetUser();
 
                 if (loginOlanPersonel == null)
@@ -139,15 +147,18 @@ namespace AxonInn.Controllers
 
                 string jsonVeri = JsonSerializer.Serialize(panelVerisi, _jsonOptions);
                 string prompt = "";
-                string icindeBulunanYil = DateTime.Now.Year.ToString();
 
-                if (panelVerisi.Yil == icindeBulunanYil)
+                // YYYY-MM formatında mevcut ayı alıyoruz (Örn: 2024-05)
+                string icindeBulunanAy = DateTime.Now.ToString("yyyy-MM");
+
+                // panelVerisi.Yil propertysi artık string olarak "2024-05" gibi ayları veya "Tüm Zamanlar" tutuyor
+                if (panelVerisi.Yil == icindeBulunanAy)
                 {
                     var trendYorumlarListesi = await _context.Yorum
                                                  .AsNoTracking()
                                                  .Where(y => y.HotelRef == loginOlanPersonel.DepartmanRefNavigation.HotelRef)
                                                  .OrderByDescending(y => y.MisafirKonaklamaTarihi)
-                                                 .Take(50)
+                                                 .Take(50) // Son 50 güncel yorumu kök neden analizi için çekiyoruz
                                                  .Select(y => new
                                                  {
                                                      Departman = y.GeminiAnalizIlgiliDepartman,
@@ -159,61 +170,64 @@ namespace AxonInn.Controllers
 
                     prompt = $@"Sen AxonInn otel yönetim sistemi için çalışan kıdemli bir Turizm Stratejisti ve Veri Bilimcisisin.
 
-Aşağıda otelimizin genel gidişatını gösteren 7 farklı analiz grafiğinin verilerini (GrafikVerileri) ve misafirlerin yaşadığı spesifik sorunları/durumları gösteren son kritik misafir yorumlarının özetlerini (KritikYorumlar) JSON olarak veriyorum:
+                            Aşağıda otelimizin genel gidişatını gösteren 7 farklı analiz grafiğinin verilerini (GrafikVerileri) ve misafirlerin yaşadığı spesifik sorunları/durumları gösteren son kritik misafir yorumlarının özetlerini (KritikYorumlar) JSON olarak veriyorum:
 
-GrafikVerileri:
-{jsonVeri}
+                            GrafikVerileri:
+                            {jsonVeri}
 
-KritikYorumlar (Sorunların kök nedenini anlamak için bu gerçek verileri kullan):
-{jsonKritikYorumlar}
+                            KritikYorumlar (Sorunların kök nedenini anlamak için bu gerçek verileri kullan):
+                            {jsonKritikYorumlar}
 
-Lütfen bu iki veri setini detaylıca sentezle. Sadece grafiklerdeki düşüşleri/çıkışları söyleme, 'KritikYorumlar' verisine bakarak bu trendlerin NEDEN yaşandığını tespit et ve otel müdürü için aksiyon alınabilir, net, profesyonel tavsiyeler üret.
+                            Lütfen bu iki veri setini detaylıca sentezle. Sadece grafiklerdeki düşüşleri/çıkışları söyleme, 'KritikYorumlar' verisine bakarak bu trendlerin NEDEN yaşandığını tespit et ve otel müdürü için aksiyon alınabilir, net, profesyonel tavsiyeler üret.
 
-ÇOK ÖNEMLİ KURALLAR:
-1- Arayüzde yerimiz çok kısıtlı! Her bir tavsiye KESİNLİKLE EN FAZLA 6 CÜMLE olmalı. Lafı uzatma, tespit ettiğin spesifik sorunu söyle ve doğrudan çözüm öner.
-2- Tavsiyelerini havada bırakma, mutlaka 'KritikYorumlar'da gördüğün gerçek misafir şikayetlerine veya beklentilerine dayandır.
-3- SADECE aşağıdaki JSON formatında cevap ver. Markdown karakterleri (```json vb.) veya ekstra açıklamalar KESİNLİKLE KULLANMA.
+                            ÇOK ÖNEMLİ KURALLAR:
+                            1- Arayüzde yerimiz çok kısıtlı! Her bir tavsiye KESİNLİKLE EN FAZLA 6 CÜMLE olmalı. Lafı uzatma, tespit ettiğin spesifik sorunu söyle ve doğrudan çözüm öner.
+                            2- Tavsiyelerini havada bırakma, mutlaka 'KritikYorumlar'da gördüğün gerçek misafir şikayetlerine veya beklentilerine dayandır.
+                            3- SADECE aşağıdaki JSON formatında cevap ver. Markdown karakterleri (```json vb.) veya ekstra açıklamalar KESİNLİKLE KULLANMA.
 
-İstenen JSON Kalıbı:
-{{
-  ""DuyguTavsiyesi"": """",
-  ""DepartmanTavsiyesi"": """",
-  ""HisPolarTavsiyesi"": """",
-  ""KelimeTavsiyesi"": """",
-  ""UlkeTavsiyesi"": """",
-  ""KonaklamaTavsiyesi"": """",
-  ""TrendTavsiyesi"": """"
-}}";
+                            İstenen JSON Kalıbı:
+                            {{
+                              ""DuyguTavsiyesi"": """",
+                              ""DepartmanTavsiyesi"": """",
+                              ""HisPolarTavsiyesi"": """",
+                              ""KelimeTavsiyesi"": """",
+                              ""UlkeTavsiyesi"": """",
+                              ""KonaklamaTavsiyesi"": """",
+                              ""TrendTavsiyesi"": """"
+                            }}";
                 }
                 else
                 {
                     prompt = $@"Sen AxonInn otel yönetim sistemi için çalışan kıdemli bir Turizm Stratejisti ve Veri Bilimcisisin.
 
-Aşağıda otelimizin genel gidişatını gösteren 7 farklı analiz grafiğinin verilerini JSON olarak veriyorum:
+                            Aşağıda otelimizin genel gidişatını gösteren 7 farklı analiz grafiğinin verilerini JSON olarak veriyorum:
 
-GrafikVerileri:
-{jsonVeri}
+                            GrafikVerileri:
+                            {jsonVeri}
 
-Lütfen bu verileri detaylıca incele ve otel müdürü için aksiyon alınabilir, net ve profesyonel tavsiyeler üret.
+                            Lütfen bu verileri detaylıca incele ve otel müdürü için aksiyon alınabilir, net ve profesyonel tavsiyeler üret.
 
-ÇOK ÖNEMLİ KURALLAR:
-1- Arayüzde yerimiz çok kısıtlı! Her bir tavsiye KESİNLİKLE EN FAZLA 6 CÜMLE olmalı. Lafı uzatma, doğrudan sorunu söyle ve çözüm öner.
-2- SADECE aşağıdaki JSON formatında cevap ver. Markdown karakterleri veya ekstra açıklamalar KULLANMA.
+                            ÇOK ÖNEMLİ KURALLAR:
+                            1- Arayüzde yerimiz çok kısıtlı! Her bir tavsiye KESİNLİKLE EN FAZLA 6 CÜMLE olmalı. Lafı uzatma, doğrudan sorunu söyle ve çözüm öner.
+                            2- SADECE aşağıdaki JSON formatında cevap ver. Markdown karakterleri veya ekstra açıklamalar KULLANMA.
 
-İstenen JSON Kalıbı:
-{{
-  ""DuyguTavsiyesi"": """",
-  ""DepartmanTavsiyesi"": """",
-  ""HisPolarTavsiyesi"": """",
-  ""KelimeTavsiyesi"": """",
-  ""UlkeTavsiyesi"": """",
-  ""KonaklamaTavsiyesi"": """",
-  ""TrendTavsiyesi"": """"
-}}";
+                            İstenen JSON Kalıbı:
+                            {{
+                              ""DuyguTavsiyesi"": """",
+                              ""DepartmanTavsiyesi"": """",
+                              ""HisPolarTavsiyesi"": """",
+                              ""KelimeTavsiyesi"": """",
+                              ""UlkeTavsiyesi"": """",
+                              ""KonaklamaTavsiyesi"": """",
+                              ""TrendTavsiyesi"": """"
+                            }}";
                 }
 
                 string geminiApiKey = _configuration["GeminiApi:ApiKey"];
+
+                // Hatalı markdown formatı temizlendi, saf URL bırakıldı
                 string apiUrl = $"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={geminiApiKey}";
+
                 var requestData = new
                 {
                     contents = new[] { new { parts = new[] { new { text = prompt } } } },
@@ -236,7 +250,6 @@ Lütfen bu verileri detaylıca incele ve otel müdürü için aksiyon alınabili
 
                             var sonuc = JsonSerializer.Deserialize<AiTavsiyeSonucu>(aiCevabi, _jsonOptions);
 
-                            // 🛠️ HATA 2 DÜZELTİLDİ: Yapay zekadan dönen sonuç yeniDeger parametresine kaydırıldı.
                             await _logService.LogKaydetAsync(loginOlanPersonel, "Yapay Zeka Tavsiyesi Alındı", string.Empty, aiCevabi);
 
                             return Json(sonuc);
@@ -245,7 +258,7 @@ Lütfen bu verileri detaylıca incele ve otel müdürü için aksiyon alınabili
                 }
                 return StatusCode(500, "Gemini API'den geçerli bir yanıt alınamadı. Lütfen daha sonra tekrar deneyin.");
             }
-            catch (Exception ex)
+            catch (Exception)
             {
                 return View("~/Views/Error/Error.cshtml", new ErrorViewModel { RequestId = Activity.Current?.Id ?? HttpContext.TraceIdentifier });
             }

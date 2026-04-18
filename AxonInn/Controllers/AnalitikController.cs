@@ -49,8 +49,6 @@ namespace AxonInn.Controllers
             _currentUserService = currentUserService;
         }
 
-  
-
         private Departman? GetSessionBilgisi(Personel loginOlanPersonel)
         {
             if (HttpContext.Items["CachedSessionData"] is Departman cachedSession) return cachedSession;
@@ -264,6 +262,9 @@ namespace AxonInn.Controllers
             }
         }
 
+
+        // çalışır durumda browserda bu link ile çalıştır
+        // http://localhost:5114/Analitik/TripadvisorYorumlariApifyApiKaydet
         public async Task<IActionResult> TripadvisorYorumlariApifyApiKaydet()
         {
             var user = _currentUserService.GetUser();
@@ -301,6 +302,8 @@ namespace AxonInn.Controllers
             return RedirectToAction("Yorum");
         }
 
+        // çalışır durumda browserda bu link ile çalıştır
+        //http://localhost:5114/Analitik/GeminiAnalizleriKaydet
         public async Task<IActionResult> GeminiAnalizleriKaydetAsync()
         {
             var user = _currentUserService.GetUser();
@@ -321,6 +324,9 @@ namespace AxonInn.Controllers
             return RedirectToAction("Yorum");
         }
 
+
+        // çalışır durumda browserda bu link ile çalıştır
+        // http://localhost:5114/Analitik/TripadvisordanAlamadigimizMisafirUlkesiniGeminiTahminEdipGuncellesinToplu
         public async Task TripadvisordanAlamadigimizMisafirUlkesiniGeminiTahminEdipGuncellesinTopluAsync()
         {
             var user = _currentUserService.GetUser();
@@ -328,8 +334,9 @@ namespace AxonInn.Controllers
             var session = GetSessionBilgisi(user);
             if (session == null || session.HotelRefNavigation == null) return;
 
-            string geminiApiKey = _configuration["GeminiApi:ApiKey"];
-            string apiUrl = $"[https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=](https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=){geminiApiKey}";
+         string geminiApiKey = _configuration["GeminiApi:ApiKey"];
+            string apiUrl = $"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={geminiApiKey}";
+
 
             var adayYorumlar = await _context.Yorum
                 .AsNoTracking()
@@ -362,18 +369,18 @@ namespace AxonInn.Controllers
                 string jsonVeri = JsonSerializer.Serialize(promptIcinYorumlar, _jsonRelaxedOptions);
 
                 string prompt = $@"Sen uzman bir dilbilimci ve çevirmensin. Sana JSON formatında {grupEntity.Count} adet otel yorumu veriyorum.
-Her bir kayıt için şu işlemi yap:
-- Eğer 'mevcutUlke' BOŞ ise: 'yorum' metnindeki makine çevirisi hatalarını analiz edip misafirin ülkesini tahmin et ve TÜRKÇE yaz.
-- Eğer 'mevcutUlke' DOLU ise: O kelimeyi sadece Türkçeye çevir (Örn: Germany -> Almanya).
+                                    Her bir kayıt için şu işlemi yap:
+                                    - Eğer 'mevcutUlke' BOŞ ise: 'yorum' metnindeki makine çevirisi hatalarını analiz edip misafirin ülkesini tahmin et ve TÜRKÇE yaz.
+                                    - Eğer 'mevcutUlke' DOLU ise: O kelimeyi sadece Türkçeye çevir (Örn: Germany -> Almanya).
 
-Kesin Kurallar:
-1. SADECE bir JSON dizisi (array) döndür.
-2. Format kesinlikle şöyle olmalı: [{{""id"": 0, ""ulke"": ""Türkiye""}}]
-3. Başında ve sonunda ```json gibi markdown işaretleri OLMASIN. Saf JSON ver.
-4. Bulamazsan 'Bilinmiyor' yaz.
+                                    Kesin Kurallar:
+                                    1. SADECE bir JSON dizisi (array) döndür.
+                                    2. Format kesinlikle şöyle olmalı: [{{""id"": 0, ""ulke"": ""Türkiye""}}]
+                                    3. Başında ve sonunda ```json gibi markdown işaretleri OLMASIN. Saf JSON ver.
+                                    4. Bulamazsan 'Bilinmiyor' yaz.
 
-İşlenecek Veriler:
-{jsonVeri}";
+                                    İşlenecek Veriler:
+                                    {jsonVeri}";
 
                 try
                 {
@@ -402,7 +409,7 @@ Kesin Kurallar:
                                             int arrayId = eleman.GetProperty("id").GetInt32();
                                             string bulunanUlke = eleman.GetProperty("ulke").GetString() ?? "";
 
-                                            if (!string.IsNullOrWhiteSpace(bulunanUlke) && bulunanUlke != "Bilinmiyor" && arrayId < grupEntity.Count)
+                                            if (!string.IsNullOrWhiteSpace(bulunanUlke) && arrayId < grupEntity.Count)
                                             {
                                                 grupEntity[arrayId].MisafirUlkesi = bulunanUlke;
                                             }

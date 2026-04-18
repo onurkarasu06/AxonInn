@@ -41,7 +41,8 @@ namespace AxonInn.Models.Analitik
 
         public async Task<List<Yorum>> TripadvisorYorumGetirApifyApiAsync(long hotelID, int getirilecekKayitAdeti, string apiToken)
         {
-            string hotelUrl = "https://www.tripadvisor.com.tr/Hotel_Review-g12078952-d23426767-Reviews-Alarcha_Hotels_Resort-Boztepe_Manavgat_Turkish_Mediterranean_Coast.html";
+            //string hotelUrl = "https://www.tripadvisor.com.tr/Hotel_Review-g12078952-d23426767-Reviews-Alarcha_Hotels_Resort-Boztepe_Manavgat_Turkish_Mediterranean_Coast.html";
+            string hotelUrl = "https://www.tripadvisor.com.tr/Hotel_Review-g297961-d629069-Reviews-Aslan_City_Hotel-Alanya_Turkish_Mediterranean_Coast.html";
             string ApiUrl = $"https://api.apify.com/v2/acts/maxcopell~tripadvisor-reviews/run-sync-get-dataset-items?token={apiToken}";
 
             var payload = new { startUrls = new[] { new { url = hotelUrl } }, maxItemsPerQuery = getirilecekKayitAdeti };
@@ -238,7 +239,11 @@ namespace AxonInn.Models.Analitik
             var requestBody = new
             {
                 contents = new[] { new { parts = new[] { new { text = prompt } } } },
-                generationConfig = new { response_mime_type = "application/json" }
+                generationConfig = new
+                {
+                    response_mime_type = "application/json",
+                    temperature = 0.1 
+                }
             };
 
             try
@@ -269,7 +274,7 @@ namespace AxonInn.Models.Analitik
 
             // O(N²) CPU HATASI ÇÖZÜLDÜ: .Skip(i * 20).Take(20) işlemi, her döndüğünde listeyi baştan tarayarak CPU'yu dar boğaza sokar.
             // Yeni nesil C# içindeki optimize edilmiş .Chunk(20) metoduyla liste 1 kerede bellekte en hızlı şekilde dilimlenir.
-            var partiler = dbYorumList.Chunk(20).ToList();
+            var partiler = dbYorumList.Chunk(10).ToList();
 
             foreach (var suAnkiParti in partiler)
             {

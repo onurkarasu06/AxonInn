@@ -87,23 +87,24 @@
         </div>
         
                 <div class="d-flex flex-column flex-md-row gap-3 align-items-center">
-                    <select id="ayFiltresi" class="form-select select-modern shadow-sm" style="width: auto; min-width: 160px;" onchange="ayDegisti()" aria-label="Ay Filtresi Seçimi">
-                        <option value="">Tüm Zamanlar</option>
-                        @if(ViewBag.Aylar != null)
-                        {
-                            foreach(var a in ViewBag.Aylar)
+                        <select id="ayFiltresi" class="form-select select-modern shadow-sm" style="width: auto; min-width: 160px;"
+                        onchange="ayDegisti()" aria-label="Ay Filtresi Seçimi">
+                            <option value="">Tüm Zamanlar</option>
+                            @if(ViewBag.Aylar != null)
                             {
-                                if(ViewBag.SeciliAy != null && ViewBag.SeciliAy.ToString() == a)
+                                foreach(var a in ViewBag.Aylar)
                                 {
-                                    <option value="@a" selected>@a Dönemi</option>
-                                }
-                                else
-                                {
-                                    <option value="@a">@a Dönemi</option>
+                                    if(ViewBag.SeciliAy != null && ViewBag.SeciliAy.ToString() == a)
+                                    {
+                                        <option value="@a" selected>@a Ayı</option>
+                                    }
+                                    else
+                                    {
+                                        <option value="@a">@a Ayı</option>
+                                    }
                                 }
                             }
-                        }
-                    </select>
+                        </select>
 
                     <button id="btnAiTavsiye" class="btn btn-ai-magic">
                         <i class="fas fa-wand-magic-sparkles me-2"></i> Yönetim Özetlerini AI ile Yenile
